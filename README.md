@@ -23,7 +23,7 @@
 ### 1. Install dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 2. Set up environment variables
@@ -45,7 +45,7 @@ Then fill in `.env.local`:
 ### 3. Start the app
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000)
@@ -57,7 +57,7 @@ Click **"Sync Now"** in the header, enter your `CRON_SECRET` when prompted.
 
 **Option B — via CLI:**  
 ```bash
-npm run cron:now
+pnpm run cron:now
 ```
 
 ---
@@ -66,7 +66,7 @@ npm run cron:now
 
 ### Option A — Keep Node running (simplest)
 ```bash
-npm run cron
+pnpm run cron
 ```
 Runs every 6 hours, fetches jobs, sends email if new matches found.
 
@@ -76,7 +76,7 @@ crontab -e
 ```
 Add:
 ```
-0 */6 * * * cd /path/to/job-radar && npm run cron:now >> logs/cron.log 2>&1
+0 */6 * * * cd /path/to/job-radar && pnpm run cron:now >> logs/cron.log 2>&1
 ```
 
 ### Option C — Vercel Cron Jobs (if deploying to Vercel)
@@ -175,3 +175,13 @@ Triggers a full job fetch and upsert. Returns `{ added, updated, skipped, total 
 - **Rate limits** — both APIs have generous free tiers (Adzuna: 250 calls/day, Reed: unlimited read)
 - **Job cap** — only the top 500 scoring jobs are kept to avoid unbounded growth
 - **Email threshold** — email only sends when new jobs are added (not on re-runs with no changes)
+
+
+---
+
+## current status
+
+- a glorfied jobs fetcher
+- missing two main features
+  - fetching jobs in accordance to my profile
+  - fetching jobs supporting visa sponsorship

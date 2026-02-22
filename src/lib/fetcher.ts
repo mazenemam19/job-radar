@@ -82,6 +82,7 @@ async function fetchAdzunaCountry(
         app_id: appId,
         app_key: appKey,
         what: title,
+        // what: `${title} visa sponsorship`,
         // what_and: "visa sponsorship",
         results_per_page: 50,
         max_days_old: 60,
@@ -236,6 +237,7 @@ export async function fetchReedJobs(): Promise<Job[]> {
         const scores = scoreJob(base);
         // if (!scores.hasVisaSponsorship) continue;
         if (scores.matchedSkills.length === 0) continue;
+        // if (scores.matchScore < 50) continue;  // ← add this line
         results.push({ ...base, ...scores });
       }
 
