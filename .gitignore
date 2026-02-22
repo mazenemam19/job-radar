@@ -1,0 +1,25 @@
+# deps
+node_modules/
+
+# next
+.next/
+out/
+
+# env
+.env.local
+.env*.local
+
+# data (optional — remove this line if you want to commit your job data)
+# data/jobs.json
+
+# build artifacts
+.scripts-out/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logs
+logs/
+*.log
