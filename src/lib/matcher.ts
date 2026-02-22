@@ -12,7 +12,6 @@ function skillFoundInText(skill: SkillEntry, text: string): boolean {
   const normalized = normalizeText(text);
   const allTerms = [skill.name, ...skill.aliases].map((t) => normalizeText(t));
   return allTerms.some((term) => {
-    // Use word boundary matching to avoid "react" matching "reactive"
     const pattern = new RegExp(`(?:^|\\s|[,;(])${escapeRegex(term)}(?:$|\\s|[,;)])`, "i");
     return pattern.test(normalized);
   });
@@ -23,7 +22,6 @@ function escapeRegex(str: string): string {
 }
 
 // ─── Recency Score (0–100) ────────────────────────────────────────────────────
-// Jobs posted today = 100, 30 days ago = 50, 60+ days ago = 0
 
 function computeRecencyScore(postedAt: string): number {
   try {
@@ -37,7 +35,6 @@ function computeRecencyScore(postedAt: string): number {
 }
 
 // ─── Skill Match Score (0–100) ────────────────────────────────────────────────
-// Weighted: core skills matter more than familiar ones
 
 function computeSkillScore(text: string): {
   score: number;
@@ -45,7 +42,6 @@ function computeSkillScore(text: string): {
   missing: string[];
 } {
   const { skills } = CV_PROFILE;
-
   let totalWeight = 0;
   let matchedWeight = 0;
   const matched: string[] = [];
@@ -57,7 +53,6 @@ function computeSkillScore(text: string): {
       matchedWeight += skill.weight;
       matched.push(skill.name);
     } else {
-      // Only add to missing if it's proficient/core (weight >= 2)
       if (skill.weight >= 2) missing.push(skill.name);
     }
   }
@@ -66,12 +61,74 @@ function computeSkillScore(text: string): {
   return { score, matched, missing };
 }
 
-// ─── Visa / Relocation Detection ─────────────────────────────────────────────
+// ─── Visa Detection (negation-aware) ─────────────────────────────────────────
+// Strategy:
+//   1. Check explicit "not sponsoring" phrases first — if found, return false immediately
+//   2. Then check for any positive visa keyword — if found, return true
+// This avoids the over-broad negation window that was killing legitimate jobs.
+
+const NEGATIVE_VISA_PHRASES = [
+  "cannot offer visa sponsorship",
+  "unable to offer visa sponsorship",
+  "unable to provide visa sponsorship",
+  "does not offer visa sponsorship",
+  "do not offer visa sponsorship",
+  "we do not offer visa sponsorship",
+  "not open to visa sponsorship",
+  "this role is not open to visa",
+  "this position does not offer visa",
+  "this position is not eligible for visa",
+  "visa sponsorship is not available",
+  "visa sponsorship not available",
+  "visa sponsorship: not available",
+  "no visa sponsorship",
+  "without visa sponsorship",
+  "not eligible for visa sponsorship",
+  "sponsorship is not available",
+  "sponsorship not available",
+  "sponsorship: not available",
+  "sponsorship: unfortunately",
+  "unfortunately, sponsorship",
+  "unfortunately sponsorship",
+  "unable to sponsor",
+  "cannot sponsor",
+  "we cannot sponsor",
+  "we do not sponsor",
+  "we are unable to sponsor",
+  "we are not able to sponsor",
+  "no sponsorship",
+  "not providing sponsorship",
+  "must be eligible to work in the us without",
+  "must be authorized to work in the us without",
+  "not open to visa transfer",
+  "corp-to-corp",
+  // patterns like "visa sponsorship: not available" embedded in structured fields
+  "visa: not available",
+  "visa/sponsorship: no",
+];
+
+// After ruling out negatives, any mention of these terms is enough
+const POSITIVE_VISA_TERMS = [
+  "visa sponsorship",
+  "visa sponsor",
+  "tier 2 sponsor",
+  "skilled worker visa",
+  "work permit sponsor",
+  "we will sponsor",
+  "willing to sponsor",
+];
 
 function detectVisaSponsorship(text: string): boolean {
   const lower = text.toLowerCase();
-  return CV_PROFILE.visaKeywords.some((kw) => lower.includes(kw));
+
+  // Step 1: explicit negatives — fast exit
+  if (NEGATIVE_VISA_PHRASES.some((phrase) => lower.includes(phrase))) return false;
+
+  // Step 2: any positive mention is enough (negatives already ruled out above)
+  return POSITIVE_VISA_TERMS.some((term) => lower.includes(term));
 }
+
+// ─── Relocation Detection ─────────────────────────────────────────────────────
 
 function detectRelocation(text: string): boolean {
   const lower = text.toLowerCase();
@@ -79,16 +136,14 @@ function detectRelocation(text: string): boolean {
 }
 
 // ─── Total Score ──────────────────────────────────────────────────────────────
-// Weights: skill match 60%, recency 30%, visa bonus 5%, relocation bonus 5%
 
 function computeTotalScore(
   skillScore: number,
   recencyScore: number,
-  hasVisa: boolean,
   hasRelocation: boolean
 ): number {
   const base = skillScore * 0.6 + recencyScore * 0.3;
-  const bonus = (hasVisa ? 5 : 0) + (hasRelocation ? 5 : 0);
+  const bonus = hasRelocation ? 10 : 0;
   return Math.min(100, Math.round(base + bonus));
 }
 
@@ -101,7 +156,7 @@ export function scoreJob(job: Omit<Job, "matchScore" | "matchedSkills" | "missin
   const recencyScore = computeRecencyScore(job.postedAt);
   const hasVisa = detectVisaSponsorship(fullText);
   const hasRelocation = detectRelocation(fullText);
-  const totalScore = computeTotalScore(matchScore, recencyScore, hasVisa, hasRelocation);
+  const totalScore = computeTotalScore(matchScore, recencyScore, hasRelocation);
 
   return {
     matchScore,

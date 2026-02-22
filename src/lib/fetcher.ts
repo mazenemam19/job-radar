@@ -21,6 +21,7 @@ const DISQUALIFY_KEYWORDS = [
   "british citizenship required",
   "must be a uk citizen",
   "must hold uk citizenship",
+  "us citizenship required",
   "citizenship required",
   "must be a us citizen",
   "security clearance required",
@@ -31,7 +32,7 @@ const DISQUALIFY_KEYWORDS = [
   "nato secret",
   "eligible for uk security clearance",
   "no sponsorship",
-  "No Relocation",
+  "no Relocation",
   "we do not sponsor",
   "unable to sponsor",
   "cannot sponsor",
@@ -81,7 +82,7 @@ async function fetchAdzunaCountry(
         app_id: appId,
         app_key: appKey,
         what: title,
-        what_and: "visa sponsorship",
+        // what_and: "visa sponsorship",
         results_per_page: 50,
         max_days_old: 60,
         sort_by: "date",
@@ -118,7 +119,7 @@ async function fetchAdzunaCountry(
         };
 
         const scores = scoreJob(base);
-        if (!scores.hasVisaSponsorship) continue;
+        // if (!scores.hasVisaSponsorship) continue;
 
         results.push({ ...base, ...scores });
       }
@@ -182,9 +183,7 @@ export async function fetchReedJobs(): Promise<Job[]> {
   const results: Job[] = [];
   const seen = new Set<string>();
 
-  const searchCombos = CV_PROFILE.searchTitles.slice(0, 3).map(
-    (title) => `${title} visa sponsorship`
-  );
+  const searchCombos = CV_PROFILE.searchTitles.slice(0, 3)
 
   for (const keywords of searchCombos) {
     try {
@@ -235,8 +234,8 @@ export async function fetchReedJobs(): Promise<Job[]> {
         };
 
         const scores = scoreJob(base);
-        if (!scores.hasVisaSponsorship) continue;
-
+        // if (!scores.hasVisaSponsorship) continue;
+        if (scores.matchedSkills.length === 0) continue;
         results.push({ ...base, ...scores });
       }
 
