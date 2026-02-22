@@ -13,6 +13,37 @@ function truncate(text: string, max = 2000): string {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
+// ─── Disqualifying keywords ───────────────────────────────────────────────────
+// Jobs containing any of these are useless for someone relocating from abroad
+
+const DISQUALIFY_KEYWORDS = [
+  "uk citizenship required",
+  "british citizenship required",
+  "must be a uk citizen",
+  "must hold uk citizenship",
+  "citizenship required",
+  "must be a us citizen",
+  "security clearance required",
+  "active security clearance",
+  "sc clearance required",
+  "dv clearance required",
+  "highest level of government clearance",
+  "nato secret",
+  "eligible for uk security clearance",
+  "no sponsorship",
+  "No Relocation",
+  "we do not sponsor",
+  "unable to sponsor",
+  "cannot sponsor",
+  "sponsorship not available",
+  "no visa sponsorship",
+];
+
+function isDisqualified(text: string): boolean {
+  const lower = text.toLowerCase();
+  return DISQUALIFY_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 // ─── Adzuna ───────────────────────────────────────────────────────────────────
 
 interface AdzunaJob {
@@ -45,21 +76,26 @@ async function fetchAdzunaCountry(
   const results: Job[] = [];
 
   try {
-    // Fetch up to 2 pages per title/country combo
     for (let page = 1; page <= 2; page++) {
       const params = {
         app_id: appId,
         app_key: appKey,
         what: title,
+        what_and: "visa sponsorship",
         results_per_page: 50,
-        max_days_old: 30,
+        max_days_old: 60,
         sort_by: "date",
       };
 
       const url = `https://api.adzuna.com/v1/api/jobs/${countryCode}/search/${page}`;
       const { data } = await axios.get(url, { params, timeout: 10000 });
 
+      if (!data.results?.length) break;
+
       for (const raw of data.results as AdzunaJob[]) {
+        const fullText = `${raw.title} ${raw.description}`;
+        if (isDisqualified(fullText)) continue;
+
         const base = {
           id: generateId("adzuna", raw.id),
           title: raw.title,
@@ -72,25 +108,21 @@ async function fetchAdzunaCountry(
           postedAt: raw.created,
           salary:
             raw.salary_min || raw.salary_max
-              ? {
-                min: raw.salary_min,
-                max: raw.salary_max,
-                currency: raw.currency ?? "GBP",
-              }
+              ? { min: raw.salary_min, max: raw.salary_max, currency: raw.currency ?? "GBP" }
               : undefined,
           source: "adzuna" as const,
           tags: [raw.category.label],
           fetchedAt: new Date().toISOString(),
-          // will be filled by scoreJob
           hasVisaSponsorship: false,
           hasRelocation: false,
         };
 
         const scores = scoreJob(base);
+        if (!scores.hasVisaSponsorship) continue;
+
         results.push({ ...base, ...scores });
       }
 
-      // Avoid hammering the API
       await sleep(300);
     }
   } catch (err: unknown) {
@@ -117,7 +149,7 @@ export async function fetchAdzunaJobs(): Promise<Job[]> {
           allJobs.push(job);
         }
       }
-      await sleep(500);
+      await sleep(400);
     }
   }
 
@@ -150,15 +182,18 @@ export async function fetchReedJobs(): Promise<Job[]> {
   const results: Job[] = [];
   const seen = new Set<string>();
 
-  for (const title of CV_PROFILE.searchTitles.slice(0, 4)) {
+  const searchCombos = CV_PROFILE.searchTitles.slice(0, 3).map(
+    (title) => `${title} visa sponsorship`
+  );
+
+  for (const keywords of searchCombos) {
     try {
       const { data } = await axios.get("https://www.reed.co.uk/api/1.0/search", {
         params: {
-          keywords: title,
+          keywords,
           locationName: "UK",
           distancefromlocation: 999,
           resultsToTake: 100,
-          minimumSalary: 40000,
         },
         auth: { username: apiKey, password: "" },
         timeout: 10000,
@@ -169,8 +204,14 @@ export async function fetchReedJobs(): Promise<Job[]> {
         if (seen.has(id)) continue;
         seen.add(id);
 
-        const postedAt = (() => { const d = new Date(raw.date); return isNaN(d.getTime()) ? null : d.toISOString(); })();
+        const postedAt = (() => {
+          const d = new Date(raw.date);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        })();
         if (!postedAt) continue;
+
+        const fullText = `${raw.jobTitle} ${raw.jobDescription}`;
+        if (isDisqualified(fullText)) continue;
 
         const base = {
           id,
@@ -194,15 +235,17 @@ export async function fetchReedJobs(): Promise<Job[]> {
         };
 
         const scores = scoreJob(base);
+        if (!scores.hasVisaSponsorship) continue;
+
         results.push({ ...base, ...scores });
       }
 
       await sleep(600);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        console.error(`Reed error [${title}]:`, err.response?.data ?? err.message);
+        console.error(`Reed error [${keywords}]:`, err.response?.data ?? err.message);
       } else {
-        console.error(`Reed error [${title}]:`, err);
+        console.error(`Reed error [${keywords}]:`, err);
       }
     }
   }
@@ -222,8 +265,6 @@ export async function fetchAllJobs(): Promise<Job[]> {
   console.log(`   ✓ Reed: ${reedJobs.length} jobs`);
 
   const combined = [...adzunaJobs, ...reedJobs];
-
-  // Deduplicate by id
   const unique = Array.from(new Map(combined.map((j) => [j.id, j])).values());
 
   console.log(`📦 Total unique jobs: ${unique.length}`);

@@ -32,6 +32,9 @@ export const CV_PROFILE = {
     { code: "nl", name: "Netherlands" },
     { code: "fr", name: "France" },
     { code: "at", name: "Austria" },
+    { code: "ch", name: "Switzerland" },
+    { code: "pl", name: "Poland" },
+    { code: "nz", name: "New Zealand" },
   ],
 
   // ─── Skills with weights and aliases ─────────────────────────────────────────

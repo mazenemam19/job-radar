@@ -72,9 +72,8 @@ function JobCard({ job, index }: { job: Job; index: number }) {
 
   const salaryStr =
     job.salary?.min || job.salary?.max
-      ? `${job.salary.currency ?? ""} ${job.salary.min?.toLocaleString() ?? ""}${
-          job.salary.max ? `–${job.salary.max.toLocaleString()}` : "+"
-        }`
+      ? `${job.salary.currency ?? ""} ${job.salary.min?.toLocaleString() ?? ""}${job.salary.max ? `–${job.salary.max.toLocaleString()}` : "+"
+      }`
       : null;
 
   return (
@@ -215,6 +214,9 @@ const COUNTRIES = [
   { code: "NL", label: "🇳🇱 Netherlands" },
   { code: "FR", label: "🇫🇷 France" },
   { code: "AT", label: "🇦🇹 Austria" },
+  { code: "CH", label: "🇨🇭 Switzerland" },
+  { code: "PL", label: "🇵🇱 Poland" },
+  { code: "NZ", label: "🇳🇿 New Zealand" },
 ];
 
 function FilterBar({
@@ -271,17 +273,6 @@ function FilterBar({
         <span className="mono text-xs" style={{ color: "var(--accent)", width: 24 }}>{filters.minScore}</span>
       </div>
 
-      {/* Toggles */}
-      <ToggleFilter
-        label="🛂 Visa only"
-        active={filters.visaOnly}
-        onClick={() => onChange({ visaOnly: !filters.visaOnly })}
-      />
-      <ToggleFilter
-        label="📦 Relocation"
-        active={filters.relocationOnly}
-        onClick={() => onChange({ relocationOnly: !filters.relocationOnly })}
-      />
     </div>
   );
 }
@@ -393,8 +384,8 @@ export default function Dashboard() {
   };
 
   const jobs = data?.jobs ?? [];
-  const visaCount = jobs.filter((j) => j.hasVisaSponsorship).length;
   const relocationCount = jobs.filter((j) => j.hasRelocation).length;
+  const topScore = jobs.length ? Math.max(...jobs.map((j) => j.totalScore)) : 0;
   const avgScore = jobs.length
     ? Math.round(jobs.reduce((s, j) => s + j.totalScore, 0) / jobs.length)
     : 0;
@@ -425,7 +416,7 @@ export default function Dashboard() {
           </div>
           <div>
             <h1 className="mono font-bold text-sm tracking-wide" style={{ color: "var(--text)" }}>JOB_RADAR</h1>
-            <p className="text-xs" style={{ color: "var(--text-faint)" }}>relocation &amp; visa sponsorship tracker</p>
+            <p className="text-xs" style={{ color: "var(--text-faint)" }}>visa sponsorship · abroad</p>
           </div>
         </div>
 
@@ -464,8 +455,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <StatCard label="Total Matches" value={data?.total ?? "—"} color="var(--text)" />
           <StatCard label="Avg Score" value={avgScore || "—"} color="var(--accent)" />
-          <StatCard label="Visa Sponsors" value={visaCount || "—"} color="var(--purple)" />
-          <StatCard label="Relocation" value={relocationCount || "—"} color="var(--accent2)" />
+          <StatCard label="Top Score" value={topScore || "—"} color="var(--green)" />
+          <StatCard label="+ Relocation" value={relocationCount || "—"} color="var(--accent2)" sub="bonus perk" />
         </div>
 
         {/* Filters */}

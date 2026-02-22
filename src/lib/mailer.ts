@@ -40,9 +40,7 @@ function renderJobCard(job: Job): string {
           <h3 style="margin:0 0 4px;font-size:16px;color:#111827">${job.title}</h3>
           <p style="margin:0;color:#6b7280;font-size:14px">${job.company} &bull; ${job.location}, ${job.country}</p>
         </div>
-        <div style="text-align:center;background:${scoreColor(job.totalScore)};color:#fff;border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0">
-          ${job.totalScore}
-        </div>
+        <div style="text-align:center;background:${scoreColor(job.totalScore)};color:#fff;border-radius:50%;width:52px;height:52px;line-height:52px;font-weight:700;font-size:15px;min-width:52px">${job.totalScore}</div>
       </div>
       ${badges ? `<p style="margin:10px 0 0;font-size:13px">${badges}</p>` : ""}
       <p style="margin:8px 0 0;font-size:13px;color:#374151">💰 ${salary} &nbsp;&nbsp;📅 ${format(new Date(job.postedAt), "MMM d, yyyy")}</p>
