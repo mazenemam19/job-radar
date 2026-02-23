@@ -1,10 +1,27 @@
-import { Job } from "./types";
-
 export interface SkillConfig {
   name: string;
   weight: number;
   aliases: string[];
 }
+
+// Skills that define a frontend developer — at least one must match
+export const CORE_FRONTEND_SKILLS = new Set([
+  "React",
+  "TypeScript",
+  "JavaScript",
+  "HTML",
+  "CSS",
+  "SASS",
+  "Next.js",
+  "Vue",
+  "Angular",
+  "Redux",
+  "React Query",
+  "Material UI",
+  "Vite",
+  "Webpack",
+  "Svelte",
+]);
 
 export const SKILLS: SkillConfig[] = [
   // Expert (weight 3)
@@ -83,7 +100,14 @@ export function computeRecencyScore(postedAt: string): number {
 
 export function computeRelocationBonus(description: string): number {
   const lower = description.toLowerCase();
-  const keywords = ["relocation package", "relocation assistance", "relocation support", "we cover relocation", "relocation bonus", "relocation stipend"];
+  const keywords = [
+    "relocation package",
+    "relocation assistance",
+    "relocation support",
+    "we cover relocation",
+    "relocation bonus",
+    "relocation stipend",
+  ];
   return keywords.some((kw) => lower.includes(kw)) ? 10 : 0;
 }
 
@@ -134,4 +158,64 @@ export function getCountryFromLocation(location: string): { country: string; fla
     if (re.test(loc)) return { country, flag };
   }
   return { country: location || "Unknown", flag: "🌐" };
+}
+
+// Minimum number of CORE frontend skills that must match for a job to pass
+export const MIN_CORE_SKILLS_REQUIRED = 2;
+
+// Job titles that are clearly non-frontend — reject regardless of skill overlap
+const NON_FRONTEND_TITLE_PATTERNS = [
+  /\b(backend|back-end|back end)\b/i,
+  /\b(devops|dev-ops|sre|site reliability)\b/i,
+  /\b(data engineer|data scientist|ml engineer|machine learning)\b/i,
+  /\b(ai engineer|llm engineer|ai developer)\b/i,
+  /\b(android|ios|mobile)\s+(engineer|developer)\b/i,
+  /\b(python|java|golang|go|rust|ruby|php|c\+\+|\.net)\s+(engineer|developer)\b/i,
+  /\b(infrastructure|platform)\s+engineer\b/i,
+  /\b(security|network)\s+engineer\b/i,
+  /\bdentist\b|\bnurse\b|\bdoctor\b|\bphysician\b/i,
+  // Staff/principal engineers with AI, data, ops, or cloud context but no frontend keyword
+  /staff\s+engineer.{0,60}(ai|ml|data|ops|cloud|infra|platform)/i,
+  /(ai|ml|data|ops|cloud|infra|platform).{0,60}staff\s+engineer/i,
+];
+
+// Frontend-positive title keywords — if title has none of these, require stronger skill signal
+const FRONTEND_TITLE_KEYWORDS = [
+  /\b(front.?end|ui|ux|react|angular|vue|web|javascript|typescript|css|html)\b/i,
+  /\bfull.?stack\b/i,
+  /\bsoftware\s+(engineer|developer)\b/i, // generic — allowed if skills match
+];
+
+export function isClearlyNonFrontend(title: string): boolean {
+  return NON_FRONTEND_TITLE_PATTERNS.some((re) => re.test(title));
+}
+
+export function hasFrontendTitleSignal(title: string): boolean {
+  return FRONTEND_TITLE_KEYWORDS.some((re) => re.test(title));
+}
+
+/**
+ * Central pass/fail gate for a job. Returns null if job passes, or a string
+ * reason if it should be dropped. Call this AFTER visa + citizenship checks.
+ */
+export function getFilterFailReason(title: string, matchedSkills: string[]): string | null {
+  // 1. Title is clearly a non-frontend role
+  if (isClearlyNonFrontend(title)) {
+    return `non-frontend title: "${title}"`;
+  }
+
+  // 2. Must match at least MIN_CORE_SKILLS_REQUIRED core frontend skills
+  const coreMatches = matchedSkills.filter((s) => CORE_FRONTEND_SKILLS.has(s));
+  if (coreMatches.length < MIN_CORE_SKILLS_REQUIRED) {
+    return `only ${
+      coreMatches.length
+    } core frontend skills matched (need ${MIN_CORE_SKILLS_REQUIRED}): ${matchedSkills.join(", ")}`;
+  }
+
+  // 3. No matched skills at all (belt + suspenders)
+  if (matchedSkills.length === 0) {
+    return "no skill match";
+  }
+
+  return null;
 }

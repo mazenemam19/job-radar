@@ -6,6 +6,9 @@ import {
   computeTotalScore,
   requiresCitizenshipOrClearance,
   getCountryFromLocation,
+  isClearlyNonFrontend,
+  CORE_FRONTEND_SKILLS,
+  MIN_CORE_SKILLS_REQUIRED,
 } from "../scoring";
 import { detectVisaSponsorship } from "../visa";
 
@@ -19,7 +22,7 @@ interface JobicyJob {
   jobGeo: string;
   jobLevel: string;
   jobExcerpt: string;
-  jobDescription: string; // full HTML
+  jobDescription: string;
   pubDate: string;
   annualSalaryMin?: string;
   annualSalaryMax?: string;
@@ -27,13 +30,12 @@ interface JobicyJob {
 }
 
 interface JobicyResponse {
-  friendlyNotice?: string;
   jobCount: number;
   jobs: JobicyJob[];
 }
 
 function stripHtml(html: string): string {
-  return html
+  return (html || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -51,90 +53,100 @@ function buildSalary(job: JobicyJob): string | undefined {
 
 export async function fetchJobicy(): Promise<Job[]> {
   const results: Job[] = [];
-  let totalFetched = 0;
-  let withVisa = 0;
+  const seen = new Set<number>();
+  const allJobs: JobicyJob[] = [];
   let droppedNoVisa = 0;
   let droppedCitizenship = 0;
   let droppedNoSkills = 0;
 
-  // Fetch dev jobs — max 50 per call (API limit)
-  try {
-    const res = await fetch("https://jobicy.com/api/v2/remote-jobs?count=50&industry=dev", {
-      headers: { Accept: "application/json", "User-Agent": "JobRadar/1.0" },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) {
-      console.warn(`[Jobicy] HTTP ${res.status}`);
-      return [];
-    }
-
-    const json = (await res.json()) as JobicyResponse;
-    const jobs = json.jobs || [];
-    totalFetched = jobs.length;
-
-    console.log(`[Jobicy] Fetched ${totalFetched} raw jobs, running visa keyword detection...`);
-
-    for (const raw of jobs) {
-      const descText = stripHtml(raw.jobDescription || raw.jobExcerpt || "");
-      const combinedText = `${raw.jobTitle} ${descText}`;
-
-      const visaResult = detectVisaSponsorship(combinedText);
-      if (!visaResult.sponsored) {
-        droppedNoVisa++;
-        continue;
-      }
-      withVisa++;
-
-      if (requiresCitizenshipOrClearance(combinedText)) {
-        droppedCitizenship++;
-        continue;
-      }
-
-      const { matchedSkills, missingSkills, skillMatchScore } = computeSkillMatch(combinedText);
-      if (matchedSkills.length === 0) {
-        droppedNoSkills++;
-        continue;
-      }
-
-      const postedAt = new Date(raw.pubDate).toISOString();
-      const recencyScore = computeRecencyScore(postedAt);
-      const relocationBonus = computeRelocationBonus(descText);
-      const totalScore = computeTotalScore(skillMatchScore, recencyScore, relocationBonus);
-
-      const location = raw.jobGeo && raw.jobGeo !== "Anywhere" ? raw.jobGeo : "Remote";
-      const { country, flag } = getCountryFromLocation(location);
-
-      results.push({
-        id: `jobicy_${raw.id}`,
-        source: "jobicy",
-        title: raw.jobTitle,
-        company: raw.companyName,
-        location,
-        country,
-        countryFlag: flag,
-        url: raw.url,
-        description: descText,
-        salary: buildSalary(raw),
-        postedAt,
-        visaSponsorship: true,
-        matchedSkills,
-        missingSkills,
-        skillMatchScore,
-        recencyScore,
-        relocationBonus,
-        totalScore,
-        fetchedAt: new Date().toISOString(),
+  // Jobicy only supports one industry per request — call separately
+  for (const industry of ["dev"]) {
+    try {
+      const res = await fetch(`https://jobicy.com/api/v2/remote-jobs?count=50&industry=${industry}`, {
+        headers: { Accept: "application/json", "User-Agent": "JobRadar/1.0" },
+        signal: AbortSignal.timeout(15000),
       });
+      if (!res.ok) {
+        console.warn(`[Jobicy] HTTP ${res.status} for industry=${industry}`);
+        continue;
+      }
+      const json = (await res.json()) as JobicyResponse;
+      for (const j of json.jobs || []) {
+        if (!seen.has(j.id)) {
+          seen.add(j.id);
+          allJobs.push(j);
+        }
+      }
+    } catch (err) {
+      console.warn(`[Jobicy] Error for industry=${industry}:`, err);
     }
-  } catch (err) {
-    console.warn("[Jobicy] Fetch error:", err);
-    return [];
+  }
+
+  console.log(`[Jobicy] Fetched ${allJobs.length} raw jobs, running visa keyword detection...`);
+
+  for (const raw of allJobs) {
+    const descText = stripHtml(raw.jobDescription || raw.jobExcerpt || "");
+    const combinedText = `${raw.jobTitle} ${descText}`;
+
+    const visaResult = detectVisaSponsorship(combinedText);
+    if (!visaResult.sponsored) {
+      droppedNoVisa++;
+      continue;
+    }
+
+    if (requiresCitizenshipOrClearance(combinedText)) {
+      droppedCitizenship++;
+      continue;
+    }
+
+    // Title filter: reject clearly non-frontend roles
+    if (isClearlyNonFrontend(raw.jobTitle)) {
+      droppedNoSkills++;
+      continue;
+    }
+
+    const { matchedSkills, missingSkills, skillMatchScore } = computeSkillMatch(combinedText);
+
+    // Must match at least 2 core frontend skills
+    const coreMatches = matchedSkills.filter((s) => CORE_FRONTEND_SKILLS.has(s));
+    if (coreMatches.length < MIN_CORE_SKILLS_REQUIRED) {
+      droppedNoSkills++;
+      continue;
+    }
+
+    const postedAt = new Date(raw.pubDate).toISOString();
+    const recencyScore = computeRecencyScore(postedAt);
+    const relocationBonus = computeRelocationBonus(descText);
+    const totalScore = computeTotalScore(skillMatchScore, recencyScore, relocationBonus);
+
+    const location = raw.jobGeo && raw.jobGeo !== "Anywhere" ? raw.jobGeo : "Remote";
+    const { country, flag } = getCountryFromLocation(location);
+
+    results.push({
+      id: `jobicy_${raw.id}`,
+      source: "jobicy",
+      title: raw.jobTitle,
+      company: raw.companyName,
+      location,
+      country,
+      countryFlag: flag,
+      url: raw.url,
+      description: descText,
+      salary: buildSalary(raw),
+      postedAt,
+      visaSponsorship: true,
+      matchedSkills,
+      missingSkills,
+      skillMatchScore,
+      recencyScore,
+      relocationBonus,
+      totalScore,
+      fetchedAt: new Date().toISOString(),
+    });
   }
 
   console.log(
-    `[Jobicy] Pipeline: ${totalFetched} fetched → ${droppedNoVisa} no visa → ${withVisa} with visa → ${droppedCitizenship} dropped (citizenship) → ${droppedNoSkills} dropped (no skill match) → ${results.length} passed`
+    `[Jobicy] Pipeline: ${allJobs.length} fetched → ${droppedNoVisa} no visa → ${droppedCitizenship} citizenship → ${droppedNoSkills} no skills → ${results.length} passed`
   );
-
   return results;
 }

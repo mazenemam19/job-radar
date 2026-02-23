@@ -2,6 +2,7 @@ import { fetchArbeitnow } from "./sources/arbeitnow";
 import { fetchRemotive } from "./sources/remotive";
 import { fetchJobicy } from "./sources/jobicy";
 import { fetchRemoteOK } from "./sources/remoteok";
+import { fetchTheMuse } from "./sources/themuse";
 import { readStore, writeStore, mergeJobs } from "./storage";
 import { sendNewJobsEmail } from "./email";
 import { CronLog, Job } from "./types";
@@ -10,7 +11,7 @@ export async function runFetch(): Promise<CronLog> {
   console.log("\n========== Job Radar Fetch Started ==========");
   console.log(new Date().toISOString());
 
-  const [arbeitnowJobs, remotiveJobs, jobicyJobs, remoteokJobs] = await Promise.all([
+  const [arbeitnowJobs, remotiveJobs, jobicyJobs, remoteokJobs, themuseJobs] = await Promise.all([
     fetchArbeitnow().catch((err) => {
       console.error("[Arbeitnow] Fatal:", err);
       return [] as Job[];
@@ -27,12 +28,17 @@ export async function runFetch(): Promise<CronLog> {
       console.error("[RemoteOK] Fatal:", err);
       return [] as Job[];
     }),
+    fetchTheMuse().catch((err) => {
+      console.error("[TheMuse] Fatal:", err);
+      return [] as Job[];
+    }),
   ]);
 
-  const allNew = [...arbeitnowJobs, ...remotiveJobs, ...jobicyJobs, ...remoteokJobs];
+  const allNew = [...arbeitnowJobs, ...remotiveJobs, ...jobicyJobs, ...remoteokJobs, ...themuseJobs];
 
   console.log(
-    `[Fetch] Arbeitnow: ${arbeitnowJobs.length} | Remotive: ${remotiveJobs.length} | Jobicy: ${jobicyJobs.length} | RemoteOK: ${remoteokJobs.length} | Total: ${allNew.length}`
+    `[Fetch] Arbeitnow: ${arbeitnowJobs.length} | Remotive: ${remotiveJobs.length} | ` +
+      `Jobicy: ${jobicyJobs.length} | RemoteOK: ${remoteokJobs.length} | TheMuse: ${themuseJobs.length} | Total: ${allNew.length}`
   );
 
   const store = readStore();
@@ -56,7 +62,7 @@ export async function runFetch(): Promise<CronLog> {
 
   return {
     arbeitnowFetched: arbeitnowJobs.length,
-    remotiveFetched: remotiveJobs.length + jobicyJobs.length + remoteokJobs.length,
+    remotiveFetched: remotiveJobs.length + jobicyJobs.length + remoteokJobs.length + themuseJobs.length,
     passedFilters: allNew.length,
     added,
     skipped,

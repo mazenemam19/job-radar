@@ -1,6 +1,6 @@
 export interface Job {
   id: string;
-  source: "arbeitnow" | "remotive" | "jobicy" | "remoteok";
+  source: "arbeitnow" | "remotive" | "jobicy" | "remoteok" | "themuse";
   title: string;
   company: string;
   location: string;

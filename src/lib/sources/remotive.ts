@@ -6,6 +6,9 @@ import {
   computeTotalScore,
   requiresCitizenshipOrClearance,
   getCountryFromLocation,
+  isClearlyNonFrontend,
+  CORE_FRONTEND_SKILLS,
+  MIN_CORE_SKILLS_REQUIRED,
 } from "../scoring";
 import { detectVisaSponsorship } from "../visa";
 
@@ -14,7 +17,6 @@ interface RemotiveJob {
   url: string;
   title: string;
   company_name: string;
-  company_logo?: string;
   category: string;
   tags: string[];
   job_type: string;
@@ -30,53 +32,67 @@ interface RemotiveResponse {
 
 export async function fetchRemotive(): Promise<Job[]> {
   const results: Job[] = [];
-  let totalFetched = 0;
-  let withVisa = 0;
+  const seen = new Set<number>();
+  const raw: RemotiveJob[] = [];
   let droppedNoVisa = 0;
   let droppedCitizenship = 0;
   let droppedNoSkills = 0;
 
-  let raw: RemotiveJob[] = [];
-  try {
-    const res = await fetch("https://remotive.com/api/remote-jobs?category=software-dev&limit=100", {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) {
-      console.warn(`[Remotive] HTTP ${res.status}`);
-      return [];
+  // Fetch multiple categories for broader coverage
+  const CATEGORIES = ["software-dev", "design", "product"];
+
+  for (const cat of CATEGORIES) {
+    try {
+      const res = await fetch(`https://remotive.com/api/remote-jobs?category=${cat}&limit=100`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) {
+        console.warn(`[Remotive] HTTP ${res.status} for category=${cat}`);
+        continue;
+      }
+      const json = (await res.json()) as RemotiveResponse;
+      for (const j of json.jobs || []) {
+        if (!seen.has(j.id)) {
+          seen.add(j.id);
+          raw.push(j);
+        }
+      }
+    } catch (err) {
+      console.warn(`[Remotive] Error for category=${cat}:`, err);
     }
-    const json = (await res.json()) as RemotiveResponse;
-    raw = json.jobs || [];
-  } catch (err) {
-    console.warn("[Remotive] Fetch error:", err);
-    return [];
   }
 
-  totalFetched = raw.length;
-  console.log(`[Remotive] Fetched ${totalFetched} raw jobs, running visa keyword detection...`);
+  console.log(
+    `[Remotive] Fetched ${raw.length} raw jobs across ${CATEGORIES.length} categories, running visa keyword detection...`
+  );
 
   for (const job of raw) {
     const descText = job.description || "";
     const combinedText = `${job.title} ${descText}`;
 
-    // Visa check via keyword detection on full description
     const visaResult = detectVisaSponsorship(combinedText);
     if (!visaResult.sponsored) {
       droppedNoVisa++;
       continue;
     }
-    withVisa++;
 
-    // Hard filter: no citizenship/clearance
     if (requiresCitizenshipOrClearance(combinedText)) {
       droppedCitizenship++;
       continue;
     }
 
+    // Title filter: reject clearly non-frontend roles
+    if (isClearlyNonFrontend(job.title)) {
+      droppedNoSkills++;
+      continue;
+    }
+
     const { matchedSkills, missingSkills, skillMatchScore } = computeSkillMatch(combinedText);
 
-    if (matchedSkills.length === 0) {
+    // Must match at least 2 core frontend skills
+    const coreMatches = matchedSkills.filter((s) => CORE_FRONTEND_SKILLS.has(s));
+    if (coreMatches.length < MIN_CORE_SKILLS_REQUIRED) {
       droppedNoSkills++;
       continue;
     }
@@ -113,8 +129,7 @@ export async function fetchRemotive(): Promise<Job[]> {
   }
 
   console.log(
-    `[Remotive] Pipeline: ${totalFetched} fetched → ${droppedNoVisa} no visa → ${withVisa} with visa → ${droppedCitizenship} dropped (citizenship) → ${droppedNoSkills} dropped (no skill match) → ${results.length} passed`
+    `[Remotive] Pipeline: ${raw.length} fetched → ${droppedNoVisa} no visa → ${droppedCitizenship} dropped (citizenship) → ${droppedNoSkills} dropped (no skill match) → ${results.length} passed`
   );
-
   return results;
 }

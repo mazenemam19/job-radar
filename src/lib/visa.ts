@@ -5,32 +5,37 @@
  */
 
 // Strong positive signals — any one of these = sponsored
-const POSITIVE_PATTERNS = [
+const POSITIVE_PATTERNS: RegExp[] = [
   /visa\s+sponsor(ship|ed|ing|s)?/i,
   /sponsor\s+(a\s+)?visa/i,
   /work\s+permit\s+sponsor/i,
   /sponsor\s+work\s+permit/i,
   /we\s+(will\s+)?(provide|support|offer|cover|assist\s+with)\s+.{0,30}visa/i,
   /visa\s+(support|assistance|provided|included|covered)/i,
-  /relocation\s+(package|support|assistance).{0,100}visa/i, // relocation + visa nearby
+  /relocation\s+(package|support|assistance).{0,100}visa/i,
   /visa.{0,100}relocation\s+(package|support|assistance)/i,
   /immigration\s+support/i,
+  /we\s+(help|assist|support)\s+(with\s+)?(your\s+)?immigration/i,
   /work\s+authoris?ation\s+(support|provided|sponsored)/i,
   /candidate[s]?\s+(from|outside).{0,60}(visa|sponsor)/i,
-  /open\s+to\s+.{0,30}(visa|international|relocation)/i,
+  /open\s+to\s+.{0,30}(visa|relocation)/i,
   /\bsponsor(ing|ed)?\b.{0,40}\b(candidates?|applicants?|workers?|engineers?|developers?)\b/i,
   /\b(candidates?|applicants?|workers?|engineers?|developers?)\b.{0,40}\bsponsor(ing|ed)?\b/i,
+  /international\s+candidates?\s+(are\s+)?(welcome|encouraged|considered)/i,
+  /we\s+welcome\s+international\s+(candidates?|applicants?)/i,
+  /open\s+to\s+(candidates?\s+)?(from|worldwide|globally|across\s+the\s+world)/i,
   /visa\s+stamping/i,
-  /h[-\s]?1b/i, // US H1-B sponsorship mention
-  /tier\s+2\s+visa/i, // UK Tier 2
+  /h[-\s]?1b/i,
+  /tier\s+2\s+visa/i,
   /skilled\s+worker\s+visa/i,
-  /blue\s+card/i, // EU Blue Card
+  /blue\s+card/i,
+  /work\s+visa\s+(provided|sponsored|supported|covered)/i,
 ];
 
-// Hard negative signals — if any match, it's NOT sponsored (check before positives)
-const NEGATIVE_PATTERNS = [
+// Hard negative signals — checked FIRST, any match = not sponsored
+const NEGATIVE_PATTERNS: RegExp[] = [
   /no\s+visa\s+sponsor/i,
-  /not\s+(able|able)\s+to\s+sponsor/i,
+  /not\s+able\s+to\s+sponsor/i,
   /unable\s+to\s+(provide\s+)?sponsor/i,
   /cannot\s+sponsor/i,
   /won'?t\s+sponsor/i,
@@ -54,24 +59,19 @@ export interface VisaCheckResult {
 }
 
 export function detectVisaSponsorship(text: string): VisaCheckResult {
-  // Check negatives first — explicit "no sponsorship" overrides everything
   for (const neg of NEGATIVE_PATTERNS) {
     if (neg.test(text)) {
       return { sponsored: false, negativeMatch: neg.source };
     }
   }
-
-  // Check positives
   for (const pos of POSITIVE_PATTERNS) {
     if (pos.test(text)) {
       return { sponsored: true, matchedPattern: pos.source };
     }
   }
-
   return { sponsored: false };
 }
 
-// For Arbeitnow: also check the tags array for visa-related tags
 export function checkArbeitnowTags(tags: string[]): boolean {
   const visaTags = ["visa-sponsorship", "visa_sponsorship", "visa", "sponsorship", "relocation", "work-permit"];
   return tags.some((tag) => visaTags.includes(tag.toLowerCase()));

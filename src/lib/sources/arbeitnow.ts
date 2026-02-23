@@ -1,13 +1,16 @@
+import { Job } from "../types";
 import {
+  computeSkillMatch,
   computeRecencyScore,
   computeRelocationBonus,
-  computeSkillMatch,
   computeTotalScore,
-  getCountryFromLocation,
   requiresCitizenshipOrClearance,
+  getCountryFromLocation,
+  isClearlyNonFrontend,
+  CORE_FRONTEND_SKILLS,
+  MIN_CORE_SKILLS_REQUIRED,
 } from "../scoring";
-import { Job } from "../types";
-import { checkArbeitnowTags, detectVisaSponsorship } from "../visa";
+import { detectVisaSponsorship, checkArbeitnowTags } from "../visa";
 
 interface ArbeitnowJob {
   slug: string;
@@ -78,6 +81,9 @@ export async function fetchArbeitnow(): Promise<Job[]> {
         withVisa++;
 
         // Hard filter: no citizenship/clearance
+        // Filter non-frontend job titles
+        if (isClearlyNonFrontend(raw.title)) continue;
+
         if (requiresCitizenshipOrClearance(combinedText)) {
           droppedCitizenship++;
           continue;
@@ -85,13 +91,10 @@ export async function fetchArbeitnow(): Promise<Job[]> {
 
         const { matchedSkills, missingSkills, skillMatchScore } = computeSkillMatch(combinedText);
 
-        if (matchedSkills.length === 0) {
+        // Must match at least 1 core frontend skill (not just AWS/Docker)
+        const coreMatches = matchedSkills.filter((s) => CORE_FRONTEND_SKILLS.has(s));
+        if (coreMatches.length < MIN_CORE_SKILLS_REQUIRED) {
           droppedNoSkills++;
-          console.log(
-            `[Arbeitnow] Dropped (no skill match): "${raw.title}" @ ${raw.company_name} | tags: ${(raw.tags || []).join(
-              ", "
-            )}`
-          );
           continue;
         }
 
