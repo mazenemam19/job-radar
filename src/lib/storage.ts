@@ -1,78 +1,54 @@
 import fs from "fs";
 import path from "path";
-import { Job, StorageData } from "@/types";
+import { Job, JobStore } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "jobs.json");
+const DATA_PATH = path.join(process.cwd(), "data", "jobs.json");
+const MAX_JOBS = 500;
 
-function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function ensureDataFile(): void {
+  const dir = path.dirname(DATA_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(DATA_PATH)) {
+    const empty: JobStore = { jobs: [], lastUpdated: new Date().toISOString() };
+    fs.writeFileSync(DATA_PATH, JSON.stringify(empty, null, 2));
   }
 }
 
-function readDb(): StorageData {
-  ensureDir();
-  if (!fs.existsSync(DB_PATH)) {
-    return { jobs: [], lastFetchedAt: null, totalFetched: 0 };
-  }
+export function readStore(): JobStore {
+  ensureDataFile();
   try {
-    const raw = fs.readFileSync(DB_PATH, "utf-8");
-    return JSON.parse(raw) as StorageData;
+    const raw = fs.readFileSync(DATA_PATH, "utf-8");
+    return JSON.parse(raw) as JobStore;
   } catch {
-    return { jobs: [], lastFetchedAt: null, totalFetched: 0 };
+    return { jobs: [], lastUpdated: new Date().toISOString() };
   }
 }
 
-function writeDb(data: StorageData): void {
-  ensureDir();
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+export function writeStore(store: JobStore): void {
+  ensureDataFile();
+  // Sort by totalScore desc, trim to MAX_JOBS
+  store.jobs.sort((a, b) => b.totalScore - a.totalScore);
+  if (store.jobs.length > MAX_JOBS) {
+    store.jobs = store.jobs.slice(0, MAX_JOBS);
+  }
+  store.lastUpdated = new Date().toISOString();
+  fs.writeFileSync(DATA_PATH, JSON.stringify(store, null, 2));
 }
 
-export function getJobs(): Job[] {
-  return readDb().jobs;
-}
-
-export function getMeta(): Pick<StorageData, "lastFetchedAt" | "totalFetched"> {
-  const { lastFetchedAt, totalFetched } = readDb();
-  return { lastFetchedAt, totalFetched };
-}
-
-export function upsertJobs(incoming: Job[]): { added: number; updated: number; skipped: number } {
-  const db = readDb();
-  const existing = new Map(db.jobs.map((j) => [j.id, j]));
-
+export function mergeJobs(existingStore: JobStore, newJobs: Job[]): { store: JobStore; added: number; skipped: number } {
+  const existingIds = new Set(existingStore.jobs.map((j) => j.id));
   let added = 0;
-  let updated = 0;
   let skipped = 0;
 
-  for (const job of incoming) {
-    const prev = existing.get(job.id);
-    if (!prev) {
-      existing.set(job.id, job);
-      added++;
-    } else if (prev.totalScore !== job.totalScore || prev.matchedSkills.length !== job.matchedSkills.length) {
-      existing.set(job.id, { ...job, fetchedAt: new Date().toISOString() });
-      updated++;
-    } else {
+  for (const job of newJobs) {
+    if (existingIds.has(job.id)) {
       skipped++;
+    } else {
+      existingStore.jobs.push(job);
+      existingIds.add(job.id);
+      added++;
     }
   }
 
-  // Sort by totalScore desc, then postedAt desc
-  const sorted = Array.from(existing.values()).sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-    return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-  });
-
-  // Keep max 500 jobs to avoid the file growing unbounded
-  const trimmed = sorted.slice(0, 500);
-
-  writeDb({
-    jobs: trimmed,
-    lastFetchedAt: new Date().toISOString(),
-    totalFetched: db.totalFetched + added,
-  });
-
-  return { added, updated, skipped };
+  return { store: existingStore, added, skipped };
 }

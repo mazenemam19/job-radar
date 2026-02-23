@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Job Radar — Find Your Next Role Abroad",
-  description: "Personal job matching dashboard for relocation-friendly roles",
+  title: "Job Radar 🎯",
+  description: "Frontend developer jobs with visa sponsorship",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

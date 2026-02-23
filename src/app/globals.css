@@ -1,76 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   --bg: #090e1a;
-  --surface: #0f1629;
-  --surface2: #161e35;
-  --border: #1e2a45;
-  --border-bright: #2a3a5c;
-  --text: #e8edf8;
-  --text-muted: #6b7fa3;
-  --text-faint: #3d4f70;
-  --accent: #3b82f6;
-  --accent-glow: rgba(59, 130, 246, 0.15);
-  --accent2: #06b6d4;
-  --green: #10b981;
-  --amber: #f59e0b;
-  --red: #ef4444;
-  --purple: #8b5cf6;
 }
 
-* {
-  box-sizing: border-box;
+body {
+  background: var(--bg);
+  color: #e2e8f0;
 }
 
-html, body {
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1525;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e3050;
+  border-radius: 3px;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
-
-/* Animated radar sweep bg element */
-.radar-sweep {
-  animation: sweep 8s linear infinite;
-  transform-origin: center;
-}
-@keyframes sweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* Skill pill transition */
+.skill-pill {
+  transition: background 0.15s;
 }
 
-/* Score ring pulse */
-@keyframes pulse-ring {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+/* Score circle */
+.score-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1rem;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
 }
 
-/* Fade in cards */
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.card-enter {
-  animation: slide-up 0.3s ease both;
+/* Card expand animation */
+.card-expand {
+  overflow: hidden;
+  transition: max-height 0.3s ease;
 }
 
-/* Glowing dot */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
+/* Range input */
+input[type="range"] {
+  accent-color: #2563eb;
 }
-.blink { animation: blink 1.5s ease infinite; }
-
-/* Mono label */
-.mono { font-family: 'Space Mono', monospace; }

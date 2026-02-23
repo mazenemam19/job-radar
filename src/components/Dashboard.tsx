@@ -1,552 +1,281 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Job, FilterState } from "@/types";
-import { formatDistanceToNow } from "date-fns";
-import clsx from "clsx";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Job, JobStore } from "@/lib/types";
+import JobCard from "./JobCard";
 
-// ─── Score Circle ─────────────────────────────────────────────────────────────
-
-function ScoreCircle({ score, size = 52 }: { score: number; size?: number }) {
-  const color = score >= 70 ? "var(--green)" : score >= 45 ? "var(--amber)" : "var(--text-muted)";
-  const r = (size - 6) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-
-  return (
-    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth="3" />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="3"
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dasharray 0.5s ease" }}
-        />
-      </svg>
-      <span
-        className="mono absolute inset-0 flex items-center justify-center text-xs font-bold"
-        style={{ color }}
-      >
-        {score}
-      </span>
-    </div>
-  );
-}
-
-// ─── Skill Pill ───────────────────────────────────────────────────────────────
-
-function SkillPill({ name, type }: { name: string; type: "matched" | "missing" }) {
-  return (
-    <span
-      className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
-      style={{
-        background: type === "matched" ? "rgba(16,185,129,0.12)" : "rgba(107,127,163,0.1)",
-        color: type === "matched" ? "var(--green)" : "var(--text-faint)",
-        border: `1px solid ${type === "matched" ? "rgba(16,185,129,0.25)" : "var(--border)"}`,
-      }}
-    >
-      {type === "matched" ? "✓" : "○"} {name}
-    </span>
-  );
-}
-
-// ─── Country Flag Helper ──────────────────────────────────────────────────────
-
-const FLAGS: Record<string, string> = {
-  GB: "🇬🇧", US: "🇺🇸", CA: "🇨🇦", AU: "🇦🇺",
-  DE: "🇩🇪", NL: "🇳🇱", FR: "🇫🇷", SE: "🇸🇪",
-  NO: "🇳🇴", AT: "🇦🇹", CH: "🇨🇭", BE: "🇧🇪",
-};
-
-// ─── Job Card ─────────────────────────────────────────────────────────────────
-
-function JobCard({ job, index }: { job: Job; index: number }) {
-  const [expanded, setExpanded] = useState(false);
-  const flag = FLAGS[job.countryCode] ?? "🌍";
-
-  const salaryStr =
-    job.salary?.min || job.salary?.max
-      ? `${job.salary.currency ?? ""} ${job.salary.min?.toLocaleString() ?? ""}${job.salary.max ? `–${job.salary.max.toLocaleString()}` : "+"
-      }`
-      : null;
-
-  return (
-    <div
-      className="card-enter rounded-xl overflow-hidden"
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        animationDelay: `${Math.min(index * 40, 400)}ms`,
-        transition: "border-color 0.2s",
-      }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-bright)")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)")}
-    >
-      {/* Main row */}
-      <div className="flex items-start gap-4 p-4">
-        <ScoreCircle score={job.totalScore} />
-
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-1 mb-1">
-            <h3 className="font-semibold text-sm leading-snug" style={{ color: "var(--text)" }}>
-              {job.title}
-            </h3>
-            {job.hasVisaSponsorship && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                style={{ background: "rgba(139,92,246,0.12)", color: "var(--purple)", border: "1px solid rgba(139,92,246,0.25)" }}>
-                🛂 Visa
-              </span>
-            )}
-            {job.hasRelocation && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                style={{ background: "rgba(6,182,212,0.12)", color: "var(--accent2)", border: "1px solid rgba(6,182,212,0.25)" }}>
-                📦 Relocation
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
-            <span className="font-medium" style={{ color: "var(--text)" }}>{job.company}</span>
-            <span>{flag} {job.location}</span>
-            {salaryStr && <span>💰 {salaryStr}</span>}
-            <span>🕐 {formatDistanceToNow(new Date(job.postedAt), { addSuffix: true })}</span>
-            <span className="mono" style={{ color: "var(--text-faint)", fontSize: 10 }}>
-              {job.source.toUpperCase()}
-            </span>
-          </div>
-
-          {/* Skills preview */}
-          <div className="flex flex-wrap gap-1 mt-2">
-            {job.matchedSkills.slice(0, 6).map((s) => (
-              <SkillPill key={s} name={s} type="matched" />
-            ))}
-            {job.matchedSkills.length > 6 && (
-              <span className="text-xs" style={{ color: "var(--text-faint)" }}>
-                +{job.matchedSkills.length - 6} more
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 items-end flex-shrink-0">
-          <a
-            href={job.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
-            style={{
-              background: "var(--accent)",
-              color: "#fff",
-            }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.opacity = "0.85")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.opacity = "1")}
-          >
-            Apply →
-          </a>
-          <button
-            onClick={() => setExpanded((p) => !p)}
-            className="text-xs transition-colors"
-            style={{ color: "var(--text-faint)" }}
-          >
-            {expanded ? "▲ less" : "▼ details"}
-          </button>
-        </div>
-      </div>
-
-      {/* Expanded details */}
-      {expanded && (
-        <div
-          className="px-4 pb-4 pt-0 border-t"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div className="grid grid-cols-3 gap-3 mt-3 mb-3">
-            <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface2)" }}>
-              <div className="mono text-lg font-bold" style={{ color: "var(--green)" }}>{job.matchScore}</div>
-              <div className="text-xs" style={{ color: "var(--text-muted)" }}>Skill Match</div>
-            </div>
-            <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface2)" }}>
-              <div className="mono text-lg font-bold" style={{ color: "var(--accent)" }}>{job.recencyScore}</div>
-              <div className="text-xs" style={{ color: "var(--text-muted)" }}>Recency</div>
-            </div>
-            <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface2)" }}>
-              <div className="mono text-lg font-bold" style={{ color: "var(--text)" }}>{job.totalScore}</div>
-              <div className="text-xs" style={{ color: "var(--text-muted)" }}>Total Score</div>
-            </div>
-          </div>
-
-          {job.missingSkills.length > 0 && (
-            <div className="mb-3">
-              <p className="text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>Skills you have that aren&apos;t mentioned:</p>
-              <div className="flex flex-wrap gap-1">
-                {job.missingSkills.slice(0, 8).map((s) => (
-                  <SkillPill key={s} name={s} type="missing" />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-lg p-3" style={{ background: "var(--surface2)" }}>
-            <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              {job.description.slice(0, 500)}{job.description.length > 500 ? "…" : ""}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Filter Bar ───────────────────────────────────────────────────────────────
-
-const COUNTRIES = [
-  { code: "", label: "All Countries" },
-  { code: "GB", label: "🇬🇧 UK" },
-  { code: "US", label: "🇺🇸 US" },
-  { code: "CA", label: "🇨🇦 Canada" },
-  { code: "AU", label: "🇦🇺 Australia" },
-  { code: "DE", label: "🇩🇪 Germany" },
-  { code: "NL", label: "🇳🇱 Netherlands" },
-  { code: "FR", label: "🇫🇷 France" },
-  { code: "AT", label: "🇦🇹 Austria" },
-  { code: "CH", label: "🇨🇭 Switzerland" },
-  { code: "PL", label: "🇵🇱 Poland" },
-  { code: "NZ", label: "🇳🇿 New Zealand" },
-];
-
-function FilterBar({
-  filters,
-  onChange,
-}: {
-  filters: FilterState;
-  onChange: (f: Partial<FilterState>) => void;
-}) {
-  const inputStyle: React.CSSProperties = {
-    background: "var(--surface2)",
-    border: "1px solid var(--border)",
-    color: "var(--text)",
-    borderRadius: 8,
-    padding: "6px 12px",
-    fontSize: 13,
-    outline: "none",
-  };
-
-  return (
-    <div className="flex flex-wrap gap-3 items-center">
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search title, company, location…"
-        value={filters.search}
-        onChange={(e) => onChange({ search: e.target.value })}
-        style={{ ...inputStyle, minWidth: 240 }}
-      />
-
-      {/* Country */}
-      <select
-        value={filters.country}
-        onChange={(e) => onChange({ country: e.target.value })}
-        style={inputStyle}
-      >
-        {COUNTRIES.map((c) => (
-          <option key={c.code} value={c.code}>{c.label}</option>
-        ))}
-      </select>
-
-      {/* Min score */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>Min score</span>
-        <input
-          type="range"
-          min={0}
-          max={90}
-          step={10}
-          value={filters.minScore}
-          onChange={(e) => onChange({ minScore: parseInt(e.target.value) })}
-          style={{ accentColor: "var(--accent)", width: 80 }}
-        />
-        <span className="mono text-xs" style={{ color: "var(--accent)", width: 24 }}>{filters.minScore}</span>
-      </div>
-
-    </div>
-  );
-}
-
-function ToggleFilter({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
-      style={{
-        background: active ? "var(--accent-glow)" : "var(--surface2)",
-        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-        color: active ? "var(--accent)" : "var(--text-muted)",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
-  return (
-    <div className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-      <div className="mono text-2xl font-bold" style={{ color: color ?? "var(--text)" }}>{value}</div>
-      <div className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{label}</div>
-      {sub && <div className="text-xs mt-0.5" style={{ color: "var(--text-faint)" }}>{sub}</div>}
-    </div>
-  );
-}
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
-
-interface ApiResponse {
-  jobs: Job[];
-  total: number;
-  page: number;
-  totalPages: number;
-  lastFetchedAt: string | null;
-  totalFetched: number;
-}
+const PAGE_SIZE = 30;
 
 export default function Dashboard() {
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const [store, setStore] = useState<JobStore | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [country, setCountry] = useState("All");
+  const [minScore, setMinScore] = useState(0);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<FilterState>({
-    country: "",
-    minScore: 0,
-    visaOnly: false,
-    relocationOnly: false,
-    search: "",
-  });
+  const [fetching, setFetching] = useState(false);
 
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchJobs = useCallback(async (f: FilterState, p: number) => {
-    setLoading(true);
-    const params = new URLSearchParams({
-      page: String(p),
-      limit: "30",
-      ...(f.country && { country: f.country }),
-      ...(f.minScore > 0 && { minScore: String(f.minScore) }),
-      ...(f.visaOnly && { visaOnly: "true" }),
-      ...(f.relocationOnly && { relocationOnly: "true" }),
-      ...(f.search && { search: f.search }),
-    });
-
+  const loadJobs = useCallback(async () => {
     try {
-      const res = await fetch(`/api/jobs?${params}`);
-      const json = await res.json();
-      setData(json);
+      const res = await fetch("/api/jobs", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: JobStore = await res.json();
+      setStore(data);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      setPage(1);
-      fetchJobs(filters, 1);
-    }, 300);
-  }, [filters, fetchJobs]);
+    loadJobs();
+  }, [loadJobs]);
 
-  useEffect(() => {
-    fetchJobs(filters, page);
-  }, [page]); // eslint-disable-line
+  const jobs = store?.jobs ?? [];
 
-  const handleFilterChange = (partial: Partial<FilterState>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
-  };
+  // Countries for dropdown
+  const countries = useMemo(() => {
+    const set = new Set(jobs.map((j) => j.country));
+    return ["All", ...Array.from(set).sort()];
+  }, [jobs]);
 
-  const triggerFetch = async () => {
+  // Filter & search
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return jobs.filter((j) => {
+      if (country !== "All" && j.country !== country) return false;
+      if (j.totalScore < minScore) return false;
+      if (q && !`${j.title} ${j.company} ${j.location} ${j.matchedSkills.join(" ")}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [jobs, country, minScore, search]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const avg = total ? Math.round(filtered.reduce((s, j) => s + j.totalScore, 0) / total) : 0;
+    const top = total ? Math.max(...filtered.map((j) => j.totalScore)) : 0;
+    const withReloc = filtered.filter((j) => j.relocationBonus > 0).length;
+    return { total, avg, top, withReloc };
+  }, [filtered]);
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleFilterChange = useCallback(() => setPage(1), []);
+
+  async function triggerFetch() {
+    const secret = prompt("Enter CRON_SECRET to trigger a fetch:");
+    if (!secret) return;
     setFetching(true);
     try {
-      const secret = prompt("Enter your CRON_SECRET (from .env.local):");
-      if (!secret) return;
-      await fetch("/api/cron", {
+      const res = await fetch("/api/cron", {
         method: "POST",
         headers: { "x-cron-secret": secret },
       });
-      await fetchJobs(filters, 1);
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Done! Added: ${data.added}, Skipped: ${data.skipped}`);
+        await loadJobs();
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      alert(`Request failed: ${e}`);
     } finally {
       setFetching(false);
     }
-  };
+  }
 
-  const jobs = data?.jobs ?? [];
-  const relocationCount = jobs.filter((j) => j.hasRelocation).length;
-  const topScore = jobs.length ? Math.max(...jobs.map((j) => j.totalScore)) : 0;
-  const avgScore = jobs.length
-    ? Math.round(jobs.reduce((s, j) => s + j.totalScore, 0) / jobs.length)
-    : 0;
-
-  return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      {/* Header */}
-      <header
-        className="sticky top-0 z-10 flex items-center justify-between px-6 py-4"
-        style={{
-          background: "rgba(9,14,26,0.85)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          {/* Radar icon */}
-          <div className="relative w-8 h-8">
-            <svg viewBox="0 0 32 32" className="w-8 h-8">
-              <circle cx="16" cy="16" r="14" fill="none" stroke="var(--border-bright)" strokeWidth="1" />
-              <circle cx="16" cy="16" r="9" fill="none" stroke="var(--border)" strokeWidth="1" />
-              <circle cx="16" cy="16" r="4" fill="none" stroke="var(--border)" strokeWidth="1" />
-              <circle cx="16" cy="16" r="1.5" fill="var(--accent)" />
-              <line x1="16" y1="2" x2="16" y2="30" stroke="var(--border)" strokeWidth="0.5" />
-              <line x1="2" y1="16" x2="30" y2="16" stroke="var(--border)" strokeWidth="0.5" />
-              <path d="M16 16 L30 5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" className="radar-sweep" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="mono font-bold text-sm tracking-wide" style={{ color: "var(--text)" }}>JOB_RADAR</h1>
-            <p className="text-xs" style={{ color: "var(--text-faint)" }}>visa sponsorship · abroad</p>
-          </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#090e1a" }}>
+        <div className="text-center">
+          <div className="text-4xl mb-4">🎯</div>
+          <div className="text-slate-400 text-lg">Loading job radar...</div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="flex items-center gap-4">
-          {data?.lastFetchedAt && (
-            <span className="text-xs hidden sm:block" style={{ color: "var(--text-faint)" }}>
-              Last synced{" "}
-              <span style={{ color: "var(--text-muted)" }}>
-                {formatDistanceToNow(new Date(data.lastFetchedAt), { addSuffix: true })}
-              </span>
-            </span>
-          )}
-          <button
-            onClick={triggerFetch}
-            disabled={fetching}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-2"
-            style={{
-              background: fetching ? "var(--surface2)" : "var(--accent)",
-              color: fetching ? "var(--text-muted)" : "#fff",
-              border: "1px solid transparent",
-            }}
-          >
-            {fetching ? (
-              <>
-                <span className="blink">●</span> Fetching…
-              </>
-            ) : (
-              "⟳ Sync Now"
-            )}
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#090e1a" }}>
+        <div className="text-red-400 text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <div>{error}</div>
+          <button onClick={loadJobs} className="mt-4 px-4 py-2 bg-blue-600 rounded text-white text-sm">
+            Retry
           </button>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <StatCard label="Total Matches" value={data?.total ?? "—"} color="var(--text)" />
-          <StatCard label="Avg Score" value={avgScore || "—"} color="var(--accent)" />
-          <StatCard label="Top Score" value={topScore || "—"} color="var(--green)" />
-          <StatCard label="+ Relocation" value={relocationCount || "—"} color="var(--accent2)" sub="bonus perk" />
+  return (
+    <div className="min-h-screen px-4 py-8 max-w-6xl mx-auto" style={{ background: "#090e1a" }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            🎯 Job Radar
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Frontend dev jobs · Visa sponsorship only · Sorted by match score
+            {store?.lastUpdated && (
+              <span> · Last updated {new Date(store.lastUpdated).toLocaleString()}</span>
+            )}
+          </p>
         </div>
-
-        {/* Filters */}
-        <div
-          className="rounded-xl p-4 mb-5"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        <button
+          onClick={triggerFetch}
+          disabled={fetching}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 disabled:cursor-not-allowed rounded-lg text-white text-sm font-semibold transition-colors"
         >
-          <FilterBar filters={filters} onChange={handleFilterChange} />
-        </div>
+          {fetching ? "⏳ Fetching..." : "🔄 Fetch Now"}
+        </button>
+      </div>
 
-        {/* Results count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {data ? (
-              <>
-                Showing <span style={{ color: "var(--text)" }}>{jobs.length}</span> of{" "}
-                <span style={{ color: "var(--text)" }}>{data.total}</span> jobs
-              </>
-            ) : "Loading…"}
-          </p>
-          <p className="mono text-xs" style={{ color: "var(--text-faint)" }}>
-            sorted by score ↓
-          </p>
-        </div>
-
-        {/* Job list */}
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="rounded-xl h-28 animate-pulse"
-                style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-              />
-            ))}
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: "Total Matches", value: stats.total, icon: "📋", color: "text-blue-400" },
+          { label: "Avg Score", value: stats.avg, icon: "📊", color: "text-purple-400" },
+          { label: "Top Score", value: stats.top, icon: "🏆", color: "text-yellow-400" },
+          { label: "With Relocation", value: stats.withReloc, icon: "✈️", color: "text-green-400" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl p-5" style={{ background: "#0d1525", border: "1px solid #1e3050" }}>
+            <div className="text-2xl mb-1">{s.icon}</div>
+            <div className={`text-3xl font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-slate-500 text-xs mt-1">{s.label}</div>
           </div>
-        ) : jobs.length === 0 ? (
-          <div
-            className="rounded-xl p-16 text-center"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-xl p-5 mb-6 flex flex-col md:flex-row gap-4" style={{ background: "#0d1525", border: "1px solid #1e3050" }}>
+        <div className="flex-1">
+          <label className="text-slate-400 text-xs font-semibold mb-1 block uppercase tracking-wider">Search</label>
+          <input
+            type="text"
+            placeholder="Title, company, skill..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); handleFilterChange(); }}
+            className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ background: "#111c30", border: "1px solid #1e3050" }}
+          />
+        </div>
+        <div className="min-w-[180px]">
+          <label className="text-slate-400 text-xs font-semibold mb-1 block uppercase tracking-wider">Country</label>
+          <select
+            value={country}
+            onChange={(e) => { setCountry(e.target.value); handleFilterChange(); }}
+            className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ background: "#111c30", border: "1px solid #1e3050" }}
           >
-            <div className="text-4xl mb-4">📡</div>
-            <p className="font-semibold" style={{ color: "var(--text)" }}>No jobs found</p>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              {data?.totalFetched === 0
-                ? 'Click "Sync Now" to fetch jobs for the first time'
-                : "Try adjusting your filters"}
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {jobs.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} />
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
             ))}
-          </div>
+          </select>
+        </div>
+        <div className="min-w-[200px]">
+          <label className="text-slate-400 text-xs font-semibold mb-1 block uppercase tracking-wider">
+            Min Score: <span className="text-blue-400 font-bold">{minScore}</span>
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={minScore}
+            onChange={(e) => { setMinScore(Number(e.target.value)); handleFilterChange(); }}
+            className="w-full mt-2"
+          />
+        </div>
+        {(search || country !== "All" || minScore > 0) && (
+          <button
+            onClick={() => { setSearch(""); setCountry("All"); setMinScore(0); setPage(1); }}
+            className="self-end px-3 py-2 text-slate-400 hover:text-white text-sm rounded-lg transition-colors"
+            style={{ background: "#111c30" }}
+          >
+            Clear ✕
+          </button>
         )}
+      </div>
 
-        {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-8">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: page === 1 ? "var(--text-faint)" : "var(--text)",
-              }}
-            >
-              ← Prev
-            </button>
-            <span className="mono text-xs" style={{ color: "var(--text-muted)" }}>
-              {page} / {data.totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={page === data.totalPages}
-              className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: page === data.totalPages ? "var(--text-faint)" : "var(--text)",
-              }}
-            >
-              Next →
-            </button>
+      {/* Results count */}
+      <div className="text-slate-500 text-sm mb-4">
+        Showing {paginated.length} of {filtered.length} jobs (sorted by match score)
+      </div>
+
+      {/* Job list */}
+      {paginated.length === 0 ? (
+        <div className="text-center py-20">
+          <div className="text-5xl mb-4">🔍</div>
+          <div className="text-slate-400 text-lg">No jobs found</div>
+          <div className="text-slate-600 text-sm mt-2">
+            {jobs.length === 0 ? (
+              <>No jobs stored yet. Click <strong>Fetch Now</strong> to run your first fetch.</>
+            ) : (
+              <>Try adjusting your filters.</>
+            )}
           </div>
-        )}
-      </main>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {paginated.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+            style={{ background: "#0d1525" }}
+          >
+            ← Prev
+          </button>
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              let p = i + 1;
+              if (totalPages > 7) {
+                if (page <= 4) p = i + 1;
+                else if (page >= totalPages - 3) p = totalPages - 6 + i;
+                else p = page - 3 + i;
+              }
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                    p === page
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                  style={{ background: p === page ? undefined : "#0d1525" }}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+            style={{ background: "#0d1525" }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

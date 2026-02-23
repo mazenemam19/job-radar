@@ -9,18 +9,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#eef2ff",
-          100: "#e0e7ff",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
-          900: "#312e81",
+        navy: {
+          900: "#090e1a",
+          800: "#0d1525",
+          700: "#111c30",
+          600: "#162238",
+          500: "#1e3050",
         },
       },
     },
   },
   plugins: [],
 };
-
 export default config;
