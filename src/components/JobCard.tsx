@@ -1,189 +1,158 @@
+// src/components/JobCard.tsx
 "use client";
 
-import { useState } from "react";
-import { Job } from "@/lib/types";
+import { useState, useEffect } from "react";
+import type { Job } from "@/lib/types";
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
+// ── Score ring ───────────────────────────────────────────────────────────────
+function ScoreRing({ score }: { score: number }) {
+  const [animated, setAnimated] = useState(0);
 
-function scoreColor(score: number): { bg: string; text: string } {
-  if (score >= 70) return { bg: "#15803d", text: "#86efac" };
-  if (score >= 45) return { bg: "#92400e", text: "#fcd34d" };
-  return { bg: "#374151", text: "#9ca3af" };
-}
+  useEffect(() => {
+    // Small delay so the animation fires after card mount
+    const t = setTimeout(() => setAnimated(Math.round(score)), 120);
+    return () => clearTimeout(t);
+  }, [score]);
 
-export default function JobCard({ job }: { job: Job }) {
-  const [expanded, setExpanded] = useState(false);
-  const { bg, text: textColor } = scoreColor(job.totalScore);
-
-  const descExcerpt = job.description
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 300);
+  const r = 23;
+  const C = 2 * Math.PI * r;          // ≈ 144.5
+  const arc = (animated / 100) * C;
+  const color = score >= 80 ? "var(--green)" : score >= 60 ? "var(--amber)" : "var(--slate)";
 
   return (
-    <div
-      className="rounded-xl overflow-hidden transition-all"
-      style={{ background: "#0d1525", border: "1px solid #1e3050" }}
+    <div className="score-ring-wrap">
+      <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: "rotate(-90deg)" }}>
+        {/* Track */}
+        <circle cx="29" cy="29" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="3.5" />
+        {/* Arc */}
+        <circle
+          cx="29" cy="29" r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeDasharray={`${arc} ${C}`}
+          style={{ transition: "stroke-dasharray 0.9s cubic-bezier(0.34, 1.3, 0.64, 1)" }}
+        />
+      </svg>
+      <span className="score-num" style={{ color }}>
+        {Math.round(score)}
+      </span>
+    </div>
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function daysAgo(iso: string): string {
+  const d = Math.floor((Date.now() - Date.parse(iso)) / 864e5);
+  if (isNaN(d) || d < 0) return "–";
+  if (d === 0) return "Today";
+  if (d === 1) return "Yesterday";
+  return `${d}d ago`;
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setW(Math.min(100, value)), 200);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  const color = value >= 80 ? "var(--green)" : value >= 60 ? "var(--amber)" : "var(--slate)";
+  return (
+    <div className="sbar-row">
+      <span className="sbar-lbl">{label}</span>
+      <div className="sbar-track">
+        <div className="sbar-fill" style={{ width: `${w}%`, background: color }} />
+      </div>
+      <span className="sbar-val" style={{ color }}>{Math.round(value)}</span>
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+export default function JobCard({ job, index }: { job: Job; index: number }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const qual =
+    job.totalScore >= 80 ? "excellent" :
+    job.totalScore >= 60 ? "good" : "";
+
+  return (
+    <article
+      className={`job-card ${qual}`}
+      style={{ animationDelay: `${Math.min(index * 0.045, 0.4)}s` }}
     >
-      {/* Main row */}
-      <div className="p-5">
-        <div className="flex items-start gap-4">
-          {/* Score circle */}
-          <div
-            className="flex-shrink-0 w-[52px] h-[52px] rounded-full flex items-center justify-center font-bold text-base"
-            style={{ background: bg, color: textColor }}
-          >
-            {job.totalScore}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-white text-base leading-snug">{job.title}</h3>
-                <div className="text-slate-400 text-sm mt-0.5">
-                  {job.company}
-                  <span className="mx-2 text-slate-600">·</span>
-                  <span>{job.countryFlag} {job.location}</span>
-                  {job.salary && (
-                    <>
-                      <span className="mx-2 text-slate-600">·</span>
-                      <span className="text-blue-400">{job.salary}</span>
-                    </>
-                  )}
-                </div>
-                <div className="text-slate-600 text-xs mt-1 flex items-center gap-2">
-                  <span>{timeAgo(job.postedAt)}</span>
-                  <span>·</span>
-                  <span className="capitalize">{job.source}</span>
-                  {job.relocationBonus > 0 && (
-                    <>
-                      <span>·</span>
-                      <span className="text-blue-400">✈️ Relocation</span>
-                    </>
-                  )}
-                  <span>·</span>
-                  <span className="text-green-500">🛂 Visa Sponsored</span>
-                </div>
-              </div>
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                Apply →
-              </a>
-            </div>
-
-            {/* Skill pills */}
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {job.matchedSkills.slice(0, 8).map((skill) => (
-                <span
-                  key={skill}
-                  className="px-2 py-0.5 rounded-full text-xs font-medium"
-                  style={{ background: "#14532d", color: "#86efac" }}
-                >
-                  {skill}
-                </span>
-              ))}
-              {job.matchedSkills.length > 8 && (
-                <span className="text-slate-500 text-xs px-2 py-0.5">
-                  +{job.matchedSkills.length - 8} more
-                </span>
-              )}
-            </div>
+      {/* ── Top row ─────────────────────────────────────────────── */}
+      <div className="card-top">
+        <div className="card-company">
+          <span className="company-flag">{job.countryFlag}</span>
+          <div style={{ minWidth: 0 }}>
+            <span className="company-name">{job.company}</span>
+            <span className="company-country">{job.country}</span>
           </div>
         </div>
-
-        {/* Expand toggle */}
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="mt-3 text-slate-500 hover:text-slate-300 text-xs flex items-center gap-1 transition-colors"
-        >
-          {expanded ? "▲ Less details" : "▼ More details"}
-        </button>
+        <ScoreRing score={job.totalScore} />
       </div>
 
-      {/* Expanded section */}
-      {expanded && (
-        <div className="px-5 pb-5" style={{ borderTop: "1px solid #1e3050" }}>
-          <div className="pt-4 grid md:grid-cols-2 gap-6">
-            {/* Score breakdown */}
-            <div>
-              <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Score Breakdown</h4>
-              <div className="space-y-2">
-                {[
-                  { label: "Skill Match", value: job.skillMatchScore, weight: "60%", color: "#3b82f6" },
-                  { label: "Recency", value: job.recencyScore, weight: "30%", color: "#8b5cf6" },
-                  { label: "Relocation Bonus", value: job.relocationBonus, weight: "10%", color: "#10b981" },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-400">{item.label} <span className="text-slate-600">({item.weight})</span></span>
-                      <span className="font-bold" style={{ color: item.color }}>{item.value}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#162238" }}>
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${Math.min(100, item.value)}%`, background: item.color }}
-                      />
-                    </div>
-                  </div>
-                ))}
-                <div className="pt-2 flex justify-between text-sm font-bold border-t mt-2" style={{ borderColor: "#1e3050" }}>
-                  <span className="text-slate-300">Total Score</span>
-                  <span className="text-white">{job.totalScore}</span>
-                </div>
-              </div>
-            </div>
+      {/* ── Title ───────────────────────────────────────────────── */}
+      <h2 className="card-title">{job.title}</h2>
 
-            {/* Missing skills */}
-            <div>
-              <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Missing Skills</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {job.missingSkills.slice(0, 12).map((skill) => (
-                  <span
-                    key={skill}
-                    className="px-2 py-0.5 rounded-full text-xs"
-                    style={{ background: "#1c1917", color: "#78716c" }}
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* ── Meta ────────────────────────────────────────────────── */}
+      <div className="card-meta">
+        <span>📍 {job.location}</span>
+        {job.salary && <span>💰 {job.salary}</span>}
+        <span className="meta-date">{daysAgo(job.postedAt)}</span>
+        <span className="visa-badge">✈ Visa ✓</span>
+      </div>
 
-          {/* Description excerpt */}
-          <div className="mt-4">
-            <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Description Excerpt</h4>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              {descExcerpt}
-              {job.description.length > 300 && (
-                <a
-                  href={job.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline ml-1"
-                >
-                  Read more →
-                </a>
-              )}
-            </p>
-          </div>
+      {/* ── Skills ──────────────────────────────────────────────── */}
+      <div className="card-skills">
+        {job.matchedSkills.map(s => (
+          <span key={s} className="skill-chip matched">{s}</span>
+        ))}
+        {job.missingSkills.slice(0, 4).map(s => (
+          <span key={s} className="skill-chip missing">{s}</span>
+        ))}
+      </div>
+
+      {/* ── Score breakdown ─────────────────────────────────────── */}
+      <div className="score-bars">
+        <ScoreBar label="Skills"   value={job.skillMatchScore} />
+        <ScoreBar label="Recency"  value={job.recencyScore} />
+        {job.relocationBonus > 0 && (
+          <div className="reloc-badge">+{job.relocationBonus} relocation bonus</div>
+        )}
+      </div>
+
+      {/* ── Expanded description ─────────────────────────────────── */}
+      {expanded && job.description && (
+        <div className="card-desc">
+          {job.description.length > 900
+            ? job.description.slice(0, 900) + "…"
+            : job.description}
         </div>
       )}
-    </div>
+
+      {/* ── Actions ─────────────────────────────────────────────── */}
+      <div className="card-actions">
+        <a
+          href={job.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-apply"
+        >
+          Apply Now ↗
+        </a>
+        {job.description && (
+          <button
+            className="btn-details"
+            onClick={() => setExpanded(v => !v)}
+          >
+            {expanded ? "↑ Less" : "↓ Details"}
+          </button>
+        )}
+      </div>
+    </article>
   );
 }

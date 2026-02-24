@@ -1,19 +1,25 @@
-// Load env vars for standalone script
-import path from "path";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require("dotenv").config({ path: path.join(process.cwd(), ".env.local") });
+// src/scripts/cron.ts
+// Entry point for: pnpm run cron:now
+// Runs the full scan and prints a summary.
 
-import { runFetch } from "../lib/runner";
+import { runAllSources } from "../lib/runner";
 
-async function main() {
+(async () => {
   try {
-    const log = await runFetch();
-    console.log("Summary:", log);
+    const log = await runAllSources();
+    console.log("\n── Run summary ──────────────────────────────────────");
+    console.log(`  New jobs:    ${log.newJobs}`);
+    console.log(`  Total jobs:  ${log.totalJobs}`);
+    console.log(`  Duration:    ${(log.durationMs / 1000).toFixed(1)}s`);
+    console.log(`  Sources:     ${JSON.stringify(log.sources)}`);
+    if (log.errors.length) {
+      console.warn(`  Errors (${log.errors.length}):`);
+      log.errors.forEach(e => console.warn(`    • ${e}`));
+    }
+    console.log("─────────────────────────────────────────────────────\n");
     process.exit(0);
   } catch (err) {
-    console.error("Cron failed:", err);
+    console.error("[cron] Fatal error:", err);
     process.exit(1);
   }
-}
-
-main();
+})();
