@@ -1,10 +1,12 @@
 // src/lib/types.ts
 
 export type JobSource = "company";
+export type JobMode = "visa" | "local";  // visa = remote+visa, local = egypt direct
 
 export interface Job {
-  id: string;             // e.g. "company_monzo_12345"
+  id: string;
   source: JobSource;
+  mode: JobMode;       // which pipeline produced this job
   title: string;
   company: string;
   location: string;
@@ -13,15 +15,15 @@ export interface Job {
   url: string;
   description: string;
   salary?: string;
-  postedAt: string;       // ISO string from ATS
-  visaSponsorship: true;  // Always true — that's the whole point of this list
+  postedAt: string;
+  visaSponsorship: boolean; // true for visa-mode jobs, false for local-mode
   matchedSkills: string[];
   missingSkills: string[];
-  skillMatchScore: number;   // 0–100 (0 = filtered out, < MIN_CORE_SKILLS)
-  recencyScore: number;      // 0–100 (100 = today, 0 = 60+ days old)
-  relocationBonus: number;   // 0 or 10
-  totalScore: number;        // 0.6*skill + 0.3*recency + 0.1*relocation
-  fetchedAt: string;         // ISO string of when we scraped it
+  skillMatchScore: number;
+  recencyScore: number;
+  relocationBonus: number;
+  totalScore: number;
+  fetchedAt: string;
 }
 
 export interface JobStore {
