@@ -313,3 +313,137 @@ export function isTimezoneIncompatible(text: string): boolean {
     /work\s+authorization\s+(in|for)\s+(the\s+)?(us|uk|eu)\b/,
   ].some(re => re.test(t));
 }
+
+// ── Custom Local Egyptian Company Fetchers ──────────────────────────────────
+
+/**
+ * Giza Systems — custom careers site.
+ * Filters: Egypt jobs, IT/Software role categories (5,21), sorted by date.
+ * Returns HTML page, we extract job cards from it.
+ */
+export async function fetchGizaSystems(mode: JobMode): Promise<Job[]> {
+  const company: BaseCompany = { name: "Giza Systems", country: "Egypt", countryFlag: "🇪🇬", city: "Cairo" };
+  const url = "https://www.gizasystemscareers.com/app/control/byt_job_search_manager?action=1&token=9IAKQR&query=trigger%3Ddate_indexed%26job_city%3Deg%2C2%2C0%26page%3D1%26jb_role%3D5%2C21%26date_indexed%3D8&body=job-search-results&lan=en";
+  const res = await safeFetch(url);
+  if (!res) return [];
+  const html = await res.text();
+
+  // Extract job cards: title, link, date from the returned HTML fragment
+  const jobs: RawJob[] = [];
+  // Pattern: job title in anchor tags and date in nearby spans
+  const cardRegex = /<a[^>]+href="([^"]+byt_job_details[^"]+)"[^>]*>\s*([^<]+)<\/a>/gi;
+  const dateRegex = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}-\d{2}-\d{2})/;
+  let match: RegExpExecArray | null;
+  const seenUrls = new Set<string>();
+
+  // Split into rough "cards" to pair title+date
+  const cards = html.split(/class="[^"]*job[^"]*"/i);
+  for (const card of cards) {
+    const linkMatch = /<a[^>]+href="([^"]+byt_job_details[^"]+)"[^>]*>([^<]{3,80})<\/a>/i.exec(card);
+    if (!linkMatch) continue;
+    const [, href, rawTitle] = linkMatch;
+    const title = rawTitle.trim();
+    if (!title || seenUrls.has(href)) continue;
+    seenUrls.add(href);
+
+    const dateMatch = dateRegex.exec(card);
+    const postedAt = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+
+    const fullUrl = href.startsWith("http") ? href : `https://www.gizasystemscareers.com${href}`;
+    jobs.push({ id: `local_gizasystems_${Buffer.from(href).toString("base64").slice(0, 16)}`, title, location: "Cairo", url: fullUrl, postedAt, description: "" });
+  }
+
+  console.log(`[local] Giza Systems raw: ${jobs.length}`);
+  return processJobs(jobs, company, mode, false);
+}
+
+/**
+ * Bright Skies — GraphQL API.
+ */
+export async function fetchBrightSkies(mode: JobMode): Promise<Job[]> {
+  const company: BaseCompany = { name: "Bright Skies", country: "Egypt", countryFlag: "🇪🇬", city: "Cairo" };
+  const res = await (async () => {
+    try {
+      return await fetch("https://brightskiesinc.com/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
+        body: JSON.stringify({
+          operationName: "getJobs",
+          variables: { pageSize: 50, page: 1, title: "" },
+          query: `query getJobs($pageSize: Int!, $page: Int!, $title: String, $department: String, $location: String) {
+            jobs(filters: {title: {contains: $title}, department: {contains: $department}, location: {contains: $location}}, pagination: {pageSize: $pageSize, page: $page}) {
+              data { id attributes { title location job_type department } }
+            }
+          }`,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch { return null; }
+  })();
+
+  if (!res) return [];
+  try {
+    const data = await res.json() as { data?: { jobs?: { data?: Array<{ id: string; attributes: { title: string; location: string; department: string } }> } } };
+    const items = data?.data?.jobs?.data ?? [];
+    const jobs: RawJob[] = items.map((item) => ({
+      id: `local_brightskies_${item.id}`,
+      title: item.attributes.title,
+      location: item.attributes.location || "Cairo",
+      url: `https://brightskiesinc.com/careers/jobs/${item.id}`,
+      postedAt: new Date().toISOString(), // no date in API response
+      description: item.attributes.department || "",
+    }));
+    console.log(`[local] Bright Skies raw: ${jobs.length}`);
+    return processJobs(jobs, company, mode, false);
+  } catch { return []; }
+}
+
+/**
+ * Pharos Solutions — WordPress AJAX job filter endpoint.
+ */
+export async function fetchPharos(mode: JobMode): Promise<Job[]> {
+  const company: BaseCompany = { name: "Pharos Solutions", country: "Egypt", countryFlag: "🇪🇬", city: "Cairo" };
+  const res = await (async () => {
+    try {
+      return await fetch("https://pharos-solutions.de/wp-admin/admin-ajax.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0",
+        },
+        body: "awsm_job_spec%5Bjob-category%5D=36&awsm_job_spec%5Bjob-type%5D=32&awsm_job_spec%5Bjob-location%5D=&action=jobfilter&listings_per_page=30",
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch { return null; }
+  })();
+
+  if (!res) return [];
+  try {
+    const html = await res.text();
+    const jobs: RawJob[] = [];
+    // Extract job listings from WP HTML response
+    const linkRegex = /<a[^>]+href="(https?:\/\/pharos-solutions\.de\/job\/[^"]+)"[^>]*>\s*<h2[^>]*>([^<]{3,100})<\/h2>/gi;
+    const dateRegex = /<time[^>]+datetime="([^"]+)"/i;
+    let match: RegExpExecArray | null;
+
+    // Split by job cards
+    const cards = html.split(/<article|<li[^>]*class="[^"]*job/i);
+    for (const card of cards) {
+      const linkM = /<a[^>]+href="(https?:\/\/pharos-solutions\.de\/(?:job|jobs)[^"]*)"[^>]*>([^<]{3,100})/i.exec(card);
+      if (!linkM) continue;
+      const [, url, rawTitle] = linkM;
+      const title = rawTitle.replace(/<[^>]+>/g, "").trim();
+      if (!title) continue;
+
+      const dateM = dateRegex.exec(card);
+      const postedAt = dateM ? dateM[1] : new Date().toISOString();
+
+      jobs.push({
+        id: `local_pharos_${Buffer.from(url).toString("base64").slice(0, 16)}`,
+        title, location: "Cairo", url, postedAt, description: "",
+      });
+    }
+    console.log(`[local] Pharos raw: ${jobs.length}`);
+    return processJobs(jobs, company, mode, false);
+  } catch { return []; }
+}

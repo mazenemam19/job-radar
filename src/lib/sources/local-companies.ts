@@ -1,6 +1,6 @@
 // src/lib/sources/local-companies.ts
 import type { Job } from "../types";
-import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchBambooHR, type ATSConfig } from "./ats-utils";
+import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchBambooHR, fetchGizaSystems, fetchBrightSkies, fetchPharos, type ATSConfig } from "./ats-utils";
 
 const COUNTRY = "Egypt";
 const FLAG = "🇪🇬";
@@ -32,18 +32,16 @@ const COMPANIES: ATSConfig[] = [
     { ats: "greenhouse",     name: "Khazna",       slug: "khazna",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
     { ats: "lever",          name: "Trella",       slug: "trella",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-    // ── TODO: Need manual page fetch to identify ATS ──────────────────────
-    // enozom       → https://enozom.com/Company/Join_Us/           (custom or Zoho?)
-    // Pharos       → https://pharos-solutions.de/careers/          (unknown)
-    // softxpert    → https://softxpert.zohorecruit.com/jobs/Careers (Zoho Recruit - needs custom fetcher)
-    // trianglz     → https://trianglz.com/software-development-jobs-egypt-trianglz/
-    // inovaeg      → https://inovaeg.com/jobs/
-    // espace       → https://espace.com.eg/jobs/
-    // eventum      → https://odoo.eventumsolutions.com/jobs (Odoo - needs custom fetcher)
-    // objects      → https://objects.ws/careers/
-    // brightskiesinc → https://brightskiesinc.com/careers/jobs
-    // gizasystems  → https://www.gizasystemscareers.com/en/job-search-results/
+    // ── Server-side / Down (cannot scrape) ───────────────────────────────
+    // Objects      → server-side rendered
+    // Trianglz     → server-side rendered
+    // SoftXpert    → Zoho Recruit, server-side
+    // Enozom       → server-side (also no openings currently)
+    // Innova       → API currently down
 ];
+
+// ── Companies with custom fetchers (non-standard ATS) ────────────────────────
+// Giza Systems, Bright Skies, Pharos use custom endpoints (see ats-utils.ts)
 
 export async function fetchLocalJobs(): Promise<Job[]> {
     const results = await Promise.allSettled(
@@ -73,6 +71,23 @@ export async function fetchLocalJobs(): Promise<Job[]> {
             console.error("[local] Unhandled rejection:", r.reason);
         }
     }
+    // ── Custom fetchers (non-standard ATS) ──────────────────────────────────
+    const customFetchers = [
+        fetchGizaSystems(MODE),
+        fetchBrightSkies(MODE),
+        fetchPharos(MODE),
+    ];
+    const customResults = await Promise.allSettled(customFetchers);
+    for (const r of customResults) {
+        if (r.status === "fulfilled") {
+            for (const j of r.value) {
+                if (!seen.has(j.id)) { seen.add(j.id); all.push(j); }
+            }
+        } else {
+            console.error("[local] Custom fetcher error:", r.reason);
+        }
+    }
+
     console.log(`[local] Total: ${all.length} jobs`);
     return all;
 }
