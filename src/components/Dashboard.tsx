@@ -42,7 +42,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
-  const [minScore, setMinScore] = useState(0);
+  const [minScore, setMinScore] = useState(1);
   const [sortBy, setSortBy] = useState<"score" | "recency" | "company">("score");
 
   const loadJobs = useCallback(async () => {

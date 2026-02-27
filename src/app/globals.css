@@ -623,7 +623,9 @@ body::before {
   margin-left: auto;
 }
 
-.visa-badge, .local-badge, .remote-badge {
+.visa-badge,
+.local-badge,
+.remote-badge {
   font-family: var(--font-mono);
   font-size: 9.5px;
   padding: 2px 8px;
@@ -674,6 +676,12 @@ body::before {
   color: var(--text-muted);
   border: 1px solid var(--border);
   opacity: 0.55;
+}
+
+.skill-chip.bonus {
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--slate);
+  border: 1px solid rgba(100, 116, 139, 0.28);
 }
 
 .score-bars {
@@ -819,6 +827,7 @@ body::before {
     font-size: 12px;
   }
 }
+
 /* ── Job Detail Page ──────────────────────────────────────────────────────── */
 
 .detail-shell {
@@ -849,7 +858,11 @@ body::before {
   margin-bottom: 32px;
   transition: color 0.15s, border-color 0.15s;
 }
-.detail-back:hover { color: var(--text); border-color: var(--border-hi); }
+
+.detail-back:hover {
+  color: var(--text);
+  border-color: var(--border-hi);
+}
 
 .detail-header {
   background: var(--surface);
@@ -866,7 +879,9 @@ body::before {
   margin-bottom: 16px;
 }
 
-.detail-flag { font-size: 28px; }
+.detail-flag {
+  font-size: 28px;
+}
 
 .detail-company {
   display: block;
@@ -956,7 +971,11 @@ body::before {
   text-decoration: none;
   transition: background 0.15s, transform 0.1s;
 }
-.detail-apply-btn:hover { background: var(--accent-h); transform: translateY(-1px); }
+
+.detail-apply-btn:hover {
+  background: var(--accent-h);
+  transform: translateY(-1px);
+}
 
 /* ── Rendered job description HTML ─────────────────────────────────────────── */
 
@@ -981,9 +1000,18 @@ body::before {
   line-height: 1.3;
 }
 
-.detail-body h1 { font-size: 22px; }
-.detail-body h2 { font-size: 17px; color: var(--accent-h); }
-.detail-body h3 { font-size: 15px; }
+.detail-body h1 {
+  font-size: 22px;
+}
+
+.detail-body h2 {
+  font-size: 17px;
+  color: var(--accent-h);
+}
+
+.detail-body h3 {
+  font-size: 15px;
+}
 
 .detail-body p {
   margin: 0 0 14px;
@@ -1001,12 +1029,14 @@ body::before {
   color: var(--text);
 }
 
-.detail-body strong, .detail-body b {
+.detail-body strong,
+.detail-body b {
   color: #fff;
   font-weight: 600;
 }
 
-.detail-body em, .detail-body i {
+.detail-body em,
+.detail-body i {
   color: var(--text-muted);
 }
 
@@ -1015,7 +1045,10 @@ body::before {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.detail-body a:hover { color: #fff; }
+
+.detail-body a:hover {
+  color: #fff;
+}
 
 .detail-body hr {
   border: none;

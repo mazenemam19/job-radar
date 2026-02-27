@@ -72,15 +72,16 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
         {job.isRemote && <span className="remote-badge">🌐 Remote</span>}
         {job.salary && <span>💰 {job.salary}</span>}
         <span className="meta-date">{daysAgo(job.postedAt)}</span>
-        {job.mode === "visa"
-          ? <span className="visa-badge">✈ Visa ✓</span>
-          : <span className="local-badge">🇪🇬 Local</span>
+        {job.mode === "visa" ? <span className="visa-badge">✈ Visa ✓</span>
+          : job.mode === "local" ? <span className="local-badge">🇪🇬 Local</span>
+            : <span className="remote-badge">🌐 Global</span>
         }
       </div>
 
       <div className="card-skills">
         {job.matchedSkills.map(s => <span key={s} className="skill-chip matched">{s}</span>)}
         {job.missingSkills.slice(0, 4).map(s => <span key={s} className="skill-chip missing">{s}</span>)}
+        {job.bonusSkills.map(s => <span key={s} className="skill-chip bonus">{s}</span>)}
       </div>
 
       <div className="score-bars">
