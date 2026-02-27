@@ -1,48 +1,86 @@
 # 🎯 Job Radar
 
-A high-fidelity job aggregator for **Senior Frontend Developers** (React/TypeScript). This tool targets global visa-sponsoring remote giants and high-growth Egyptian startups, using direct ATS APIs to bypass noisy aggregators and recruiters.
+A precision job aggregator and scoring engine designed for **Senior Frontend Developers** (React/TypeScript).
 
-## 🚀 Current Status & Achievements
+Job Radar bypasses the noise of LinkedIn, Wuzzuf, and recruiter-heavy aggregators by scraping job data directly from company career portals (ATS). It automatically filters out irrelevant roles and scores every job against your specific tech stack.
 
--   **High-Fidelity Filtering**: Successfully implemented strict filters to ensure only relevant Frontend roles are surfaced.
-    -   **Blocked**: Fullstack, Tech Lead, Lead, Staff, Principal, Manager, Helpdesk/Support, and non-tech roles (Sales, Operations, Content Creation).
-    -   **Target**: Senior Frontend developers with ~4-5 years of experience.
--   **Expanded ATS Support**: Scrapers are now unified and support 7 major platforms:
-    -   **Greenhouse**, **Lever**, **Ashby**, **Workable (Widget API)**, **Teamtailor**, **Breezy HR**, and **SmartRecruiters**.
--   **Local Dashboard (Egypt)**: Monitors 11+ major Egyptian startups including **Bosta, Thndr, Nawy, Dubizzle, Yassir, Vezeeta, MaxAB, and Wasoko**.
--   **Visa/Remote Dashboard**: Monitors global remote giants like **GitLab, Speechify, Adyen, Intercom, and Contentful**.
--   **Remote Detection**: Integrated logic to detect remote status from titles and descriptions, with a dedicated **🌐 Remote** badge in the UI.
--   **Sponsorship Accuracy**: Refined logic to only mark jobs as "Visa ✓" if explicitly mentioned or part of a confirmed sponsorship pipeline.
+## 🚀 The Mission
 
-## 🛠️ Key Features
+Most job boards are flooded with "Fullstack", "Tech Lead", and "Support" roles that waste a Frontend specialist's time. This tool is built to:
+1.  **Eliminate Noise**: Strictly filter out anything that isn't a pure Frontend role using title keywords and description signal analysis.
+2.  **Target Seniority**: Focus on the ~4-5 years experience "sweet spot" (rejecting Junior, Lead, and Executive roles).
+3.  **Verify Sourcing**: Hit direct ATS APIs to ensure listings are fresh and real.
+4.  **Detect Remote**: Automatically identify work-from-home options and filter by timezone compatibility (GMT+2 friendly).
 
--   **Direct Sourcing**: Pulls directly from company career boards (no LinkedIn/Wuzzuf noise).
--   **Automated Scoring**: Jobs are scored (0-100) based on:
-    -   60% Skill Match (React, TypeScript, JavaScript, etc.)
-    -   30% Recency
-    -   10% Relocation/Visa mention
--   **Deduplication**: Automatically handles duplicate listings across multiple scans.
--   **Email Alerts**: Instant SMTP notifications for top-scoring new roles.
+## 🛠️ Supported Platforms (ATS)
 
-## 🏗️ Architecture
+The system features a unified scraping pipeline supporting 8 major Applicant Tracking Systems:
+-   **Greenhouse** (`boards-api.greenhouse.io`)
+-   **Lever** (`api.lever.co`)
+-   **Ashby** (`api.ashbyhq.com`)
+-   **Workable** (`apply.workable.com` via Widget API)
+-   **Teamtailor** (`{slug}.teamtailor.com`)
+-   **Breezy HR** (`{slug}.breezy.hr`)
+-   **SmartRecruiters** (`api.smartrecruiters.com`)
+-   **BambooHR** (`{slug}.bamboohr.com`)
 
--   **Framework**: Next.js 14 (App Router)
--   **Language**: TypeScript
--   **Scrapers**: Unified pipeline in `src/lib/sources/ats-utils.ts`.
--   **Persistence**: JSON file storage (`data/jobs.json`) with a 500-job cap.
--   **Scheduling**: Cron-based fetching via `src/scripts/cron.ts`.
+## 📊 How Scoring Works
+
+Every job is analyzed and assigned a score from **0 to 100**:
+-   **60% Skill Match**: Scans for React, TypeScript, JavaScript, Redux, React Query, Material UI, Vite, etc.
+-   **30% Recency**: Newer jobs get significantly higher scores. Jobs older than **30 days** are automatically expired.
+-   **10% Bonuses**: Extra points for explicit mentions of "Relocation".
+
+## 🏠 Monitoring Pipelines
+
+### 1. Local Dashboard (Egypt Hub)
+Monitors high-growth startups and tech agencies in Egypt. 
+*   **Active Scrapers**: Bosta, Thndr, Speechify (Egypt), Nawy, Yassir, Dubizzle.
+*   **Monitoring**: Instabug, Vezeeta, MaxAB, Rubikal, Blink22, Robusta, and more.
+
+### 2. Visa Dashboard
+Monitors global "Remote Giants" known for visa sponsorship and relocation assistance:
+*   **Verified**: GitLab, Speechify, Adyen, Intercom, Contentful, Monzo, N26, Typeform.
+
+### 3. Global Dashboard (NEW)
+Monitors worldwide remote-first companies that are timezone-compatible with Egypt (GMT+2). Includes a strict filter to reject roles restricted to US/Canada/UK/EU residents only.
+
+## 💻 Tech Stack
+
+-   **Frontend**: Next.js 14 (App Router), React, Tailwind CSS.
+-   **Backend**: TypeScript, Node.js (TS-Node for scripts).
+-   **Communication**: Nodemailer (SMTP) for instant job alerts (Visa pipeline only).
+-   **Data**: Flat JSON storage (`data/jobs.json`) with auto-deduplication and 30-day expiry.
 
 ## 🚦 Getting Started
 
-1.  **Install dependencies**: `pnpm install`
-2.  **Environment**: Create `.env.local` (see `.env.local.example`).
-3.  **Run Dashboard**: `pnpm dev`
-4.  **Run Scan**: `pnpm run cron:now`
+### 1. Installation
+```bash
+pnpm install
+```
 
-## 🧠 How It Works
+### 2. Configuration
+Create a `.env.local` file based on `.env.local.example`:
+- `SMTP_*`: Required for email alerts.
+- `CRON_SECRET`: Secures the API trigger.
 
-1.  **Scan**: The runner iterates through verified slugs in `companies.ts` and `local-companies.ts`.
-2.  **Scrape**: Unified fetchers hit JSON endpoints for Greenhouse, Lever, Workable, etc.
-3.  **Filter**: Titles are checked against a strict blocklist (Lead, Fullstack, Support, etc.).
-4.  **Score**: Descriptions are scanned for React/TS ecosystem keywords.
-5.  **Display**: Dashboard sorts by score, showing match/missing skills and remote status.
+### 3. Usage
+```bash
+pnpm dev          # Start the dashboard UI at http://localhost:3000
+pnpm run cron:now # Trigger an immediate global scan across all 3 pipelines
+```
+
+## 🧠 Adding a New Company
+
+To add a new company, simply add an entry to the `COMPANIES` array in the corresponding file under `src/lib/sources/`:
+
+```typescript
+{ 
+  ats: "greenhouse", 
+  name: "MyCompany", 
+  slug: "my-company-slug", 
+  country: "Germany", 
+  countryFlag: "🇩🇪" 
+}
+```
+The unified pipeline in `ats-utils.ts` handles scraping, filtering, and scoring automatically.
