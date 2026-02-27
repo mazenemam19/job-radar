@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState<"idle" | "ok" | "err">("idle");
 
-  const [mode, setMode] = useState<JobMode>("visa");
+  const [mode, setMode] = useState<"all" | JobMode>("all");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -71,8 +71,8 @@ export default function Dashboard() {
 
   const allJobs = store?.jobs ?? [];
 
-  // Jobs filtered by current mode tab
-  const modeJobs = useMemo(() => allJobs.filter(j => j.mode === mode), [allJobs, mode]);
+  // Jobs filtered by current mode
+  const modeJobs = useMemo(() => mode === "all" ? allJobs : allJobs.filter(j => j.mode === mode), [allJobs, mode]);
 
   const companies = useMemo(() => [...new Set(modeJobs.map(j => j.company))].sort(), [modeJobs]);
   const countries = useMemo(() => [...new Set(modeJobs.map(j => j.country))].sort(), [modeJobs]);
@@ -97,7 +97,7 @@ export default function Dashboard() {
   const globalCount = useMemo(() => allJobs.filter(j => j.mode === "global").length, [allJobs]);
 
   // Reset filters on mode switch
-  const switchMode = (m: JobMode) => {
+  const switchMode = (m: "all" | JobMode) => {
     setMode(m);
     setSearch(""); setCompanyFilter("all"); setCountryFilter("all"); setMinScore(0);
   };
@@ -126,29 +126,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Mode tabs */}
+        {/* Mode dropdown */}
         <div className="mode-tabs">
-          <button
-            className={`mode-tab ${mode === "visa" ? "active" : ""}`}
-            onClick={() => switchMode("visa")}
+          <select
+            className="mode-dropdown"
+            value={mode}
+            onChange={e => switchMode(e.target.value as "all" | JobMode)}
           >
-            ✈️ Visa Sponsorship
-            <span className="tab-count">{visaCount}</span>
-          </button>
-          <button
-            className={`mode-tab ${mode === "local" ? "active" : ""}`}
-            onClick={() => switchMode("local")}
-          >
-            🇪🇬 Local Egypt
-            <span className="tab-count">{localCount}</span>
-          </button>
-          <button
-            className={`mode-tab ${mode === "global" ? "active" : ""}`}
-            onClick={() => switchMode("global")}
-          >
-            🌐 Global Remote
-            <span className="tab-count">{globalCount}</span>
-          </button>
+            <option value="all">🌐 All Jobs ({allJobs.length})</option>
+            <option value="visa">✈️ Visa Sponsorship ({visaCount})</option>
+            <option value="local">🇪🇬 Local Egypt ({localCount})</option>
+            <option value="global">🌍 Global Remote ({globalCount})</option>
+          </select>
         </div>
 
         {/* Stats strip */}
@@ -174,7 +163,7 @@ export default function Dashboard() {
           <option value="all">All Companies</option>
           {companies.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {mode === "visa" && (
+        {(mode === "visa" || mode === "all") && (
           <select className="filter-select" value={countryFilter} onChange={e => setCountryFilter(e.target.value)}>
             <option value="all">All Countries</option>
             {countries.map(c => <option key={c} value={c}>{c}</option>)}
@@ -193,7 +182,9 @@ export default function Dashboard() {
 
       {/* Mode description */}
       <div className="mode-desc">
-        {mode === "visa"
+        {mode === "all"
+          ? "🔍 All jobs across all pipelines — visa sponsorship, local Egypt, and global remote. Use the dropdown to filter by pipeline."
+          : mode === "visa"
           ? "🌍 Remote positions at European tech companies — all actively sponsor visas. Senior-only & off-discipline roles are automatically filtered out."
           : mode === "local"
           ? "🇪🇬 On-site / hybrid roles at Egyptian tech companies in Cairo & Alexandria. Same skill-match scoring — no visa assumption."

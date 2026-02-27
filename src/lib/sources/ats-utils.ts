@@ -7,6 +7,49 @@ import { isClearlyNonFrontend, isTooSenior, isGenericTitleButBackendRole, requir
 export interface BaseCompany { name: string; country: string; countryFlag: string; city?: string; }
 export interface ATSConfig extends BaseCompany { ats: "greenhouse" | "lever" | "ashby" | "workable" | "teamtailor" | "breezy" | "smartrecruiters" | "bamboohr"; slug: string; }
 
+/** 
+ * Maps common country names/codes found in ATS location strings to flags.
+ */
+const COUNTRY_MAP: Record<string, { name: string, flag: string }> = {
+  "ireland": { name: "Ireland", flag: "🇮🇪" },
+  "germany": { name: "Germany", flag: "🇩🇪" },
+  "netherlands": { name: "Netherlands", flag: "🇳🇱" },
+  "united kingdom": { name: "UK", flag: "🇬🇧" },
+  "uk": { name: "UK", flag: "🇬🇧" },
+  "london": { name: "UK", flag: "🇬🇧" },
+  "berlin": { name: "Germany", flag: "🇩🇪" },
+  "amsterdam": { name: "Netherlands", flag: "🇳🇱" },
+  "dublin": { name: "Ireland", flag: "🇮🇪" },
+  "spain": { name: "Spain", flag: "🇪🇸" },
+  "barcelona": { name: "Spain", flag: "🇪🇸" },
+  "madrid": { name: "Spain", flag: "🇪🇸" },
+  "portugal": { name: "Portugal", flag: "🇵🇹" },
+  "lisbon": { name: "Portugal", flag: "🇵🇹" },
+  "france": { name: "France", flag: "🇫🇷" },
+  "paris": { name: "France", flag: "🇫🇷" },
+  "sweden": { name: "Sweden", flag: "🇸🇪" },
+  "stockholm": { name: "Sweden", flag: "🇸🇪" },
+  "denmark": { name: "Denmark", flag: "🇩🇰" },
+  "copenhagen": { name: "Denmark", flag: "🇩🇰" },
+  "finland": { name: "Finland", flag: "🇫🇮" },
+  "helsinki": { name: "Finland", flag: "🇫🇮" },
+  "poland": { name: "Poland", flag: "🇵🇱" },
+  "warsaw": { name: "Poland", flag: "🇵🇱" },
+  "usa": { name: "USA", flag: "🇺🇸" },
+  "united states": { name: "USA", flag: "🇺🇸" },
+  "egypt": { name: "Egypt", flag: "🇪🇬" },
+  "cairo": { name: "Egypt", flag: "🇪🇬" },
+  "remote": { name: "Remote", flag: "🌍" },
+};
+
+function detectCountry(location: string, fallback: { name: string, flag: string }): { name: string, flag: string } {
+  const loc = (location || "").toLowerCase();
+  for (const [key, val] of Object.entries(COUNTRY_MAP)) {
+    if (loc.includes(key)) return val;
+  }
+  return fallback;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function stripHtml(html: string): string {
@@ -110,11 +153,13 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
       ? extractEgyptCity(r.location, company.city)
       : r.location;
 
+    const countryInfo = detectCountry(r.location, { name: company.country, flag: company.countryFlag });
+
     const hasDate = !!r.postedAt && r.postedAt.trim() !== "";
     out.push({
       id: r.id, source: "company", mode,
       title, company: company.name, location: displayLocation,
-      country: company.country, countryFlag: company.countryFlag,
+      country: countryInfo.name, countryFlag: countryInfo.flag,
       url: r.url, description: r.description, 
       isRemote,
       postedAt: hasDate ? r.postedAt : now,
@@ -124,7 +169,11 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     });
   }
 
-  console.log(`[${mode}] ${company.name}: ${raw.length} total → ${out.length} matches`);
+  if (raw.length === 0) {
+    console.warn(`[${mode}] ⚠️  ${company.name}: Returned 0 jobs (API might be broken or slug changed)`);
+  } else {
+    console.log(`[${mode}] ${company.name}: ${raw.length} total → ${out.length} matches`);
+  }
   return out;
 }
 
@@ -135,7 +184,10 @@ interface GHJob { id: number; title: string; location: { name: string }; absolut
 export async function fetchGreenhouse(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[Greenhouse] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   try {
     const { jobs } = await res.json() as { jobs: GHJob[] };
     return processJobs(jobs.map(r => ({
@@ -155,7 +207,10 @@ interface LeverJob { id: string; text: string; hostedUrl: string; createdAt: num
 export async function fetchLever(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[Lever] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   try {
     const jobs = await res.json() as LeverJob[];
     return processJobs(jobs.map(r => ({
@@ -177,7 +232,10 @@ interface AshbyResp { jobs?: AshbyJob[]; jobPostings?: AshbyJob[]; }
 export async function fetchAshby(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}?includeCompensation=true`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[Ashby] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   try {
     const data = await res.json() as AshbyResp;
     const jobs = data.jobs ?? data.jobPostings ?? [];
@@ -198,21 +256,43 @@ interface WorkableJob { shortcode: string; title: string; city: string; country:
 interface WorkableResp { jobs: WorkableJob[]; }
 interface WorkableDetail { full_description?: string; description?: string; }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ── Global Workable rate limiter ─────────────────────────────────────────
+// Workable is very aggressive about 429s when many companies hit in parallel.
+// Queue all Workable list-page requests so they run sequentially with a delay.
+let workableQueue: Promise<unknown> = Promise.resolve();
+function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
+  const next = workableQueue.then(() => fn()).then(
+    r => { workableQueue = Promise.resolve(); return r; },
+    e => { workableQueue = Promise.resolve(); throw e; },
+  );
+  workableQueue = next.catch(() => {});
+  return next;
+}
+
 /** Run promises in batches to avoid hammering APIs */
 async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[]> {
   const results: T[] = [];
   for (let i = 0; i < fns.length; i += concurrency) {
     const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map(f => f()));
     for (const r of batch) results.push(r.status === "fulfilled" ? r.value : null as T);
+    if (i + concurrency < fns.length) await sleep(2000); // 2s delay between batches
   }
   return results;
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
-  // Step 1: get job list (titles + shortcodes, descriptions usually empty)
+  // Step 1: get job list — serialized via global queue to avoid 429
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const res = await safeFetch(listUrl);
-  if (!res || !res.ok) return [];
+  const res = await queueWorkable(async () => {
+    await sleep(800); // 800ms between each Workable company
+    return safeFetch(listUrl);
+  });
+  if (!res || !res.ok) {
+    console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${listUrl}`);
+    return [];
+  }
   let data: WorkableResp;
   try {
     data = await res.json() as WorkableResp;
@@ -260,9 +340,19 @@ interface TTJob { id: string; attributes: { title: string; "external-url": strin
 interface TTResp { data: TTJob[]; }
 
 export async function fetchTeamtailor(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
-  const url = `https://${c.slug}.teamtailor.com/jobs.json`;
-  const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
+  const res = await fetch(publicUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Accept": "application/json, text/javascript, */*",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    signal: AbortSignal.timeout(30_000),
+  }).catch(() => null);
+  if (!res || !res.ok) {
+    console.error(`[Teamtailor] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${publicUrl}`);
+    return [];
+  }
   try {
     const { data } = await res.json() as TTResp;
     return processJobs(data.map(r => ({
@@ -272,7 +362,7 @@ export async function fetchTeamtailor(c: ATSConfig, mode: JobMode, visaSponsorsh
       description: stripHtml(r.attributes["body-html"]),
     })), c, mode, visaSponsorship);
   } catch (err) {
-    console.error(`[Teamtailor] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    console.error(`[Teamtailor] Failed to parse JSON from ${publicUrl} for ${c.name}:`, err);
     return [];
   }
 }
@@ -284,7 +374,10 @@ interface BreezyJob { id: string; name: string; location: { name: string }; url:
 export async function fetchBreezy(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://${c.slug}.breezy.hr/json`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[Breezy] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   try {
     const jobs = await res.json() as BreezyJob[];
     return processJobs(jobs.map(r => ({
@@ -305,7 +398,10 @@ interface SRResp { content: SRJob[]; }
 export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[SmartRecruiters] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   let content: SRJob[];
   try {
     ({ content } = await res.json() as SRResp);
@@ -342,7 +438,10 @@ interface BHResp { result: BHJob[]; }
 export async function fetchBambooHR(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.error(`[BambooHR] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${url}`);
+    return [];
+  }
   try {
     const data = await res.json() as BHResp;
     const jobs = data.result ?? [];

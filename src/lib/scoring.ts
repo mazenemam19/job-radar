@@ -114,7 +114,7 @@ export function isClearlyNonFrontend(title: string): boolean {
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
   if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
-  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfullstack\b|\bfull[\s-]stack\b/.test(t)) return false;
+  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b|\bfull[\s-]stack\b/.test(t)) return false;
   if (/[-–,]\s*(kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
 
   const desc = description.toLowerCase();

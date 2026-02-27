@@ -9,67 +9,52 @@ const COMPANIES: ATSConfig[] = [
   // ── 🇩🇪 Germany ────────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Contentful",     slug: "contentful",       country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "N26",             slug: "n26",              country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "greenhouse",     name: "Zalando",         slug: "zalando",          country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "SumUp",           slug: "sumup",            country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "greenhouse",     name: "Personio",        slug: "personio",         country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "Babbel",          slug: "babbel",           country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "greenhouse",     name: "Flixbus",         slug: "flixbus",          country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "lever",          name: "GetYourGuide",    slug: "getyourguide",     country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "lever",          name: "Tourlane",        slug: "tourlane",         country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "lever",          name: "Taxfix",          slug: "taxfix",           country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "lever",          name: "Planetly",        slug: "planetly",         country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "ashby",          name: "Pitch",           slug: "pitch",            country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "ashby",          name: "Lano",            slug: "lano",             country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "workable",       name: "Moonfare",        slug: "moonfare",         country: "Germany",      countryFlag: "🇩🇪" },
 
   // ── 🇳🇱 Netherlands ─────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Adyen",           slug: "adyen",            country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "greenhouse",     name: "Mollie",          slug: "mollie",           country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "greenhouse",     name: "Booking.com",     slug: "bookingcom",       country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "greenhouse",     name: "TomTom",          slug: "tomtom",           country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "greenhouse",     name: "WeTransfer",      slug: "wetransfer",       country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "ashby",          name: "Elastic",         slug: "elastic",          country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "lever",          name: "Messagebird",     slug: "messagebird",      country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "ashby",          name: "Mollie",          slug: "mollie",           country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "lever",          name: "TomTom",          slug: "tomtom",           country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "greenhouse",     name: "Elastic",         slug: "elastic",          country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "greenhouse",     name: "Messagebird",     slug: "bird",             country: "Netherlands",  countryFlag: "🇳🇱" },
 
   // ── 🇬🇧 United Kingdom ──────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Monzo",           slug: "monzo",            country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Revolut",         slug: "revolut",          country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Wise",            slug: "wise",             country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Deliveroo",       slug: "deliveroo",        country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Multiverse",      slug: "multiverse",       country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Octopus Energy",  slug: "octopusenergy",    country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "FutureLearn",     slug: "futurelearn",      country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "ashby",          name: "Cleo",            slug: "meetcleo",         country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "ashby",          name: "Wise",            slug: "wise",             country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "greenhouse",     name: "Deliveroo",       slug: "deliveroouk",      country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "teamtailor",     name: "Multiverse",      slug: "multiverse",       country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "ashby",          name: "Octopus Energy",  slug: "octopusenergy",    country: "UK",           countryFlag: "🇬🇧" },
   { ats: "ashby",          name: "Marshmallow",     slug: "marshmallow",      country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "lever",          name: "Cazoo",           slug: "cazoo",            country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "lever",          name: "Thread",          slug: "thread",           country: "UK",           countryFlag: "🇬🇧" },
 
   // ── 🇮🇪 Ireland ─────────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Intercom",        slug: "intercom",         country: "Ireland",      countryFlag: "🇮🇪" },
   { ats: "greenhouse",     name: "HubSpot",         slug: "hubspot",          country: "Ireland",      countryFlag: "🇮🇪" },
-  { ats: "greenhouse",     name: "Stripe",          slug: "stripe",           country: "Ireland",      countryFlag: "🇮🇪" },
-  { ats: "greenhouse",     name: "Workday",         slug: "workday",          country: "Ireland",      countryFlag: "🇮🇪" },
+  { ats: "greenhouse",     name: "Stripe",          slug: "stripe",           country: "Global",       countryFlag: "🌍" },
 
   // ── 🇪🇸 Spain ───────────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Typeform",        slug: "typeform",         country: "Spain",        countryFlag: "🇪🇸" },
-  { ats: "greenhouse",     name: "Glovo",           slug: "glovo",            country: "Spain",        countryFlag: "🇪🇸" },
+  { ats: "smartrecruiters",name: "Glovo",           slug: "glovo",            country: "Spain",        countryFlag: "🇪🇸" },
   { ats: "greenhouse",     name: "Wallapop",        slug: "wallapop",         country: "Spain",        countryFlag: "🇪🇸" },
   { ats: "workable",       name: "Factorial",       slug: "factorialhr",      country: "Spain",        countryFlag: "🇪🇸" },
   { ats: "lever",          name: "Holded",          slug: "holded",           country: "Spain",        countryFlag: "🇪🇸" },
   { ats: "lever",          name: "Outvio",          slug: "outvio",           country: "Spain",        countryFlag: "🇪🇸" },
 
   // ── 🇸🇪 Sweden ──────────────────────────────────────────────────────────────
-  { ats: "greenhouse",     name: "Klarna",          slug: "klarna",           country: "Sweden",       countryFlag: "🇸🇪" },
-  { ats: "greenhouse",     name: "Spotify",         slug: "spotify",          country: "Sweden",       countryFlag: "🇸🇪" },
-  { ats: "greenhouse",     name: "King",            slug: "king",             country: "Sweden",       countryFlag: "🇸🇪" },
-  { ats: "greenhouse",     name: "iZettle",         slug: "izettle",          country: "Sweden",       countryFlag: "🇸🇪" },
-  { ats: "lever",          name: "Anyfin",          slug: "anyfin",           country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "ashby",          name: "Klarna",          slug: "klarna",           country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "smartrecruiters",name: "Spotify",         slug: "Spotify",          country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "smartrecruiters",name: "King",            slug: "King",             country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "ashby",          name: "iZettle / Zettle",slug: "zettle",           country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "ashby",          name: "Anyfin",          slug: "anyfin",           country: "Sweden",       countryFlag: "🇸🇪" },
   { ats: "ashby",          name: "Northvolt",       slug: "northvolt",        country: "Sweden",       countryFlag: "🇸🇪" },
 
   // ── 🇩🇰 Denmark ─────────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Pleo",            slug: "pleo",             country: "Denmark",      countryFlag: "🇩🇰" },
-  { ats: "greenhouse",     name: "Zendesk",         slug: "zendesk",          country: "Denmark",      countryFlag: "🇩🇰" },
-  { ats: "lever",          name: "Templafy",        slug: "templafy",         country: "Denmark",      countryFlag: "🇩🇰" },
   { ats: "workable",       name: "Contractbook",    slug: "contractbook",     country: "Denmark",      countryFlag: "🇩🇰" },
 
   // ── 🇫🇮 Finland ─────────────────────────────────────────────────────────────
@@ -86,12 +71,11 @@ const COMPANIES: ATSConfig[] = [
   { ats: "lever",          name: "Swile",           slug: "swile",            country: "France",       countryFlag: "🇫🇷" },
 
   // ── 🇪🇺 Other EU ─────────────────────────────────────────────────────────────
-  { ats: "greenhouse",     name: "Pipedrive",       slug: "pipedrive",        country: "Estonia",      countryFlag: "🇪🇪" },
-  { ats: "greenhouse",     name: "Skype/Microsoft", slug: "microsoft",        country: "Estonia",      countryFlag: "🇪🇪" },
-  { ats: "lever",          name: "Printify",        slug: "printify",         country: "Latvia",       countryFlag: "🇱🇻" },
-  { ats: "greenhouse",     name: "UiPath",          slug: "uipath",           country: "Romania",      countryFlag: "🇷🇴" },
-  { ats: "greenhouse",     name: "Bitrise",         slug: "bitrise",          country: "Hungary",      countryFlag: "🇭🇺" },
-  { ats: "greenhouse",     name: "Lokalise",        slug: "lokalise",         country: "Latvia",       countryFlag: "🇱🇻" },
+  { ats: "ashby",          name: "Pipedrive",       slug: "pipedrive",        country: "Estonia",      countryFlag: "🇪🇪" },
+  { ats: "workable",       name: "Printify",        slug: "printify",         country: "Latvia",       countryFlag: "🇱🇻" },
+  { ats: "greenhouse",     name: "UiPath",          slug: "uipath-inc",       country: "Romania",      countryFlag: "🇷🇴" },
+  { ats: "ashby",          name: "Bitrise",         slug: "bitrise",          country: "Hungary",      countryFlag: "🇭🇺" },
+  { ats: "ashby",          name: "Lokalise",        slug: "lokalise",         country: "Latvia",       countryFlag: "🇱🇻" },
 
 
   // ── 🇩🇪 Germany (more) ──────────────────────────────────────────────────────
@@ -99,41 +83,33 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse",     name: "Scalable Capital",slug: "scalablecapital",country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "Solarisbank",    slug: "solarisbank",     country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "Komoot",         slug: "komoot",          country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "lever",          name: "Helpling",       slug: "helpling",        country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "lever",          name: "Usercentrics",   slug: "usercentrics",    country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "lever",          name: "Forto",          slug: "forto",           country: "Germany",      countryFlag: "🇩🇪" },
+  { ats: "workable",       name: "Usercentrics",   slug: "usercentrics",    country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "ashby",          name: "Moss",           slug: "getmoss",         country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "ashby",          name: "Flink",          slug: "flink",           country: "Germany",      countryFlag: "🇩🇪" },
-  { ats: "workable",       name: "Tourlane",       slug: "tourlane",        country: "Germany",      countryFlag: "🇩🇪" },
+  { ats: "ashby",          name: "Flink",          slug: "flink-2",         country: "Germany",      countryFlag: "🇩🇪" },
 
   // ── 🇳🇱 Netherlands (more) ──────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Sendcloud",      slug: "sendcloud",       country: "Netherlands",  countryFlag: "🇳🇱" },
   { ats: "greenhouse",     name: "Catawiki",       slug: "catawiki",        country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "greenhouse",     name: "Takeaway.com",   slug: "takeaway",        country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "lever",          name: "Picnic",         slug: "picnic",          country: "Netherlands",  countryFlag: "🇳🇱" },
-  { ats: "lever",          name: "Mews",           slug: "mews",            country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "ashby",          name: "Picnic",         slug: "picnic",          country: "Netherlands",  countryFlag: "🇳🇱" },
+  { ats: "ashby",          name: "Mews",           slug: "mews",            country: "Netherlands",  countryFlag: "🇳🇱" },
   { ats: "ashby",          name: "Channable",      slug: "channable",       country: "Netherlands",  countryFlag: "🇳🇱" },
 
   // ── 🇬🇧 United Kingdom (more) ───────────────────────────────────────────────
   { ats: "greenhouse",     name: "Farfetch",       slug: "farfetch",        country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Bulb Energy",    slug: "bulb",            country: "UK",           countryFlag: "🇬🇧" },
   { ats: "greenhouse",     name: "GoCardless",     slug: "gocardless",      country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Checkout.com",   slug: "checkout",        country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Depop",          slug: "depop",           country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "greenhouse",     name: "Babylon Health", slug: "babylon",         country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "lever",          name: "Bought By Many", slug: "boughtbymany",    country: "UK",           countryFlag: "🇬🇧" },
-  { ats: "lever",          name: "Paysend",        slug: "paysend",         country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "ashby",          name: "Checkout.com",   slug: "checkout-com",    country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "ashby",          name: "ManyPets",       slug: "manypets",        country: "UK",           countryFlag: "🇬🇧" },
+  { ats: "ashby",          name: "Paysend",        slug: "paysend",         country: "UK",           countryFlag: "🇬🇧" },
   { ats: "ashby",          name: "Beams",          slug: "beams",           country: "UK",           countryFlag: "🇬🇧" },
 
   // ── 🇮🇪 Ireland (more) ──────────────────────────────────────────────────────
-  { ats: "greenhouse",     name: "Zendesk",        slug: "zendesk",         country: "Ireland",      countryFlag: "🇮🇪" },
   { ats: "greenhouse",     name: "Squarespace",    slug: "squarespace",     country: "Ireland",      countryFlag: "🇮🇪" },
-  { ats: "greenhouse",     name: "Shopify",        slug: "shopify",         country: "Ireland",      countryFlag: "🇮🇪" },
-  { ats: "lever",          name: "Flipdish",       slug: "flipdish",        country: "Ireland",      countryFlag: "🇮🇪" },
+  { ats: "ashby",          name: "Shopify",        slug: "shopify",         country: "Ireland",      countryFlag: "🇮🇪" },
+  { ats: "ashby",          name: "Flipdish",       slug: "flipdish",        country: "Ireland",      countryFlag: "🇮🇪" },
 
   // ── 🇵🇹 Portugal ────────────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Feedzai",        slug: "feedzai",         country: "Portugal",     countryFlag: "🇵🇹" },
-  { ats: "greenhouse",     name: "Unbabel",        slug: "unbabel",         country: "Portugal",     countryFlag: "🇵🇹" },
+  { ats: "teamtailor",     name: "Unbabel",         slug: "unbabel",          country: "Portugal",     countryFlag: "🇵🇹" },
   { ats: "lever",          name: "Daltix",         slug: "daltix",          country: "Portugal",     countryFlag: "🇵🇹" },
   { ats: "workable",       name: "Infraspeak",     slug: "infraspeak",      country: "Portugal",     countryFlag: "🇵🇹" },
 
@@ -149,7 +125,7 @@ const COMPANIES: ATSConfig[] = [
 
   // ── 🇸🇪 Sweden (more) ───────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Voi",            slug: "voi",             country: "Sweden",       countryFlag: "🇸🇪" },
-  { ats: "greenhouse",     name: "Hemnet",         slug: "hemnet",          country: "Sweden",       countryFlag: "🇸🇪" },
+  { ats: "teamtailor",     name: "Hemnet",          slug: "hemnet",           country: "Sweden",       countryFlag: "🇸🇪" },
   { ats: "lever",          name: "Quinyx",         slug: "quinyx",          country: "Sweden",       countryFlag: "🇸🇪" },
   { ats: "workable",       name: "Mentimeter",     slug: "mentimeter",      country: "Sweden",       countryFlag: "🇸🇪" },
 
@@ -167,23 +143,22 @@ const COMPANIES: ATSConfig[] = [
 
   // ── 🇪🇺 Other EU (more) ─────────────────────────────────────────────────────
   { ats: "greenhouse",     name: "Vinted",         slug: "vinted",          country: "Lithuania",    countryFlag: "🇱🇹" },
-  { ats: "greenhouse",     name: "Bolt",           slug: "bolt",            country: "Estonia",      countryFlag: "🇪🇪" },
-  { ats: "greenhouse",     name: "Transferwise",   slug: "transferwise",    country: "Estonia",      countryFlag: "🇪🇪" },
-  { ats: "workable",       name: "Voucherify",     slug: "voucherify",      country: "Poland",       countryFlag: "🇵🇱" },
-  { ats: "lever",          name: "Tidio",          slug: "tidio",           country: "Poland",       countryFlag: "🇵🇱" },
+  { ats: "ashby",          name: "Bolt",           slug: "bolt-eu",         country: "Estonia",      countryFlag: "🇪🇪" },
+  { ats: "teamtailor",     name: "Deezer",          slug: "deezer",           country: "France",       countryFlag: "🇫🇷" },
+  { ats: "ashby",          name: "Voucherify",     slug: "voucherify",      country: "Poland",       countryFlag: "🇵🇱" },
+  { ats: "ashby",          name: "Tidio",          slug: "tidio",           country: "Poland",       countryFlag: "🇵🇱" },
   { ats: "workable",       name: "Aircall",        slug: "aircall",         country: "France",       countryFlag: "🇫🇷" },
-  { ats: "greenhouse",     name: "Deezer",         slug: "deezer",          country: "France",       countryFlag: "🇫🇷" },
-  { ats: "greenhouse",     name: "Travelperk",     slug: "travelperk",      country: "Spain",        countryFlag: "🇪🇸" },
-  { ats: "lever",          name: "Carto",          slug: "carto",           country: "Spain",        countryFlag: "🇪🇸" },
+  { ats: "ashby",          name: "Travelperk",     slug: "travelperk",      country: "Spain",        countryFlag: "🇪🇸" },
+  { ats: "ashby",          name: "Carto",          slug: "carto",           country: "Spain",        countryFlag: "🇪🇸" },
   { ats: "workable",       name: "Bdeo",           slug: "bdeo",            country: "Spain",        countryFlag: "🇪🇸" },
 
   // ── 🌍 Global remote — strong visa sponsors ──────────────────────────────────
   { ats: "greenhouse",     name: "GitLab",          slug: "gitlab",           country: "Global",       countryFlag: "🌍" },
   { ats: "greenhouse",     name: "Speechify",       slug: "speechify",        country: "USA",          countryFlag: "🇺🇸" },
-  { ats: "greenhouse",     name: "Deel",            slug: "deel",             country: "Global",       countryFlag: "🌍" },
-  { ats: "ashby",          name: "Remote.com",      slug: "remote",           country: "Global",       countryFlag: "🌍" },
-  { ats: "lever",          name: "Doist",           slug: "doist",            country: "Global",       countryFlag: "🌍" },
-  { ats: "lever",          name: "Hotjar",          slug: "hotjar",           country: "Global",       countryFlag: "🌍" },
+  { ats: "ashby",          name: "Deel",            slug: "deel",             country: "Global",       countryFlag: "🌍" },
+  { ats: "ashby",          name: "Remote.com",      slug: "remote-com",       country: "Global",       countryFlag: "🌍" },
+  { ats: "ashby",          name: "Doist",           slug: "doist",            country: "Global",       countryFlag: "🌍" },
+  { ats: "ashby",          name: "Hotjar",          slug: "hotjar",           country: "Global",       countryFlag: "🌍" },
 ];
 
 export async function fetchCompanyJobs(): Promise<Job[]> {
