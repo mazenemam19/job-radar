@@ -252,7 +252,7 @@ export async function fetchAshby(c: ATSConfig, mode: JobMode, visaSponsorship: b
 
 // ── Workable ───────────────────────────────────────────────────────────────
 
-interface WorkableJob { shortcode: string; title: string; city: string; country: string; url: string; published_on: string; description?: string; body?: string; }
+interface WorkableJob { shortcode: string; title: string; city: string; country: string; url: string; published_on: string; description?: string; body?: string; full_description?: string; }
 interface WorkableResp { jobs: WorkableJob[]; }
 interface WorkableDetail { full_description?: string; description?: string; }
 
@@ -263,7 +263,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 let workableQueue: Promise<unknown> = Promise.resolve();
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
   // Chain off current tail — result becomes the new tail even on error
-  const result = workableQueue.then(() => sleep(1500)).then(fn);
+  const result = workableQueue.then(() => sleep(3000)).then(fn);
   workableQueue = result.catch(() => {}); // swallow error so chain continues
   return result;
 }
@@ -280,9 +280,22 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
-  // Step 1: get job list — serialized via global queue to avoid 429
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const res = await queueWorkable(() => safeFetch(listUrl));
+  const res = await queueWorkable(() => fetch(listUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Referer": `https://apply.workable.com/${c.slug}/`,
+      "Origin": "https://apply.workable.com",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin",
+    },
+    signal: AbortSignal.timeout(30_000),
+  }).catch(() => null));
+
   if (!res || !res.ok) {
     console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${listUrl}`);
     return [];
@@ -298,22 +311,20 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
 
   // Step 2: pre-filter by title before fetching descriptions (saves requests)
   const candidates = jobs.filter(r => {
-    const t = r.title.toLowerCase();
     return !isClearlyNonFrontend(r.title) && !isTooSenior(r.title);
   });
 
-  // Step 3: fetch full description for each candidate (concurrency=5)
+  // Step 3: fetch full description via widget detail endpoint (per-job, concurrency=3)
   const withDesc = await pLimit(candidates.map(r => async () => {
+    // Widget detail endpoint still works per-job (less likely to be blocked than bulk list)
     const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
     const dr = await safeFetch(detailUrl);
-    let desc = "";
+    let desc = stripHtml(r.description ?? r.body ?? "");
     if (dr && dr.ok) {
       try {
         const detail = await dr.json() as WorkableDetail;
-        desc = stripHtml(detail.full_description ?? detail.description ?? "");
-      } catch (err) {
-        console.error(`[Workable] Failed to parse JSON from ${detailUrl} for ${c.name}:`, err);
-      }
+        desc = stripHtml(detail.full_description ?? detail.description ?? desc);
+      } catch { /* keep listing description */ }
     }
     return {
       id: `${mode}_workable_${c.slug}_${r.shortcode}`,

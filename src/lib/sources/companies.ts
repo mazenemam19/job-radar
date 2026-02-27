@@ -44,7 +44,7 @@ const COMPANIES: ATSConfig[] = [
   // ── 🇸🇪 Sweden ───────────────────────────────────────────────────────────────
   { ats: "smartrecruiters", name: "Spotify",    slug: "Spotify",        country: "Sweden",      countryFlag: "🇸🇪" },
   { ats: "smartrecruiters", name: "King",       slug: "King",           country: "Sweden",      countryFlag: "🇸🇪" },
-  { ats: "workable",   name: "Mentimeter",      slug: "mentimeter",     country: "Sweden",      countryFlag: "🇸🇪" },
+  // Mentimeter: moved off Workable (404)
 
   // ── 🇩🇰 Denmark ──────────────────────────────────────────────────────────────
   { ats: "greenhouse", name: "Pleo",            slug: "pleo",           country: "Denmark",     countryFlag: "🇩🇰" },
@@ -57,7 +57,6 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse", name: "Doctolib",        slug: "doctolib",       country: "France",      countryFlag: "🇫🇷" },
   { ats: "lever",      name: "Pennylane",       slug: "pennylane",      country: "France",      countryFlag: "🇫🇷" },
   { ats: "lever",      name: "Swile",           slug: "swile",          country: "France",      countryFlag: "🇫🇷" },
-  { ats: "workable",   name: "Spendesk",        slug: "spendesk",       country: "France",      countryFlag: "🇫🇷" },
   { ats: "workable",   name: "Alma",            slug: "alma",           country: "France",      countryFlag: "🇫🇷" },
   { ats: "workable",   name: "Aircall",         slug: "aircall",        country: "France",      countryFlag: "🇫🇷" },
 
@@ -69,7 +68,6 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse", name: "Scandit",         slug: "scandit",        country: "Switzerland", countryFlag: "🇨🇭" },
 
   // ── 🇮🇹 Italy ─────────────────────────────────────────────────────────────────
-  { ats: "workable",   name: "Bending Spoons",  slug: "bendingspoons",  country: "Italy",       countryFlag: "🇮🇹" },
 
   // ── 🌍 Global / strong visa sponsors ─────────────────────────────────────────
   { ats: "greenhouse", name: "GitLab",          slug: "gitlab",         country: "Global",      countryFlag: "🌍" },

@@ -116,22 +116,26 @@ export function isGenericTitleButBackendRole(title: string, description: string)
   if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
   if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b/.test(t)) return false;
 
-  // Explicit backend language in title (catches "React/Java", "- Kotlin", etc.)
-  if (/[-–,/\s](kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
+  // Explicit backend language anywhere in title (catches "React/Java", "- Kotlin", "(Fullstack) - React/Java")
+  if (/\b(kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
 
   const desc = description.toLowerCase();
 
-  // Fullstack + heavy JVM/backend in description → reject
+  // Any fullstack title + ANY JVM/backend signal in description → reject
   const isFullstack = /\bfull[\s-]?stack\b|\bfullstack\b/.test(t);
   if (isFullstack) {
-    const jvmSignals = [
+    const backendSignals = [
       /\bjvm\b/, /\bspring\s*boot\b/, /\bspring\s+framework\b/, /\bkotlin\b/,
-      /\bjava\b.*\b(backend|server|api)\b/, /\bruby\s+on\s+rails\b/, /\brails\b/,
-      /\bruby\b/,  // catch "experience working with Ruby"
+      /\bjava\b/, /\bruby\b/, /\brails\b/, /\bpython\b/,
+      /\bnode\.js\b/, /\bexpress\b/, /\bpostgresql\b|\bpostgres\b/,
+      /\bmongodb\b/, /\bkafka\b/, /\bdocker\b/, /\bkubernetes\b/,
+      /\bmicroservices\b/, /\brest\s+api\b/, /\bgraphql\b.*\bserver\b/,
     ];
-    if (jvmSignals.some(re => re.test(desc))) return true;
+    // Fullstack title + 2+ backend signals → reject (was requiring 1 JVM signal, now broader)
+    if (backendSignals.filter(re => re.test(desc)).length >= 2) return true;
   }
 
+  // Generic "Software Engineer" title needs stronger backend signal count
   const backendSignals = [
     /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
     /\bpostgresql\b|\bpostgres\b/, /\bkafka\b/,

@@ -16,20 +16,26 @@ export async function runAllSources(): Promise<CronLog> {
   let localJobs: Awaited<ReturnType<typeof fetchLocalJobs>> = [];
   let globalJobs: Awaited<ReturnType<typeof fetchGlobalJobs>> = [];
 
-  const [visaResult, localResult, globalResult] = await Promise.allSettled([
+  // ── Run visa + global in parallel first ──────────────────────────────
+  const [visaResult, globalResult] = await Promise.allSettled([
     fetchCompanyJobs(),
-    fetchLocalJobs(),
     fetchGlobalJobs(),
   ]);
 
   if (visaResult.status === "fulfilled") visaJobs = visaResult.value;
   else { errors.push(`visa pipeline: ${visaResult.reason}`); console.error("[runner] visa pipeline failed:", visaResult.reason); }
 
-  if (localResult.status === "fulfilled") localJobs = localResult.value;
-  else { errors.push(`local pipeline: ${localResult.reason}`); console.error("[runner] local pipeline failed:", localResult.reason); }
-
   if (globalResult.status === "fulfilled") globalJobs = globalResult.value;
   else { errors.push(`global pipeline: ${globalResult.reason}`); console.error("[runner] global pipeline failed:", globalResult.reason); }
+
+  // ── Run local pipeline after — so Workable queue doesn't overload ─────
+  const localResult = await fetchLocalJobs().then(
+    v => ({ status: "fulfilled" as const, value: v }),
+    r => ({ status: "rejected" as const, reason: r }),
+  );
+
+  if (localResult.status === "fulfilled") localJobs = localResult.value;
+  else { errors.push(`local pipeline: ${localResult.reason}`); console.error("[runner] local pipeline failed:", localResult.reason); }
 
   const fetched = [...visaJobs, ...localJobs, ...globalJobs];
   const { store: updated, added } = mergeJobs(store, fetched);
