@@ -49,13 +49,13 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     // ── 30-day age cap ──
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;
-    
+
     const loc = (r.location || "").toLowerCase();
     // For local mode, strictly require Egypt-related keywords
     if (mode === "local") {
-        const isEgypt = loc.includes("egypt") || loc.includes("cairo") || loc.includes("alexandria") || loc.includes("giza");
-        if (company.country === "Egypt" && !isEgypt && !loc.includes("remote")) continue; 
-        if (company.name === "Speechify" && !isEgypt) continue;
+      const isEgypt = loc.includes("egypt") || loc.includes("cairo") || loc.includes("alexandria") || loc.includes("giza");
+      if (company.country === "Egypt" && !isEgypt && !loc.includes("remote")) continue;
+      if (company.name === "Speechify" && !isEgypt) continue;
     }
 
     // Only check citizenship/clearance for visa mode (known international companies)
@@ -72,15 +72,15 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     const explicitlyOffered = /visa\s+sponsorship|relocation\s+assistance/i.test(r.description);
     const actualSponsorship = !explicitlyDenied && (explicitlyOffered || (mode === "visa" && visaSponsorship));
 
-    const isRemote = /remote|work\s+from\s+home|anywhere/i.test(title) || 
-                     /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
-                     /100%\s+remote|fully\s+remote/i.test(r.description);
+    const isRemote = /remote|work\s+from\s+home|anywhere/i.test(title) ||
+      /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
+      /100%\s+remote|fully\s+remote/i.test(r.description);
 
     out.push({
       id: r.id, source: "company", mode,
       title, company: company.name, location: r.location,
       country: company.country, countryFlag: company.countryFlag,
-      url: r.url, description: r.description, 
+      url: r.url, description: r.description,
       isRemote,
       postedAt: r.postedAt ?? now, visaSponsorship: actualSponsorship,
       ...scored, fetchedAt: now,
@@ -144,18 +144,52 @@ export async function fetchAshby(c: ATSConfig, mode: JobMode, visaSponsorship: b
 
 interface WorkableJob { shortcode: string; title: string; city: string; country: string; url: string; published_on: string; description?: string; body?: string; }
 interface WorkableResp { jobs: WorkableJob[]; }
+interface WorkableDetail { full_description?: string; description?: string; }
+
+/** Run promises in batches to avoid hammering APIs */
+async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < fns.length; i += concurrency) {
+    const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map(f => f()));
+    for (const r of batch) results.push(r.status === "fulfilled" ? r.value : null as T);
+  }
+  return results;
+}
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
-  const url = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const res = await safeFetch(url);
+  // Step 1: get job list (titles + shortcodes, descriptions usually empty)
+  const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
+  const res = await safeFetch(listUrl);
   if (!res || !res.ok) return [];
   const data = await res.json() as WorkableResp;
   const jobs = data.jobs ?? [];
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_workable_${c.slug}_${r.shortcode}`, title: r.title, location: r.city ? `${r.city}, ${r.country}` : c.city ?? c.country,
-    url: r.url, postedAt: r.published_on,
-    description: r.body ? stripHtml(r.body) : (r.description ? stripHtml(r.description) : ""),
-  })), c, mode, visaSponsorship);
+
+  // Step 2: pre-filter by title before fetching descriptions (saves requests)
+  const candidates = jobs.filter(r => {
+    const t = r.title.toLowerCase();
+    return !isClearlyNonFrontend(r.title) && !isTooSenior(r.title);
+  });
+
+  // Step 3: fetch full description for each candidate (concurrency=5)
+  const withDesc = await pLimit(candidates.map(r => async () => {
+    const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
+    const dr = await safeFetch(detailUrl);
+    let desc = "";
+    if (dr && dr.ok) {
+      const detail = await dr.json() as WorkableDetail;
+      desc = stripHtml(detail.full_description ?? detail.description ?? "");
+    }
+    return {
+      id: `${mode}_workable_${c.slug}_${r.shortcode}`,
+      title: r.title,
+      location: r.city ? `${r.city}, ${r.country}` : c.city ?? c.country,
+      url: r.url,
+      postedAt: r.published_on,
+      description: desc,
+    };
+  }), 5);
+
+  return processJobs(withDesc.filter(Boolean), c, mode, visaSponsorship);
 }
 
 // ── Teamtailor ─────────────────────────────────────────────────────────────
@@ -201,16 +235,16 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode, visaSpon
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
   const { content } = await res.json() as SRResp;
-  
+
   const detailedJobs = await Promise.all(content.map(async (r) => {
     const detailRes = await safeFetch(r.ref);
     if (!detailRes || !detailRes.ok) return null;
     const detail = await detailRes.json() as { jobAd: { sections: { jobDescription: { content: string } } } };
     return {
-        id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
-        url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
-        postedAt: r.releasedDate,
-        description: stripHtml(detail.jobAd.sections.jobDescription.content),
+      id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
+      url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
+      postedAt: r.releasedDate,
+      description: stripHtml(detail.jobAd.sections.jobDescription.content),
     };
   }));
 
