@@ -33,7 +33,25 @@ export async function safeFetch(url: string, timeout = 30_000): Promise<Response
 
 export interface RawJob { id: string; title: string; location: string; url: string; postedAt: string; description: string; }
 
-const AGE_CAP_DAYS = 14; // If it's older than 2 weeks, it's gone
+const AGE_CAP_DAYS = 7; // If it's older than 1 week, it's gone
+
+/** For local jobs: extract a specific Egyptian city from the raw location string.
+ *  Falls back to company.city (from ATSConfig), then "Cairo" as the safe default. */
+function extractEgyptCity(rawLocation: string, companyCity?: string): string {
+  const loc = (rawLocation || "").toLowerCase();
+  if (loc.includes("remote"))     return "Remote 🌐";
+  if (loc.includes("cairo"))      return "Cairo";
+  if (loc.includes("giza"))       return "Giza";
+  if (loc.includes("alexandria")) return "Alexandria";
+  if (loc.includes("maadi"))      return "Maadi, Cairo";
+  if (loc.includes("nasr city") || loc.includes("nasr-city")) return "Nasr City, Cairo";
+  if (loc.includes("heliopolis")) return "Heliopolis, Cairo";
+  if (loc.includes("new cairo") || loc.includes("new-cairo")) return "New Cairo";
+  if (loc.includes("6th") || loc.includes("sheikh zayed")) return "6th of October";
+  if (loc.includes("smart village")) return "Smart Village, Giza";
+  // If location is just a country code or blank, use company default city
+  return companyCity ?? "Cairo";
+}
 
 export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, visaSponsorship: boolean): Job[] {
   const now = new Date().toISOString();
@@ -50,13 +68,9 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;
     
-    const loc = (r.location || "").toLowerCase();
-    // For local mode, strictly require Egypt-related keywords
-    if (mode === "local") {
-        const isEgypt = loc.includes("egypt") || loc.includes("cairo") || loc.includes("alexandria") || loc.includes("giza");
-        if (company.country === "Egypt" && !isEgypt && !loc.includes("remote")) continue; 
-        if (company.name === "Speechify" && !isEgypt) continue;
-    }
+    // For local mode: NO location filtering — we only ever scrape Egyptian company ATSs,
+    // so every job that passes title/skill filters IS a Cairo/Egypt job by definition.
+    // We do extract a display city below for the UI.
 
     // Only check citizenship/clearance for visa mode (known international companies)
     if (mode === "visa" && requiresCitizenshipOrClearance(r.description)) continue;
@@ -76,9 +90,14 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
                      /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
                      /100%\s+remote|fully\s+remote/i.test(r.description);
 
+    // For local jobs: extract Egyptian city from location string, fallback to company city
+    const displayLocation = mode === "local"
+      ? extractEgyptCity(r.location, company.city)
+      : r.location;
+
     out.push({
       id: r.id, source: "company", mode,
-      title, company: company.name, location: r.location,
+      title, company: company.name, location: displayLocation,
       country: company.country, countryFlag: company.countryFlag,
       url: r.url, description: r.description, 
       isRemote,

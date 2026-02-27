@@ -1,56 +1,114 @@
 # 🎯 Job Radar
 
-A precision job aggregator and scoring engine designed for **Senior Frontend Developers** (React/TypeScript).
+A personal job-hunting dashboard that automatically scrapes frontend engineering jobs across three pipelines and scores them against your React/TypeScript skillset. Runs daily at **6pm Cairo time** via Vercel Cron.
 
-Job Radar bypasses the noise of LinkedIn, Wuzzuf, and recruiter-heavy aggregators by scraping job data directly from 50+ company career portals. It automatically filters out irrelevant roles and scores every job against your specific tech stack.
+---
 
-## 🚀 The Mission
+## Pipelines
 
-Frontend specialists shouldn't waste time on "Fullstack", "Tech Lead", or "Helpdesk" roles. This tool is built to:
-1.  **Deep Signal Analysis**: Rejects generic "Software Engineer" titles if the description contains backend/infra signals (Kubernetes, SQL, Terraform, etc.).
-2.  **Target Seniority**: Focuses on the ~5 years experience "sweet spot" (rejecting Lead, Principal, and Junior roles).
-3.  **Timezone Guard**: Automatically rejects global remote roles restricted to US/Canada/EU residents, keeping only GMT+2 (Egypt) friendly listings.
-4.  **Freshness Hard-Cap**: Strictly enforces a **14-day age limit**. If it's not fresh, it's not on the radar.
+| Pipeline | What it finds | Companies |
+|----------|--------------|-----------|
+| 🌍 **Visa Sponsors** | EU companies that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more |
+| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs | Instabug, Bosta, Thndr, Nawy, Dubizzle, Paymob, +more |
+| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2 | GitLab, Automattic, Netlify, Vercel, Linear, Zapier, +more |
 
-## 🛠️ Supported Platforms (8 ATS)
+---
 
-The system features a unified scraping pipeline supporting major Applicant Tracking Systems:
--   **Greenhouse** (`boards-api.greenhouse.io`)
--   **Lever** (`api.lever.co`)
--   **Ashby** (`api.ashbyhq.com`)
--   **Workable** (Optimized batch-fetching via Widget API)
--   **Teamtailor** (`{slug}.teamtailor.com`)
--   **Breezy HR** (`{slug}.breezy.hr`)
--   **SmartRecruiters** (`api.smartrecruiters.com`)
--   **BambooHR** (`{slug}.bamboohr.com`)
+## Scoring
 
-## 📊 How Scoring Works (0-100)
+Each job is scored 0–100 based on:
 
--   **60% Skill Match**: React, TypeScript, JavaScript, Redux, React Query, Material UI, Vite, Tailwind, Zustand, etc.
--   **30% Recency**: Newer jobs get higher priority; automatic expiry after 14 days.
--   **10% Bonuses**: Extra points for explicit mentions of "Relocation".
+- **Skill match (60%)** — how many of your expert/proficient skills appear in the JD
+- **Recency (30%)** — freshness (max 7 days old, after that dropped)
+- **Relocation bonus (10%)** — explicit relocation support mentioned
 
-## 🏠 Monitoring Pipelines
+Your core skills checked: `React`, `TypeScript`, `JavaScript`, `HTML`, `CSS`, `Redux`, `React Query`, `Next.js`, `Tailwind`, `Vite`, `Material UI`, and more.
 
-### 1. Local Dashboard (Egypt Hub)
-Verified fintech and high-growth startups: Bosta, Thndr, Nawy, Yassir, Dubizzle, Paymob, Halan, Breadfast, Khazna, Trella, and more.
+Jobs with 0 skill match score are **never shown**. Jobs older than **7 days** are auto-dropped.
 
-### 2. Visa Dashboard (EU/UK)
-Global giants known for sponsorship: GitLab, Adyen, Intercom, Contentful, Monzo, Revolut, Spotify, Klarna, Wise, and Deliveroo.
+---
 
-### 3. Global Dashboard (EMEA Remote)
-World-class remote-first companies that hire from Egypt: Automattic, GitLab, Vercel, Linear, Buffer, Doist, Loom, and Remote.com.
+## Filters Applied
 
-## 💻 Tech Stack
+1. **Title filter** — rejects backend, DevOps, Android, MLOps, compliance, hardware, marketing ops, intern roles, etc.
+2. **Backend description guard** — generic "Software Engineer" titles get description-scanned for infra signals (Kafka, Kubernetes, Terraform…)
+3. **Clearance filter** — rejects "must be US citizen / right to work in UK" etc.
+4. **Timezone filter** (global only) — rejects US-timezone-only roles
 
--   **Frontend**: Next.js 14 (App Router), React, Tailwind CSS.
--   **Backend**: TypeScript, Node.js (Concurrent batch fetching for scrapers).
--   **Communication**: Nodemailer (SMTP) for instant new-job alerts.
--   **Data**: Flat JSON storage (`data/jobs.json`) with auto-deduplication.
+---
 
-## 🚦 Getting Started
+## Setup
 
-1.  `pnpm install`
-2.  Create `.env.local` (see `.env.local.example` for SMTP and Secret keys).
-3.  `pnpm dev` to view the dashboard.
-4.  `pnpm run cron:now` to trigger a global scan across all 3 pipelines.
+### 1. Clone & install
+```bash
+git clone <your-repo>
+cd job-radar
+npm install
+```
+
+### 2. Environment variables
+Create `.env.local`:
+```env
+CRON_SECRET=your-random-secret-here
+EMAIL_USER=youremail@gmail.com
+EMAIL_PASS=your-gmail-app-password
+EMAIL_TO=youremail@gmail.com
+```
+
+### 3. Run locally
+```bash
+npm run dev
+# Dashboard at http://localhost:3000
+```
+
+### 4. Deploy to Vercel
+```bash
+vercel deploy
+```
+- Add the same env vars in Vercel dashboard → Settings → Environment Variables
+- The `vercel.json` already configures the daily cron at **4pm UTC (6pm Cairo)** ✅
+- Set `CRON_SECRET` in Vercel env — Vercel sends it automatically as `Authorization: Bearer <secret>`
+
+---
+
+## File Structure
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── cron/route.ts       ← Daily runner (GET=Vercel cron, POST=dashboard button)
+│   │   └── jobs/[id]/route.ts  ← Single job API for detail page
+│   ├── job/[id]/page.tsx       ← Job detail page
+│   └── page.tsx                ← Dashboard (3 tabs: Visa / Local / Global)
+├── components/
+│   └── JobCard.tsx             ← Job card with score ring, skill chips, detail nav
+└── lib/
+    ├── runner.ts               ← Orchestrates all 3 pipelines
+    ├── scoring.ts              ← Skill matching, title filters, score calculation
+    ├── storage.ts              ← jobs.json read/write, 7-day cleanup
+    ├── email.ts                ← Gmail alert for new visa jobs
+    └── sources/
+        ├── companies.ts        ← EU visa sponsor company list (~65 companies)
+        ├── local-companies.ts  ← Egyptian company list
+        ├── global-companies.ts ← Global remote company list
+        └── ats-utils.ts        ← Fetchers for Greenhouse, Lever, Ashby, Workable, BambooHR, SmartRecruiters
+vercel.json                     ← Cron: daily at 4pm UTC (6pm Cairo)
+```
+
+---
+
+## Adding Companies
+
+Edit the relevant source file and add a line:
+```ts
+{ ats: "greenhouse", name: "Acme Corp", slug: "acmecorp", country: "Germany", countryFlag: "🇩🇪" }
+```
+
+Supported ATS platforms: `greenhouse`, `lever`, `ashby`, `workable`, `bamboohr`, `smartrecruiters`, `teamtailor`, `breezy`
+
+---
+
+## Notes on Local Pipeline Empty Results
+
+If local shows 0 jobs, it means Egyptian companies genuinely have no fresh React openings that week — not a bug. The pipeline scrapes live ATSs, applies the same title/skill filters, and only keeps jobs ≤7 days old.

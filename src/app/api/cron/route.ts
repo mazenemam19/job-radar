@@ -2,14 +2,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAllSources } from "@/lib/runner";
 
-export const maxDuration = 60; // Vercel: allow up to 60s for scraping
+export const maxDuration = 300; // Allow up to 5min for all 3 pipelines
 
-export async function POST(req: NextRequest) {
-  // In development, allow unauthenticated trigger (for the dashboard "Run Scan" button)
+async function handleCron(req: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
-  const secret = req.headers.get("x-cron-secret");
+  // Vercel cron sends: Authorization: Bearer <CRON_SECRET>
+  // Dashboard button sends: x-cron-secret header
+  const authHeader = req.headers.get("authorization");
+  const legacySecret = req.headers.get("x-cron-secret");
+  const token = authHeader?.replace("Bearer ", "").trim() ?? legacySecret;
 
-  if (!isDev && secret !== process.env.CRON_SECRET) {
+  if (!isDev && token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,3 +24,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
 }
+
+// GET: called by Vercel Cron scheduler automatically at 4pm UTC (6pm Cairo)
+export async function GET(req: NextRequest) { return handleCron(req); }
+
+// POST: called by dashboard "Run Scan" button
+export async function POST(req: NextRequest) { return handleCron(req); }

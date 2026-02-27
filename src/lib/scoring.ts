@@ -15,7 +15,7 @@ const CORE_FRONTEND_SKILLS = [
   "next.js", "nextjs", "redux", "react query", "react-query",
   "material ui", "vite", "webpack", "tailwind",
 ];
-const MIN_CORE_SKILLS = 2;
+const MIN_CORE_SKILLS = 1;
 const SCORE_DENOMINATOR = 15;
 
 // ── Title filters ──────────────────────────────────────────────────────────
