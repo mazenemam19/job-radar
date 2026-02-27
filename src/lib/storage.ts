@@ -5,6 +5,7 @@ import { Job, JobStore, CronLog } from "./types";
 
 const STORE_PATH = path.resolve(process.cwd(), "data/jobs.json");
 const MAX_JOBS = 500;
+const MAX_JOB_AGE_DAYS = 30;
 
 function emptyStore(): JobStore {
   return { jobs: [], lastUpdated: new Date().toISOString(), cronLogs: [] };
@@ -13,7 +14,14 @@ function emptyStore(): JobStore {
 export function readStore(): JobStore {
   try {
     if (!fs.existsSync(STORE_PATH)) return emptyStore();
-    return JSON.parse(fs.readFileSync(STORE_PATH, "utf-8")) as JobStore;
+    const store = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8")) as JobStore;
+    // Auto-expire jobs older than 30 days on read
+    const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
+    store.jobs = store.jobs.filter(j => {
+      const ms = Date.parse(j.postedAt);
+      return isNaN(ms) || ms >= cutoff;
+    });
+    return store;
   } catch {
     return emptyStore();
   }

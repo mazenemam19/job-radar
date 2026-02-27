@@ -68,6 +68,7 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
 
       <div className="card-meta">
         <span>📍 {job.location}</span>
+        {job.isRemote && <span className="remote-badge">🌐 Remote</span>}
         {job.salary && <span>💰 {job.salary}</span>}
         <span className="meta-date">{daysAgo(job.postedAt)}</span>
         {job.mode === "visa"

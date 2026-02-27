@@ -23,6 +23,8 @@ export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
   return [
     /\bbackend\b/, /\bback[\s-]end\b/,
+    /\bfullstack\b/, /\bfull[\s-]stack\b/,
+    /\bhelpdesk\b/, /\bhelp\s+desk\b/, /\bservice\s+desk\b/,
     /\bdevops\b/, /\bsite[\s-]reliability\b/, /\bsre\b/,
     /\bdata\s+(engineer|scientist|analyst)\b/,
     /\bmachine\s+learning\s+engineer\b/,
@@ -32,12 +34,14 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bsecurity\s+engineer\b/, /\bnetwork\s+engineer\b/,
     /\binfrastructure\s+engineer\b/, /\bembedded\s+(software|engineer)\b/,
     /\bfirmware\b/, /\bcloud\s+engineer\b/, /\bsolutions?\s+architect\b/,
+    /\barchitect\b/,
     /\bproject\s+manager\b/, /\bprogram\s+manager\b/,
     /\bproduct\s+(manager|owner)\b/, /\baccount\s+manager\b/,
     /\bscrum\s+master\b/, /\boperations\s+manager\b/,
     /\bsales\s+manager\b/, /\bbusiness\s+(analyst|development)\b/,
-    /\bcustomer\s+success\b/,
-    /\btrainer\b/, /\btechnical\s+writer\b/, /\bcontent\s+(writer|manager)\b/,
+    /\bcustomer\s+success\b/, /\bsupport\s+engineer\b/, /\bsupport\s+specialist\b/,
+    /\bsolutions?\s+architect\b/, /\bimplementation\s+(consultant|engineer)\b/,
+    /\btrainer\b/, /\btechnical\s+writer\b/, /\bcontent\s+(writer|manager|creator)\b/,
     /\brecruiter\b/, /\bhr\s+(manager|specialist|generalist)\b/,
     /\bfinance\s+(manager|analyst|lead)\b/, /\baccountant\b/,
     /\bmarketing\s+(manager|specialist|analyst)\b/,
@@ -46,20 +50,36 @@ export function isClearlyNonFrontend(title: string): boolean {
   ].some(re => re.test(t));
 }
 
+/**
+ * Extra guard: "Software Engineer" with no frontend signal in title
+ * but backend/infra-heavy description → reject.
+ * Catches roles like Contentful "Senior Software Engineer" (storage infra team).
+ */
+export function isGenericTitleButBackendRole(title: string, description: string): boolean {
+  const t = title.toLowerCase();
+  // If title explicitly says frontend/UI, always keep
+  if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
+  // Only apply to generic titles
+  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b/.test(t)) return false;
+
+  const desc = description.toLowerCase();
+  const backendSignals = [
+    /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
+    /\bpostgresql\b|\bpostgres\b/, /\bkafka\b/,
+    /\bstorage\s+infrastructure\b/, /\bsystems?\s+engineering\b/,
+    /\bsite\s+reliability\b/, /\bci\/cd\s+pipeline\b/, /\baws\s+(rds|s3|lambda)\b/,
+  ];
+  const hits = backendSignals.filter(re => re.test(desc)).length;
+  return hits >= 3; // 3+ infra signals = backend role wearing a generic title
+}
+
 /** Rejects titles too senior for ~5 years of experience. */
 export function isTooSenior(title: string): boolean {
   const t = title.toLowerCase();
   return [
-    /\bstaff\s+(software|frontend|fullstack|web|ui)?\s*engineer\b/,
-    /\bprincipal\s+(software|frontend|fullstack|web|ui)?\s*engineer\b/,
-    /\bstaff\s+developer\b/, /\bprincipal\s+developer\b/,
+    /\blead\b/, /\bprincipal\b/, /\bstaff\b/, /\bmanager\b/, /\bhead\s+of\b/,
+    /\bdirector\b/, /\bvp\b/, /\bvice\s+president\b/, /\bchief\b/, /\bcto\b/, /\bcpo\b/,
     /\bdistinguished\s+engineer\b/, /\bfellow\b/,
-    /\bdirector\s+of\b/, /\bvp\s+(of|,)\b/, /\bvice\s+president\b/,
-    /\bhead\s+of\s+(engineering|frontend|product|technology|design)\b/,
-    /\bchief\s+(technology|technical|product|information)\s+officer\b/,
-    /\bcto\b/, /\bcpo\b/, /\bciso\b/,
-    /\bengineering\s+manager\b/, /\bsenior\s+engineering\s+manager\b/,
-    /\btechnical\s+(lead|director)\b/, /\blead\s+architect\b/,
   ].some(re => re.test(t));
 }
 

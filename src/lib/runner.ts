@@ -1,7 +1,7 @@
-// src/lib/runner.ts
 import { readStore, writeStore, mergeJobs, appendCronLog } from "./storage";
 import { fetchCompanyJobs } from "./sources/companies";
 import { fetchLocalJobs } from "./sources/local-companies";
+import { fetchGlobalJobs } from "./sources/global-companies";
 import { sendJobAlert } from "./email";
 import type { CronLog } from "./types";
 
@@ -14,11 +14,12 @@ export async function runAllSources(): Promise<CronLog> {
   const errors: string[] = [];
   let visaJobs: Awaited<ReturnType<typeof fetchCompanyJobs>> = [];
   let localJobs: Awaited<ReturnType<typeof fetchLocalJobs>> = [];
+  let globalJobs: Awaited<ReturnType<typeof fetchGlobalJobs>> = [];
 
-  // Run both pipelines in parallel
-  const [visaResult, localResult] = await Promise.allSettled([
+  const [visaResult, localResult, globalResult] = await Promise.allSettled([
     fetchCompanyJobs(),
     fetchLocalJobs(),
+    fetchGlobalJobs(),
   ]);
 
   if (visaResult.status === "fulfilled") visaJobs = visaResult.value;
@@ -27,10 +28,13 @@ export async function runAllSources(): Promise<CronLog> {
   if (localResult.status === "fulfilled") localJobs = localResult.value;
   else { errors.push(`local pipeline: ${localResult.reason}`); console.error("[runner] local pipeline failed:", localResult.reason); }
 
-  const fetched = [...visaJobs, ...localJobs];
+  if (globalResult.status === "fulfilled") globalJobs = globalResult.value;
+  else { errors.push(`global pipeline: ${globalResult.reason}`); console.error("[runner] global pipeline failed:", globalResult.reason); }
+
+  const fetched = [...visaJobs, ...localJobs, ...globalJobs];
   const { store: updated, added } = mergeJobs(store, fetched);
 
-  // Email alert only for brand-new visa-mode jobs (local jobs are close by — no email needed)
+  // Email alert only for brand-new visa-mode jobs
   const brandNewVisa = added.filter(j => !existingIds.has(j.id) && j.mode === "visa");
   if (brandNewVisa.length) {
     try { await sendJobAlert(brandNewVisa); }
@@ -42,7 +46,7 @@ export async function runAllSources(): Promise<CronLog> {
     runAt: new Date().toISOString(),
     newJobs: added.length,
     totalJobs: updated.jobs.length,
-    sources: { visa: visaJobs.length, local: localJobs.length },
+    sources: { visa: visaJobs.length, local: localJobs.length, global: globalJobs.length },
     durationMs,
     errors,
   };

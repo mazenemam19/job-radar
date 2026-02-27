@@ -36,7 +36,6 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState<"idle" | "ok" | "err">("idle");
 
-  // Mode toggle
   const [mode, setMode] = useState<JobMode>("visa");
 
   // Filters
@@ -95,6 +94,7 @@ export default function Dashboard() {
 
   const visaCount = useMemo(() => allJobs.filter(j => j.mode === "visa").length, [allJobs]);
   const localCount = useMemo(() => allJobs.filter(j => j.mode === "local").length, [allJobs]);
+  const globalCount = useMemo(() => allJobs.filter(j => j.mode === "global").length, [allJobs]);
 
   // Reset filters on mode switch
   const switchMode = (m: JobMode) => {
@@ -142,6 +142,13 @@ export default function Dashboard() {
             🇪🇬 Local Egypt
             <span className="tab-count">{localCount}</span>
           </button>
+          <button
+            className={`mode-tab ${mode === "global" ? "active" : ""}`}
+            onClick={() => switchMode("global")}
+          >
+            🌐 Global Remote
+            <span className="tab-count">{globalCount}</span>
+          </button>
         </div>
 
         {/* Stats strip */}
@@ -188,7 +195,9 @@ export default function Dashboard() {
       <div className="mode-desc">
         {mode === "visa"
           ? "🌍 Remote positions at European tech companies — all actively sponsor visas. Senior-only & off-discipline roles are automatically filtered out."
-          : "🇪🇬 On-site / hybrid roles at Egyptian tech companies in Cairo & Alexandria. Same skill-match scoring — no visa assumption."}
+          : mode === "local"
+          ? "🇪🇬 On-site / hybrid roles at Egyptian tech companies in Cairo & Alexandria. Same skill-match scoring — no visa assumption."
+          : "🌐 Worldwide remote roles at companies known to hire globally — pre-filtered to reject US-timezone-only, EU-resident-only, and work-authorization restrictions incompatible with Egypt (GMT+2). No sponsorship needed."}
       </div>
 
       {/* ── GRID ───────────────────────────────────────────────── */}

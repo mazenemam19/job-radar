@@ -1,7 +1,7 @@
 // src/lib/types.ts
 
 export type JobSource = "company";
-export type JobMode = "visa" | "local";  // visa = remote+visa, local = egypt direct
+export type JobMode = "visa" | "local" | "global";  // visa = remote+visa, local = egypt direct, global = worldwide remote Egypt-friendly
 
 export interface Job {
   id: string;
@@ -14,6 +14,7 @@ export interface Job {
   countryFlag: string;
   url: string;
   description: string;
+  isRemote?: boolean;
   salary?: string;
   postedAt: string;
   visaSponsorship: boolean; // true for visa-mode jobs, false for local-mode
