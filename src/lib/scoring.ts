@@ -114,15 +114,31 @@ export function isClearlyNonFrontend(title: string): boolean {
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
   if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
-  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b|\bfull[\s-]stack\b/.test(t)) return false;
-  if (/[-–,]\s*(kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
+  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b/.test(t)) return false;
+
+  // Explicit backend language in title (catches "React/Java", "- Kotlin", etc.)
+  if (/[-–,/\s](kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
 
   const desc = description.toLowerCase();
+
+  // Fullstack + heavy JVM/backend in description → reject
+  const isFullstack = /\bfull[\s-]?stack\b|\bfullstack\b/.test(t);
+  if (isFullstack) {
+    const jvmSignals = [
+      /\bjvm\b/, /\bspring\s*boot\b/, /\bspring\s+framework\b/, /\bkotlin\b/,
+      /\bjava\b.*\b(backend|server|api)\b/, /\bruby\s+on\s+rails\b/, /\brails\b/,
+      /\bruby\b/,  // catch "experience working with Ruby"
+    ];
+    if (jvmSignals.some(re => re.test(desc))) return true;
+  }
+
   const backendSignals = [
     /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
     /\bpostgresql\b|\bpostgres\b/, /\bkafka\b/,
     /\bsite\s+reliability\b/, /\bci\/cd\s+pipeline\b/,
     /\bspring\s*boot\b/, /\bjvm\b/, /\bdistributed\s+systems\b/,
+    /\bmicroservices\b/, /\brabbitmq\b/, /\belasticsearch\b/,
+    /\bbackend\s+api\b/, /\brest\s+api\b.*\bserver\b/,
   ];
   return backendSignals.filter(re => re.test(desc)).length >= 3;
 }

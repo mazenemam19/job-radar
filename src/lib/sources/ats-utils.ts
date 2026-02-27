@@ -259,16 +259,13 @@ interface WorkableDetail { full_description?: string; description?: string; }
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ── Global Workable rate limiter ─────────────────────────────────────────
-// Workable is very aggressive about 429s when many companies hit in parallel.
-// Queue all Workable list-page requests so they run sequentially with a delay.
+// Workable is aggressive with 429s. Queue ALL requests globally, 1.5s apart.
 let workableQueue: Promise<unknown> = Promise.resolve();
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
-  const next = workableQueue.then(() => fn()).then(
-    r => { workableQueue = Promise.resolve(); return r; },
-    e => { workableQueue = Promise.resolve(); throw e; },
-  );
-  workableQueue = next.catch(() => {});
-  return next;
+  // Chain off current tail — result becomes the new tail even on error
+  const result = workableQueue.then(() => sleep(1500)).then(fn);
+  workableQueue = result.catch(() => {}); // swallow error so chain continues
+  return result;
 }
 
 /** Run promises in batches to avoid hammering APIs */
@@ -285,10 +282,7 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   // Step 1: get job list — serialized via global queue to avoid 429
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const res = await queueWorkable(async () => {
-    await sleep(800); // 800ms between each Workable company
-    return safeFetch(listUrl);
-  });
+  const res = await queueWorkable(() => safeFetch(listUrl));
   if (!res || !res.ok) {
     console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${listUrl}`);
     return [];
@@ -340,12 +334,19 @@ interface TTJob { id: string; attributes: { title: string; "external-url": strin
 interface TTResp { data: TTJob[]; }
 
 export async function fetchTeamtailor(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
+  // Use the Teamtailor public API endpoint with proper Accept header
+  const url = `https://api.teamtailor.com/v1/jobs?&filter[status]=published`;
+  // Fallback: use the public jobs.json endpoint with Accept: application/json
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
   const res = await fetch(publicUrl, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Accept": "application/json, text/javascript, */*",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Referer": `https://${c.slug}.teamtailor.com/jobs`,
       "X-Requested-With": "XMLHttpRequest",
+      "Connection": "keep-alive",
     },
     signal: AbortSignal.timeout(30_000),
   }).catch(() => null);
