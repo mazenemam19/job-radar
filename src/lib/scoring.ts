@@ -68,8 +68,10 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\brecruiter\b/, /\bhr\s+(manager|specialist|generalist)\b/,
     /\bfinance\s+(manager|analyst|lead)\b/, /\baccountant\b/,
     /\bmarketing\s+(manager|specialist|analyst|operations)\b/, // Marketing Ops
-    /\bcompliance\s+(analyst|engineer|manager|specialist)\b/,  // Compliance
+    /\bcompliance\s+(analyst|engineer|manager|specialist|operations)\b/, // Compliance
+    /\bcompliance\s+operations\b/,                                         // Compliance Operations Analyst
     /\boperations\s+analyst\b/,
+    /\bproduct\s+designer\b/, /\bux\s+(designer|researcher)\b/,           // Designer roles (not frontend eng)
     /\bquality\s+assurance\b/, /\bautomation\s+tester\b/, /\btest\s+engineer\b/,
     /\bhardware\b/,                                            // Hardware Specialist
     /\bintern\b/,                                              // Internships (5yr exp)
@@ -122,6 +124,8 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /(secret|top\s+secret)\s+clearance/,
     /must\s+(hold|have|maintain)\s+(active\s+)?clearance/,
     /cannot\s+(provide|offer|give)\s+visa\s+sponsorship/,
+    /unable\s+to\s+(provide|offer|give|support)\s+visa\s+sponsorship/,
+    /we\s+are\s+unable\s+to\s+offer\s+visa/,
     /not\s+able\s+to\s+(provide|offer|give)\s+sponsorship/,
     /unable\s+to\s+sponsor/,
     /we\s+(do\s+not|don'?t)\s+sponsor/,
@@ -138,10 +142,21 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
 export interface ScoreInput { title: string; description: string; location: string; postedAt: string; }
 export interface ScoreResult { matchedSkills: string[]; missingSkills: string[]; skillMatchScore: number; recencyScore: number; relocationBonus: number; totalScore: number; }
 
+/**
+ * Word-boundary skill match — prevents false positives like:
+ *   "vite" inside "invite", "git" inside "digital"/"agile"
+ * This was a MAJOR bug causing non-frontend Doctolib jobs to score 100
+ * because their boilerplate says "invite you to apply" (matching "vite")
+ */
+function skillMatch(text: string, skill: string): boolean {
+  const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(`\\b${escaped}\\b`).test(text);
+}
+
 export function scoreJob(input: ScoreInput): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
 
-  const coreMatched = CORE_FRONTEND_SKILLS.filter(s => text.includes(s));
+  const coreMatched = CORE_FRONTEND_SKILLS.filter(s => skillMatch(text, s));
   if (coreMatched.length < MIN_CORE_SKILLS) {
     return {
       matchedSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6),
@@ -149,8 +164,8 @@ export function scoreJob(input: ScoreInput): ScoreResult {
     };
   }
 
-  const matchedExpert = EXPERT_SKILLS.filter(s => text.includes(s.toLowerCase()));
-  const matchedProficient = PROFICIENT_SKILLS.filter(s => text.includes(s.toLowerCase()));
+  const matchedExpert = EXPERT_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
+  const matchedProficient = PROFICIENT_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
   const skillMatchScore = Math.min(100, Math.round(((matchedExpert.length * 3 + matchedProficient.length * 2) / SCORE_DENOMINATOR) * 100));
 
   const matchedSet = new Set([...matchedExpert, ...matchedProficient].map(s => s.toLowerCase()));
