@@ -35,6 +35,20 @@ export interface RawJob { id: string; title: string; location: string; url: stri
 
 const AGE_CAP_DAYS = 7; // If it's older than 1 week, it's gone
 
+/** Returns true if a job description contains too many bonus (backend/infra) skills,
+ *  indicating it's likely a backend role despite a generic title. */
+function isTooBackendForFrontend(description: string): boolean {
+  const desc = description.toLowerCase();
+  let bonusSkillCount = 0;
+  for (const skill of BONUS_SKILLS) {
+    if (new RegExp(`\\b${skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(desc)) {
+      bonusSkillCount++;
+    }
+  }
+  // If more than 3 bonus skills are mentioned, consider it too backend-heavy
+  return bonusSkillCount >= 4;
+}
+
 /** For local jobs: extract a specific Egyptian city from the raw location string.
  *  Falls back to company.city (from ATSConfig), then "Cairo" as the safe default. */
 function extractEgyptCity(rawLocation: string, companyCity?: string): string {
@@ -63,6 +77,7 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     if (isClearlyNonFrontend(title)) continue;
     if (isTooSenior(title)) continue;
     if (isGenericTitleButBackendRole(title, r.description)) continue;
+    if (isTooBackendForFrontend(r.description)) continue; // New filter using BONUS_SKILLS
 
     // ── 14-day hard cap ──
     const postedMs = Date.parse(r.postedAt);
@@ -121,11 +136,16 @@ export async function fetchGreenhouse(c: ATSConfig, mode: JobMode, visaSponsorsh
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const { jobs } = await res.json() as { jobs: GHJob[] };
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_gh_${c.slug}_${r.id}`, title: r.title, location: r.location?.name ?? c.city ?? c.country,
-    url: r.absolute_url, postedAt: r.updated_at, description: r.content ? stripHtml(r.content) : "",
-  })), c, mode, visaSponsorship);
+  try {
+    const { jobs } = await res.json() as { jobs: GHJob[] };
+    return processJobs(jobs.map(r => ({
+      id: `${mode}_gh_${c.slug}_${r.id}`, title: r.title, location: r.location?.name ?? c.city ?? c.country,
+      url: r.absolute_url, postedAt: r.updated_at, description: r.content ? stripHtml(r.content) : "",
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[Greenhouse] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── Lever ──────────────────────────────────────────────────────────────────
@@ -136,12 +156,17 @@ export async function fetchLever(c: ATSConfig, mode: JobMode, visaSponsorship: b
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const jobs = await res.json() as LeverJob[];
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_lever_${c.slug}_${r.id}`, title: r.text, location: r.categories?.location ?? c.city ?? c.country,
-    url: r.hostedUrl, postedAt: new Date(r.createdAt).toISOString(),
-    description: r.descriptionPlain ?? (r.description ? stripHtml(r.description) : ""),
-  })), c, mode, visaSponsorship);
+  try {
+    const jobs = await res.json() as LeverJob[];
+    return processJobs(jobs.map(r => ({
+      id: `${mode}_lever_${c.slug}_${r.id}`, title: r.text, location: r.categories?.location ?? c.city ?? c.country,
+      url: r.hostedUrl, postedAt: new Date(r.createdAt).toISOString(),
+      description: r.descriptionPlain ?? (r.description ? stripHtml(r.description) : ""),
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[Lever] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── Ashby ──────────────────────────────────────────────────────────────────
@@ -153,13 +178,18 @@ export async function fetchAshby(c: ATSConfig, mode: JobMode, visaSponsorship: b
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}?includeCompensation=true`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const data = await res.json() as AshbyResp;
-  const jobs = data.jobs ?? data.jobPostings ?? [];
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_ashby_${c.slug}_${r.id}`, title: r.title, location: r.locationName ?? c.city ?? c.country,
-    url: r.jobUrl, postedAt: r.publishedAt ?? new Date().toISOString(),
-    description: r.descriptionPlain ?? (r.descriptionHtml ? stripHtml(r.descriptionHtml) : ""),
-  })), c, mode, visaSponsorship);
+  try {
+    const data = await res.json() as AshbyResp;
+    const jobs = data.jobs ?? data.jobPostings ?? [];
+    return processJobs(jobs.map(r => ({
+      id: `${mode}_ashby_${c.slug}_${r.id}`, title: r.title, location: r.locationName ?? c.city ?? c.country,
+      url: r.jobUrl, postedAt: r.publishedAt ?? new Date().toISOString(),
+      description: r.descriptionPlain ?? (r.descriptionHtml ? stripHtml(r.descriptionHtml) : ""),
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[Ashby] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── Workable ───────────────────────────────────────────────────────────────
@@ -183,7 +213,13 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
   const res = await safeFetch(listUrl);
   if (!res || !res.ok) return [];
-  const data = await res.json() as WorkableResp;
+  let data: WorkableResp;
+  try {
+    data = await res.json() as WorkableResp;
+  } catch (err) {
+    console.error(`[Workable] Failed to parse JSON from ${listUrl} for ${c.name}:`, err);
+    return [];
+  }
   const jobs = data.jobs ?? [];
 
   // Step 2: pre-filter by title before fetching descriptions (saves requests)
@@ -198,8 +234,12 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
     const dr = await safeFetch(detailUrl);
     let desc = "";
     if (dr && dr.ok) {
-      const detail = await dr.json() as WorkableDetail;
-      desc = stripHtml(detail.full_description ?? detail.description ?? "");
+      try {
+        const detail = await dr.json() as WorkableDetail;
+        desc = stripHtml(detail.full_description ?? detail.description ?? "");
+      } catch (err) {
+        console.error(`[Workable] Failed to parse JSON from ${detailUrl} for ${c.name}:`, err);
+      }
     }
     return {
       id: `${mode}_workable_${c.slug}_${r.shortcode}`,
@@ -223,13 +263,18 @@ export async function fetchTeamtailor(c: ATSConfig, mode: JobMode, visaSponsorsh
   const url = `https://${c.slug}.teamtailor.com/jobs.json`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const { data } = await res.json() as TTResp;
-  return processJobs(data.map(r => ({
-    id: `${mode}_tt_${c.slug}_${r.id}`, title: r.attributes.title, location: r.attributes["location-name"] ?? c.city ?? c.country,
-    url: r.attributes["external-url"] || `https://${c.slug}.teamtailor.com/jobs/${r.id}`,
-    postedAt: r.attributes["published-at"],
-    description: stripHtml(r.attributes["body-html"]),
-  })), c, mode, visaSponsorship);
+  try {
+    const { data } = await res.json() as TTResp;
+    return processJobs(data.map(r => ({
+      id: `${mode}_tt_${c.slug}_${r.id}`, title: r.attributes.title, location: r.attributes["location-name"] ?? c.city ?? c.country,
+      url: r.attributes["external-url"] || `https://${c.slug}.teamtailor.com/jobs/${r.id}`,
+      postedAt: r.attributes["published-at"],
+      description: stripHtml(r.attributes["body-html"]),
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[Teamtailor] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── Breezy HR ──────────────────────────────────────────────────────────────
@@ -240,11 +285,16 @@ export async function fetchBreezy(c: ATSConfig, mode: JobMode, visaSponsorship: 
   const url = `https://${c.slug}.breezy.hr/json`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const jobs = await res.json() as BreezyJob[];
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_breezy_${c.slug}_${r.id}`, title: r.name, location: r.location?.name ?? c.city ?? c.country,
-    url: r.url, postedAt: r.updated_at, description: stripHtml(r.description),
-  })), c, mode, visaSponsorship);
+  try {
+    const jobs = await res.json() as BreezyJob[];
+    return processJobs(jobs.map(r => ({
+      id: `${mode}_breezy_${c.slug}_${r.id}`, title: r.name, location: r.location?.name ?? c.city ?? c.country,
+      url: r.url, postedAt: r.updated_at, description: stripHtml(r.description),
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[Breezy] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── SmartRecruiters ───────────────────────────────────────────────────────
@@ -256,18 +306,29 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode, visaSpon
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const { content } = await res.json() as SRResp;
+  let content: SRJob[];
+  try {
+    ({ content } = await res.json() as SRResp);
+  } catch (err) {
+    console.error(`[SmartRecruiters] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
   
   const detailedJobs = await Promise.all(content.map(async (r) => {
     const detailRes = await safeFetch(r.ref);
     if (!detailRes || !detailRes.ok) return null;
-    const detail = await detailRes.json() as { jobAd: { sections: { jobDescription: { content: string } } } };
-    return {
-        id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
-        url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
-        postedAt: r.releasedDate,
-        description: stripHtml(detail.jobAd.sections.jobDescription.content),
-    };
+    try {
+      const detail = await detailRes.json() as { jobAd: { sections: { jobDescription: { content: string } } } };
+      return {
+          id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
+          url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
+          postedAt: r.releasedDate,
+          description: stripHtml(detail.jobAd.sections.jobDescription.content),
+      };
+    } catch (err) {
+      console.error(`[SmartRecruiters] Failed to parse JSON from ${r.ref} for ${c.name}:`, err);
+      return null;
+    }
   }));
 
   return processJobs(detailedJobs.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
@@ -282,16 +343,21 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode, visaSponsorship
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
-  const data = await res.json() as BHResp;
-  const jobs = data.result ?? [];
-  return processJobs(jobs.map(r => ({
-    id: `${mode}_bamboohr_${c.slug}_${r.id}`,
-    title: r.jobOpeningName,
-    location: r.city ? `${r.city}, ${r.country}` : c.city ?? c.country,
-    url: `https://${c.slug}.bamboohr.com/careers/${r.id}`,
-    postedAt: r.datePosted ?? new Date().toISOString(),
-    description: "", // BambooHR list endpoint has no description; scoring will rely on title
-  })), c, mode, visaSponsorship);
+  try {
+    const data = await res.json() as BHResp;
+    const jobs = data.result ?? [];
+    return processJobs(jobs.map(r => ({
+      id: `${mode}_bamboohr_${c.slug}_${r.id}`,
+      title: r.jobOpeningName,
+      location: r.city ? `${r.city}, ${r.country}` : c.city ?? c.country,
+      url: `https://${c.slug}.bamboohr.com/careers/${r.id}`,
+      postedAt: r.datePosted ?? new Date().toISOString(),
+      description: "", // BambooHR list endpoint has no description; scoring will rely on title
+    })), c, mode, visaSponsorship);
+  } catch (err) {
+    console.error(`[BambooHR] Failed to parse JSON from ${url} for ${c.name}:`, err);
+    return [];
+  }
 }
 
 // ── GMT+2 / Egypt timezone restriction filter (for global pipeline) ─────────

@@ -79,8 +79,8 @@ const COMPANIES: ATSConfig[] = [
   { ats: "teamtailor", name: "BMAT",           slug: "bmat",             country: "Global", countryFlag: "🌍" },
 
   // ── Breezy ─────────────────────────────────────────────────────────────────
-  { ats: "breezy",     name: "Gumroad",        slug: "gumroad",          country: "Global", countryFlag: "🌍" },
-  { ats: "breezy",     name: "Supercast",      slug: "supercast",        country: "Global", countryFlag: "🌍" },
+
+
 ];
 
 export async function fetchGlobalJobs(): Promise<Job[]> {
