@@ -13,22 +13,31 @@ const VISA = false;
 // These are globally remote-friendly companies known to hire from EMEA/worldwide.
 // Add more as you discover them — same ATS slug approach as other pipelines.
 const COMPANIES: ATSConfig[] = [
-    // Greenhouse
-    { ats: "greenhouse", name: "Automattic", slug: "automattic", country: "Global", countryFlag: "🌍" },
-    { ats: "greenhouse", name: "GitLab", slug: "gitlab", country: "Global", countryFlag: "🌍" },
-    { ats: "greenhouse", name: "Hotjar", slug: "hotjar", country: "Global", countryFlag: "🌍" },
-    { ats: "greenhouse", name: "Spreedly", slug: "spreedly", country: "Global", countryFlag: "🌍" },
+    // ── Greenhouse ─────────────────────────────────────────────────────────
+    { ats: "greenhouse", name: "Automattic",    slug: "automattic",  country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "GitLab",        slug: "gitlab",      country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Hotjar",        slug: "hotjar",      country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Spreedly",      slug: "spreedly",    country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Netlify",       slug: "netlify",     country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Help Scout",    slug: "helpscout",   country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Zapier",        slug: "zapier",      country: "Global", countryFlag: "🌍" },
+    { ats: "greenhouse", name: "Coda",          slug: "coda",        country: "Global", countryFlag: "🌍" },
 
-    // Lever
-    { ats: "lever", name: "Doist", slug: "doist", country: "Global", countryFlag: "🌍" },
-    { ats: "lever", name: "Whereby", slug: "whereby", country: "Global", countryFlag: "🌍" },
+    // ── Lever ──────────────────────────────────────────────────────────────
+    { ats: "lever",      name: "Doist",         slug: "doist",       country: "Global", countryFlag: "🌍" },
+    { ats: "lever",      name: "Whereby",       slug: "whereby",     country: "Global", countryFlag: "🌍" },
+    { ats: "lever",      name: "Buffer",        slug: "buffer",      country: "Global", countryFlag: "🌍" },
+    { ats: "lever",      name: "ConvertKit",    slug: "convertkit",  country: "Global", countryFlag: "🌍" },
 
-    // Ashby
-    { ats: "ashby", name: "Remote.com", slug: "remote", country: "Global", countryFlag: "🌍" },
-    { ats: "ashby", name: "Loom", slug: "loom", country: "Global", countryFlag: "🌍" },
+    // ── Ashby ──────────────────────────────────────────────────────────────
+    { ats: "ashby",      name: "Remote.com",    slug: "remote",      country: "Global", countryFlag: "🌍" },
+    { ats: "ashby",      name: "Loom",          slug: "loom",        country: "Global", countryFlag: "🌍" },
+    { ats: "ashby",      name: "Linear",        slug: "linear",      country: "Global", countryFlag: "🌍" },
+    { ats: "ashby",      name: "Vercel",        slug: "vercel",      country: "Global", countryFlag: "🌍" },
+    { ats: "ashby",      name: "Retool",        slug: "retool",      country: "Global", countryFlag: "🌍" },
 
-    // Workable
-    { ats: "workable", name: "Typeform", slug: "typeform", country: "Global", countryFlag: "🌍" },
+    // ── Workable ───────────────────────────────────────────────────────────
+    { ats: "workable",   name: "Typeform",      slug: "typeform",    country: "Global", countryFlag: "🌍" },
 
     // ── Add more companies here as you research them ────────────────────────
     // Pattern: { ats: "greenhouse"|"lever"|"ashby"|"workable", name: "...", slug: "...", country: "Global", countryFlag: "🌍" }

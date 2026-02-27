@@ -23,45 +23,73 @@ const SCORE_DENOMINATOR = 15;
 export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
   return [
+    // ── Backend / Infra ──────────────────────────────────────────────────────
     /\bbackend\b/, /\bback[\s-]end\b/,
-    /\bfullstack\b/, /\bfull[\s-]stack\b/,
-    /\bhelpdesk\b/, /\bhelp\s+desk\b/, /\bservice\s+desk\b/,
-    /\bdevops\b/, /\bsite[\s-]reliability\b/, /\bsre\b/,
+    /\bdevops\b/, /\bdev[\s-]ops\b/,
+    /\bsite[\s-]reliability\b/, /\bsre\b/,
+    /\bplatform\s+engineer\b/,
+    /\binfrastructure\s+engineer\b/,
+    /\bcloud\s+engineer\b/,
+    /\bsecurity\s+engineer\b/, /\bnetwork\s+engineer\b/,
+    /\bembedded\s+(software|engineer)\b/, /\bfirmware\b/,
+    /\bml[\s-]?ops\b/, /\bmlops\b/,                        // MLOps
+    /\bdatabase\s+reliability\b/, /\bdbre\b/,              // Database Reliability
+    /\bdatabase\s+engineer\b/, /\bdba\b/,
+    /\bsysadmin\b/, /\bsystem\s+administrator\b/,
+
+    // ── Mobile (not React Native specifically) ────────────────────────────────
+    /\bandroid\b/,                                          // Android engineer / Android - KMP
+    /\bios\s+engineer\b/, /\bswift\s+developer\b/,
+    /\bmobile\s+engineer\b/,
+    /\bkotlin\s+(developer|engineer|multiplatform)\b/,     // Kotlin dev
+    /[\s,\-–]\s*kotlin\s*[\s,\-–(]/,                     // "Engineer - Kotlin" or "Engineer, Kotlin"
+    /[\s,\-–]\s*java\s*[\s,\-–(]/,                       // "Engineer - Java"
+    /[\s,\-–]\s*ruby\s*[\s,\-–(]/,                       // "Engineer - Ruby"
+
+    // ── Data / ML / AI ────────────────────────────────────────────────────────
     /\bdata\s+(engineer|scientist|analyst)\b/,
     /\bmachine\s+learning\s+engineer\b/,
     /\b(ai|ml)\s+engineer\b/,
-    /\bmobile\s+engineer\b/, /\bios\s+engineer\b/, /\bandroid\s+engineer\b/,
-    /\bplatform\s+engineer\b/,
-    /\bsecurity\s+engineer\b/, /\bnetwork\s+engineer\b/,
-    /\binfrastructure\s+engineer\b/, /\bembedded\s+(software|engineer)\b/,
-    /\bfirmware\b/, /\bcloud\s+engineer\b/, /\bsolutions?\s+architect\b/,
-    /\barchitect\b/,
+    /\banalytics\s+analyst\b/, /\bweb\s+analytics\b/,     // Analytics Analyst
+
+    // ── Non-eng roles ─────────────────────────────────────────────────────────
     /\bproject\s+manager\b/, /\bprogram\s+manager\b/,
     /\bproduct\s+(manager|owner)\b/, /\baccount\s+manager\b/,
     /\bscrum\s+master\b/, /\boperations\s+manager\b/,
-    /\bsales\s+manager\b/, /\bbusiness\s+(analyst|development)\b/,
-    /\bcustomer\s+success\b/, /\bsupport\s+engineer\b/, /\bsupport\s+specialist\b/,
-    /\bsolutions?\s+architect\b/, /\bimplementation\s+(consultant|engineer)\b/,
-    /\btrainer\b/, /\btechnical\s+writer\b/, /\bcontent\s+(writer|manager|creator)\b/,
+    /\bsales\s+(manager|engineer|specialist)\b/,
+    /\bbusiness\s+(analyst|development)\b/,
+    /\bcustomer\s+success\b/,
+    /\bsupport\s+(engineer|specialist|analyst)\b/,
+    /\bhelpdesk\b/, /\bhelp\s+desk\b/, /\bservice\s+desk\b/,
+    /\bimplementation\s+(consultant|engineer)\b/,
+    /\bsolutions?\s+architect\b/, /\barchitect\b/,
+    /\btrainer\b/, /\btechnical\s+writer\b/,
+    /\bcontent\s+(writer|manager|creator)\b/,
     /\brecruiter\b/, /\bhr\s+(manager|specialist|generalist)\b/,
     /\bfinance\s+(manager|analyst|lead)\b/, /\baccountant\b/,
-    /\bmarketing\s+(manager|specialist|analyst)\b/,
+    /\bmarketing\s+(manager|specialist|analyst|operations)\b/, // Marketing Ops
+    /\bcompliance\s+(analyst|engineer|manager|specialist)\b/,  // Compliance
+    /\boperations\s+analyst\b/,
     /\bquality\s+assurance\b/, /\bautomation\s+tester\b/, /\btest\s+engineer\b/,
-    /\bdba\b/, /\bsysadmin\b/, /\bsystem\s+administrator\b/,
+    /\bhardware\b/,                                            // Hardware Specialist
+    /\bintern\b/,                                              // Internships (5yr exp)
+    /\bforward\s+deployed\b/,                                  // Forward Deployed Engineer (consulting)
   ].some(re => re.test(t));
 }
 
 /**
- * Extra guard: "Software Engineer" with no frontend signal in title
- * but backend/infra-heavy description → reject.
- * Catches roles like Contentful "Senior Software Engineer" (storage infra team).
+ * Extra guard: generic "Software Engineer" title with backend signals in description.
+ * Also catches titles that name a backend language explicitly (e.g. "- Kotlin", "- Java").
  */
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
-  // If title explicitly says frontend/UI, always keep
+  // Always keep explicit frontend titles
   if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
-  // Only apply to generic titles
+  // Only apply to generic SE/SD titles
   if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b/.test(t)) return false;
+
+  // If the title itself names a backend language after a dash/comma, reject immediately
+  if (/[-–,]\s*(kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
 
   const desc = description.toLowerCase();
   const backendSignals = [
@@ -69,9 +97,10 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bpostgresql\b|\bpostgres\b/, /\bkafka\b/,
     /\bstorage\s+infrastructure\b/, /\bsystems?\s+engineering\b/,
     /\bsite\s+reliability\b/, /\bci\/cd\s+pipeline\b/, /\baws\s+(rds|s3|lambda)\b/,
+    /\bspring\s*boot\b/, /\bjvm\b/, /\bdistributed\s+systems\b/,
   ];
   const hits = backendSignals.filter(re => re.test(desc)).length;
-  return hits >= 3; // 3+ infra signals = backend role wearing a generic title
+  return hits >= 3;
 }
 
 /** Rejects titles too senior for ~5 years of experience. */

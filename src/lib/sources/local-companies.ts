@@ -9,25 +9,28 @@ const VISA = false;
 
 const COMPANIES: ATSConfig[] = [
     // ── Verified Live ──────────────────────────────────────────────────────
-    { ats: "lever", name: "Bosta", slug: "Bosta", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "ashby", name: "Thndr", slug: "thndr", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "greenhouse", name: "Speechify", slug: "speechify", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Nawy", slug: "nawy-real-estate", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "smartrecruiters", name: "Yassir", slug: "YassirGmbh", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Dubizzle", slug: "bayutdubizzle", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "lever",          name: "Bosta",       slug: "Bosta",             country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "ashby",          name: "Thndr",        slug: "thndr",             country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Nawy",         slug: "nawy-real-estate",  country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "smartrecruiters",name: "Yassir",       slug: "YassirGmbh",        country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Dubizzle",     slug: "bayutdubizzle",     country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "bamboohr",       name: "Instabug",     slug: "instabug",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Rubikal",      slug: "rubikal",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Blink22",      slug: "blink22-3",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Squadio",      slug: "squadio23",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Robusta",      slug: "robusta",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "smartrecruiters",name: "Algoriza",     slug: "Algoriza",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Vezeeta",      slug: "vezeeta",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "breezy",         name: "MaxAB",        slug: "maxab",             country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-    // ── Confirmed from career page URL patterns ────────────────────────────
-    // ⚠️ Verify with live fetch before trusting.
-    { ats: "bamboohr", name: "Instabug", slug: "instabug", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Rubikal", slug: "rubikal", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Blink22", slug: "blink22-3", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Squadio", slug: "squadio23", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "workable", name: "Robusta", slug: "robusta", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "smartrecruiters", name: "Algoriza", slug: "Algoriza", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-
-    // ── Monitoring ──────────────────────────────────────────────────────────
-    { ats: "workable", name: "Vezeeta", slug: "vezeeta", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-    { ats: "breezy", name: "MaxAB", slug: "maxab", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    // ── Added: Fintech / High-tech Egypt ───────────────────────────────────
+    { ats: "greenhouse",     name: "Paymob",       slug: "paymob",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "lever",          name: "Halan",        slug: "halan",             country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "greenhouse",     name: "Breadfast",    slug: "breadfast",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "NearPay",      slug: "nearpay",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "workable",       name: "Lean Technologies", slug: "leantech",     country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "greenhouse",     name: "Khazna",       slug: "khazna",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+    { ats: "lever",          name: "Trella",       slug: "trella",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
     // ── TODO: Need manual page fetch to identify ATS ──────────────────────
     // enozom       → https://enozom.com/Company/Join_Us/           (custom or Zoho?)
