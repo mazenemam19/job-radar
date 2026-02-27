@@ -5,7 +5,7 @@ import { Job, JobStore, CronLog } from "./types";
 
 const STORE_PATH = path.resolve(process.cwd(), "data/jobs.json");
 const MAX_JOBS = 500;
-const MAX_JOB_AGE_DAYS = 30;
+const MAX_JOB_AGE_DAYS = 14;
 
 function emptyStore(): JobStore {
   return { jobs: [], lastUpdated: new Date().toISOString(), cronLogs: [] };

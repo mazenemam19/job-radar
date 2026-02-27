@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { Job } from "@/lib/types";
 
 function ScoreRing({ score }: { score: number }) {
@@ -44,7 +45,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 export default function JobCard({ job, index }: { job: Job; index: number }) {
-  const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
   const qual = job.totalScore >= 80 ? "excellent" : job.totalScore >= 60 ? "good" : "";
   const localCls = job.mode === "local" ? "local-mode" : "";
 
@@ -88,17 +89,11 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
         {job.relocationBonus > 0 && <div className="reloc-badge">+{job.relocationBonus} relocation bonus</div>}
       </div>
 
-      {expanded && job.description && (
-        <div className="card-desc">
-          {job.description.length > 900 ? job.description.slice(0, 900) + "…" : job.description}
-        </div>
-      )}
-
       <div className="card-actions">
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-apply">Apply Now ↗</a>
         {job.description && (
-          <button className="btn-details" onClick={() => setExpanded(v => !v)}>
-            {expanded ? "↑ Less" : "↓ Details"}
+          <button className="btn-details" onClick={() => router.push(`/job/${encodeURIComponent(job.id)}`)}>
+            Details →
           </button>
         )}
       </div>

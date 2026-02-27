@@ -7,15 +7,16 @@ const EXPERT_SKILLS = [
 const PROFICIENT_SKILLS = [
   "Next.js", "Node.js", "Express", "MongoDB", "GraphQL", "WebSocket",
   "Jest", "Vitest", "React Testing Library", "AWS", "Docker",
-  "Webpack", "Sentry", "MobX",
+  "Webpack", "Sentry", "MobX", "Tailwind", "Zustand", "React Native",
 ];
+// Only React-ecosystem signals — Angular/Vue/Svelte are not your stack
 const CORE_FRONTEND_SKILLS = [
   "react", "typescript", "javascript", "html", "css", "sass",
-  "next.js", "vue", "angular", "redux", "react query",
-  "material ui", "vite", "webpack", "svelte",
+  "next.js", "nextjs", "redux", "react query", "react-query",
+  "material ui", "vite", "webpack", "tailwind",
 ];
 const MIN_CORE_SKILLS = 2;
-const SCORE_DENOMINATOR = 15; // 5 expert × 3 = 100
+const SCORE_DENOMINATOR = 15;
 
 // ── Title filters ──────────────────────────────────────────────────────────
 

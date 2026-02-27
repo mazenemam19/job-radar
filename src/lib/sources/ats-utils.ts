@@ -33,11 +33,11 @@ export async function safeFetch(url: string, timeout = 30_000): Promise<Response
 
 export interface RawJob { id: string; title: string; location: string; url: string; postedAt: string; description: string; }
 
-export const MAX_JOB_AGE_DAYS = 30;
+const AGE_CAP_DAYS = 14; // If it's older than 2 weeks, it's gone
 
 export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, visaSponsorship: boolean): Job[] {
   const now = new Date().toISOString();
-  const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5; // 30 days ago
+  const cutoff = Date.now() - AGE_CAP_DAYS * 864e5;
   const out: Job[] = [];
 
   for (const r of raw) {
@@ -46,16 +46,16 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     if (isTooSenior(title)) continue;
     if (isGenericTitleButBackendRole(title, r.description)) continue;
 
-    // ── 30-day age cap ──
+    // ── 14-day hard cap ──
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;
-
+    
     const loc = (r.location || "").toLowerCase();
     // For local mode, strictly require Egypt-related keywords
     if (mode === "local") {
-      const isEgypt = loc.includes("egypt") || loc.includes("cairo") || loc.includes("alexandria") || loc.includes("giza");
-      if (company.country === "Egypt" && !isEgypt && !loc.includes("remote")) continue;
-      if (company.name === "Speechify" && !isEgypt) continue;
+        const isEgypt = loc.includes("egypt") || loc.includes("cairo") || loc.includes("alexandria") || loc.includes("giza");
+        if (company.country === "Egypt" && !isEgypt && !loc.includes("remote")) continue; 
+        if (company.name === "Speechify" && !isEgypt) continue;
     }
 
     // Only check citizenship/clearance for visa mode (known international companies)
@@ -72,15 +72,15 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     const explicitlyOffered = /visa\s+sponsorship|relocation\s+assistance/i.test(r.description);
     const actualSponsorship = !explicitlyDenied && (explicitlyOffered || (mode === "visa" && visaSponsorship));
 
-    const isRemote = /remote|work\s+from\s+home|anywhere/i.test(title) ||
-      /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
-      /100%\s+remote|fully\s+remote/i.test(r.description);
+    const isRemote = /remote|work\s+from\s+home|anywhere/i.test(title) || 
+                     /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
+                     /100%\s+remote|fully\s+remote/i.test(r.description);
 
     out.push({
       id: r.id, source: "company", mode,
       title, company: company.name, location: r.location,
       country: company.country, countryFlag: company.countryFlag,
-      url: r.url, description: r.description,
+      url: r.url, description: r.description, 
       isRemote,
       postedAt: r.postedAt ?? now, visaSponsorship: actualSponsorship,
       ...scored, fetchedAt: now,
@@ -235,16 +235,16 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode, visaSpon
   const res = await safeFetch(url);
   if (!res || !res.ok) return [];
   const { content } = await res.json() as SRResp;
-
+  
   const detailedJobs = await Promise.all(content.map(async (r) => {
     const detailRes = await safeFetch(r.ref);
     if (!detailRes || !detailRes.ok) return null;
     const detail = await detailRes.json() as { jobAd: { sections: { jobDescription: { content: string } } } };
     return {
-      id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
-      url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
-      postedAt: r.releasedDate,
-      description: stripHtml(detail.jobAd.sections.jobDescription.content),
+        id: `${mode}_sr_${c.slug}_${r.id}`, title: r.name, location: r.location.fullLocation ?? c.city ?? c.country,
+        url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
+        postedAt: r.releasedDate,
+        description: stripHtml(detail.jobAd.sections.jobDescription.content),
     };
   }));
 
