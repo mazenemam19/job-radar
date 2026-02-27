@@ -5,7 +5,21 @@ import { Job, JobStore, CronLog } from "./types";
 
 const STORE_PATH = path.resolve(process.cwd(), "data/jobs.json");
 const MAX_JOBS = 500;
-const MAX_JOB_AGE_DAYS = 14;
+
+/**
+ * Jobs older than this are auto-removed from the store on every read.
+ * Since we only scrape jobs ≤7 days old (AGE_CAP_DAYS in ats-utils),
+ * this ensures stale jobs that were added last week get pruned automatically.
+ *
+ * How expiry works:
+ * 1. processJobs() in ats-utils only admits jobs posted ≤7 days ago (by postedAt)
+ * 2. mergeJobs() adds NEW jobs to the store (deduplicates by id)
+ * 3. readStore() filters out any stored job where postedAt is now >7 days ago
+ *
+ * Result: on every cron run + every dashboard load, stale jobs are silently dropped.
+ * No manual cleanup needed.
+ */
+const MAX_JOB_AGE_DAYS = 7;
 
 function emptyStore(): JobStore {
   return { jobs: [], lastUpdated: new Date().toISOString(), cronLogs: [] };
@@ -15,12 +29,16 @@ export function readStore(): JobStore {
   try {
     if (!fs.existsSync(STORE_PATH)) return emptyStore();
     const store = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8")) as JobStore;
-    // Auto-expire jobs older than 30 days on read
+
+    // ── Auto-expire old jobs on every read ──────────────────────────────────
+    // postedAt is the job's original posting date (or fetchedAt if API had none).
+    // Any job older than MAX_JOB_AGE_DAYS is removed silently.
     const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
     store.jobs = store.jobs.filter(j => {
       const ms = Date.parse(j.postedAt);
-      return isNaN(ms) || ms >= cutoff;
+      return isNaN(ms) || ms >= cutoff;  // keep if date unparseable (safety) or still fresh
     });
+
     return store;
   } catch {
     return emptyStore();
@@ -35,15 +53,11 @@ export function writeStore(store: JobStore): void {
 
 /**
  * Merge new jobs into store.
- * - Deduplicates by id
+ * - Deduplicates by id (existing job keeps its original postedAt — no date drift)
  * - Sorts by totalScore descending
- * - Caps at MAX_JOBS (500) — removes lowest-scoring overflow
- * Returns the updated store AND the slice of actually-added jobs.
+ * - Caps at MAX_JOBS
  */
-export function mergeJobs(
-  store: JobStore,
-  incoming: Job[],
-): { store: JobStore; added: Job[] } {
+export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; added: Job[] } {
   const existingIds = new Set(store.jobs.map(j => j.id));
   const added = incoming.filter(j => !existingIds.has(j.id));
 
@@ -58,8 +72,5 @@ export function mergeJobs(
 }
 
 export function appendCronLog(store: JobStore, log: CronLog): JobStore {
-  return {
-    ...store,
-    cronLogs: [log, ...store.cronLogs].slice(0, 20), // keep last 20 runs
-  };
+  return { ...store, cronLogs: [log, ...store.cronLogs].slice(0, 20) };
 }

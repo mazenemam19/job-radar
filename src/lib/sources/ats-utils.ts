@@ -1,6 +1,6 @@
 // src/lib/sources/ats-utils.ts
 import type { Job, JobMode } from "../types";
-import { isClearlyNonFrontend, isTooSenior, isGenericTitleButBackendRole, requiresCitizenshipOrClearance, scoreJob } from "../scoring";
+import { isClearlyNonFrontend, isTooSenior, isGenericTitleButBackendRole, requiresCitizenshipOrClearance, scoreJob, BONUS_SKILLS } from "../scoring";
 
 // ── Shared Types ────────────────────────────────────────────────────────────
 
@@ -95,13 +95,16 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
       ? extractEgyptCity(r.location, company.city)
       : r.location;
 
+    const hasDate = !!r.postedAt && r.postedAt.trim() !== "";
     out.push({
       id: r.id, source: "company", mode,
       title, company: company.name, location: displayLocation,
       country: company.country, countryFlag: company.countryFlag,
       url: r.url, description: r.description, 
       isRemote,
-      postedAt: r.postedAt ?? now, visaSponsorship: actualSponsorship,
+      postedAt: hasDate ? r.postedAt : now,
+      dateUnknown: !hasDate,           // true = API returned no date, UI shows "Date N/A"
+      visaSponsorship: actualSponsorship,
       ...scored, fetchedAt: now,
     });
   }

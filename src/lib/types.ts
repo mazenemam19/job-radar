@@ -17,8 +17,10 @@ export interface Job {
   isRemote?: boolean;
   salary?: string;
   postedAt: string;
+  dateUnknown?: boolean;    // true when API returned no date — shown as "Date N/A" in UI
   visaSponsorship: boolean; // true for visa-mode jobs, false for local-mode
-  matchedSkills: string[];
+  matchedSkills: string[];   // Tier 2 frontend skills found
+  bonusSkills: string[];     // Tier 3 backend/infra (shown in UI, not scored)
   missingSkills: string[];
   skillMatchScore: number;
   recencyScore: number;
