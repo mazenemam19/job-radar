@@ -14,8 +14,16 @@ const COMPANIES: ATSConfig[] = [
   // ── Verified Ashby ────────────────────────────────────────────────────
   { ats: "ashby",           name: "Thndr",           slug: "thndr",              country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-  // ── Verified Workable ─────────────────────────────────────────────────
+  // ── Verified SmartRecruiters ──────────────────────────────────────────
+  { ats: "smartrecruiters", name: "Yassir",          slug: "YassirGmbh",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "smartrecruiters", name: "Algoriza",        slug: "Algoriza",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "smartrecruiters", name: "Khazna Tech",     slug: "khaznatech",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "smartrecruiters", name: "valU",            slug: "valU",               country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "smartrecruiters", name: "Homzmart",        slug: "Homzmart",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+
+  // ── Verified Workable (Local Heavyweight) ─────────────────────────────
   { ats: "workable",        name: "Swvl",            slug: "swvl",               country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "Klivvr",          slug: "klivvr",             country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Nawy",            slug: "nawy-real-estate",   country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Dubizzle",        slug: "bayutdubizzle",      country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Rubikal",         slug: "rubikal",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
@@ -35,10 +43,12 @@ const COMPANIES: ATSConfig[] = [
   { ats: "workable",        name: "Codescalers",     slug: "codescalers",        country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Dev-Point",       slug: "dev-point",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Atomica",         slug: "atomica",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-
-  // ── SmartRecruiters ───────────────────────────────────────────────────
-  { ats: "smartrecruiters", name: "Yassir",          slug: "YassirGmbh",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
-  { ats: "smartrecruiters", name: "Algoriza",        slug: "Algoriza",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "Advansys",        slug: "advansys",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "Sumerge",         slug: "sumerge",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "Integrant",       slug: "integrant",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "Eva Pharma",      slug: "evapharma",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "SWATX",           slug: "swatx",              country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+  { ats: "workable",        name: "ArpuPlus",        slug: "arpuplus",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
   // ── BambooHR ──────────────────────────────────────────────────────────
   { ats: "bamboohr",        name: "Instabug",        slug: "instabug",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },

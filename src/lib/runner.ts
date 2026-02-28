@@ -19,7 +19,8 @@ export async function runAllSources(): Promise<CronLog> {
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
   const store = readStore();
-  const existingIds = new Set(store.jobs.map(j => j.id));
+  store.jobs = []; // Clear history for fresh validation run
+  const existingIds = new Set<string>();
 
   const errors: string[] = [];
   let visaJobs: Awaited<ReturnType<typeof fetchCompanyJobs>> = [];

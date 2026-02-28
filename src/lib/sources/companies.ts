@@ -6,7 +6,7 @@ const MODE = "visa";
 const VISA = true;
 
 const COMPANIES: ATSConfig[] = [
-  // ── Stable Core (Verified Greenhouse) ───────────────────────────────────
+  // ── Verified Visa Hubs ───────────────────────────────────────────────
   { ats: "greenhouse",     name: "Contentful",     slug: "contentful",       country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "N26",             slug: "n26",              country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "SumUp",           slug: "sumup",            country: "Germany",      countryFlag: "🇩🇪" },
@@ -27,11 +27,14 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse",     name: "Scandit",        slug: "scandit",         country: "Switzerland",  countryFlag: "🇨🇭" },
   { ats: "greenhouse",     name: "Feedzai",        slug: "feedzai",         country: "Portugal",     countryFlag: "🇵🇹" },
   { ats: "greenhouse",     name: "Squarespace",    slug: "squarespace",     country: "Ireland",      countryFlag: "🇮🇪" },
-
-  // ── Stable Core (Verified Ashby) ────────────────────────────────────────
+  { ats: "greenhouse",     name: "Okta",            slug: "okta",             country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "Cloudflare",      slug: "cloudflare",       country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "DataDog",         slug: "datadog",          country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "Twilio",          slug: "twilio",           country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "Asana",           slug: "asana",            country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "Checkr",          slug: "checkr",           country: "Global",       countryFlag: "🌍" },
+  { ats: "greenhouse",     name: "Gusto",           slug: "gusto",            country: "Global",       countryFlag: "🌍" },
   { ats: "ashby",          name: "Mollie",          slug: "mollie",           country: "Netherlands",  countryFlag: "🇳🇱" },
-
-  // ── Stable Core (Verified Workable) ─────────────────────────────────────
   { ats: "workable",       name: "Moonfare",        slug: "moonfare",         country: "Germany",      countryFlag: "🇩🇪" },
 ];
 

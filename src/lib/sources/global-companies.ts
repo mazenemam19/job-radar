@@ -16,6 +16,16 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse", name: "Airbnb",         slug: "airbnb",           country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Discord",        slug: "discord",          country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Coinbase",       slug: "coinbase",         country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Figma",          slug: "figma",            country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Grafana",        slug: "grafanalabs",      country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Netlify",        slug: "netlify",          country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Lyft",           slug: "lyft",             country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Reddit",         slug: "reddit",           country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Pinterest",      slug: "pinterest",        country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Databricks",     slug: "databricks",       country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "HubSpot",        slug: "hubspot",          country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Twilio",         slug: "twilio",           country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Okta",           slug: "okta",             country: "Global", countryFlag: "🌍" },
 
   // ── Stable Core (Verified Ashby) ────────────────────────────────────────
   { ats: "ashby",      name: "Posthog",        slug: "posthog",          country: "Global", countryFlag: "🌍" },
@@ -27,6 +37,7 @@ const COMPANIES: ATSConfig[] = [
   { ats: "ashby",      name: "Neon",           slug: "neon",             country: "Global", countryFlag: "🌍" },
   { ats: "ashby",      name: "Plain",          slug: "plain",            country: "Global", countryFlag: "🌍" },
   { ats: "ashby",      name: "Linear",         slug: "linear",           country: "Global", countryFlag: "🌍" },
+  { ats: "ashby",      name: "Airbyte",        slug: "airbyte",          country: "Global", countryFlag: "🌍" },
 
   // ── Stable Core (Verified Workable) ──────────────────────────────────────
   { ats: "workable",   name: "Learnworlds",    slug: "learnworlds",      country: "Global", countryFlag: "🌍" },

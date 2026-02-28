@@ -1,65 +1,42 @@
 // src/lib/scoring.ts
 
 // ── Skill Tiers ────────────────────────────────────────────────────────────
-//
-// TIER 1 — GATE: React MUST appear in title/description or job is rejected.
-//          No React = not a frontend job, full stop.
-//
-// TIER 2 — CORE FRONTEND (scored heavily): Your actual day-to-day skills.
-//          These drive the skillMatchScore and matchedSkills display.
-//
-// TIER 3 — BONUS (shown in UI, NOT scored): Backend/infra skills that are
-//          "nice to have" but you don't want them inflating the score of a
-//          job that's really a Node/AWS role with a sprinkle of React.
-
-// ── Tier 2: Scored frontend skills ─────────────────────────────────────────
 const EXPERT_SKILLS = [
-  // Absolute core — you use these every day
   "React", "TypeScript", "JavaScript", "HTML", "CSS",
-  // State management / data fetching
   "Redux", "React Query", "Zustand", "MobX",
-  // Styling
   "Tailwind", "Material UI", "SASS",
-  // Build tools
   "Next.js", "Vite", "Webpack",
 ];
 
 const SECONDARY_SKILLS = [
-  // Testing — you know these, good signal
   "Jest", "Vitest", "React Testing Library",
-  // Other frontend
   "React Native", "GraphQL", "WebSocket", "Storybook",
 ];
 
-// ── Tier 3: Bonus — shown in UI but DON'T count toward score ───────────────
 export const BONUS_SKILLS = [
   "Node.js", "Express", "MongoDB", "PostgreSQL", "AWS",
   "Docker", "Git", "Redis", "Kubernetes",
 ];
 
-// ── Gate: ALL these must match for a job to pass ───────────────────────────
-// React is non-negotiable. At least 1 more frontend term also required.
-const RELAXED_FE_GATE = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer)\b/i;
-const REACT_GATE = /\breact\b/;  // strict word boundary — won't match "React Native" without "react"
+// ── Gate Logic ───────────────────────────────────────────────────────────
 
-const CORE_FRONTEND_TERMS = [
-  "react", "typescript", "javascript", "html", "css", "sass",
-  "next.js", "nextjs", "redux", "react query", "react-query",
-  "material ui", "vite", "webpack", "tailwind", "zustand",
-];
-const MIN_CORE = 2; // React counts as 1, need at least 1 more frontend term
+// Accept these titles even if they don't say "Frontend" explicitly
+// We are now STRICT: Software Engineer / Developer are NOT whitelisted.
+// They must pass the GenericTitleButBackendRole check which is now harder.
+const FE_TITLE_WHITELIST = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer|product engineer|design engineer|application engineer)\b/i;
 
-const SCORE_DENOMINATOR = 18; // Total possible expert points for normalization
+// Mandatory tech keywords
+const TECH_GATE = /\b(react|next\.?js|typescript|javascript|tailwind|css|frontend|front-end)\b/i;
+
+const SCORE_DENOMINATOR = 18;
 
 // ── Title filters ──────────────────────────────────────────────────────────
 
 export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
-  // TASK C: Relaxed gate — accept if title includes FE keywords even if backend keywords present
-  if (RELAXED_FE_GATE.test(t)) return false;
 
-  return [
-    // ── Backend / Infra ──────────────────────────────────────────────────────
+  // Rejection list (strictly backend/infra/management/FULLSTACK)
+  const rejections = [
     /\bbackend\b/, /\bback[\s-]end\b/,
     /\bdevops\b/, /\bdev[\s-]ops\b/,
     /\bsite[\s-]reliability\b/, /\bsre\b/,
@@ -72,26 +49,10 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bdatabase\s+reliability\b/, /\bdbre\b/,
     /\bdatabase\s+engineer\b/, /\bdba\b/,
     /\bsysadmin\b/, /\bsystem\s+administrator\b/,
-
-    // ── Fullstack ─────────────────────────────────────────────────────────────
-    /\bfull[\s-]?stack\b/, /\bfullstack\b/,
-
-    // ── Mobile ────────────────────────────────────────────────────────────────
-    /\bandroid\b/,
-    /\bios\s+engineer\b/, /\bswift\s+developer\b/,
-    /\bmobile\s+engineer\b/,
-    /\bkotlin\s+(developer|engineer|multiplatform)\b/,
-    /[\s,\-–]\s*kotlin\s*[\s,\-–(]/,
-    /[\s,\-–]\s*java\s*[\s,\-–(]/,
-    /[\s,\-–]\s*ruby\s*[\s,\-–(]/,
-
-    // ── Data / ML ─────────────────────────────────────────────────────────────
     /\bdata\s+(engineer|scientist|analyst)\b/,
     /\bmachine\s+learning\s+engineer\b/,
     /\b(ai|ml)\s+engineer\b/,
-    /\banalytics\s+analyst\b/, /\bweb\s+analytics\b/,
-
-    // ── Non-eng ───────────────────────────────────────────────────────────────
+    /\bfull[\s-]?stack\b/, /\bfullstack\b/, 
     /\bproject\s+manager\b/, /\bprogram\s+manager\b/,
     /\bproduct\s+(manager|owner)\b/, /\baccount\s+manager\b/,
     /\bscrum\s+master\b/, /\boperations\s+manager\b/,
@@ -102,47 +63,37 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bhelpdesk\b/, /\bhelp\s+desk\b/, /\bservice\s+desk\b/,
     /\bimplementation\s+(consultant|engineer)\b/,
     /\bsolutions?\s+architect\b/, /\barchitect\b/,
-    /\btrainer\b/, /\btechnical\s+writer\b/,
-    /\bcontent\s+(writer|manager|creator)\b/,
     /\brecruiter\b/, /\bhr\s+(manager|specialist|generalist)\b/,
     /\bfinance\s+(manager|analyst|lead)\b/, /\baccountant\b/,
     /\bmarketing\s+(manager|specialist|analyst|operations)\b/,
     /\bcompliance\s+(analyst|engineer|manager|specialist|operations)\b/,
-    /\bcompliance\s+operations\b/,
-    /\boperations\s+analyst\b/,
     /\bproduct\s+designer\b/, /\bux\s+(designer|researcher)\b/,
     /\bquality\s+assurance\b/, /\bautomation\s+tester\b/, /\btest\s+engineer\b/,
-    /\bhardware\b/,
-    /\bintern\b/,
-    /\bforward\s+deployed\b/,
-  ].some(re => re.test(t));
+    /\bhardware\b/, /\bintern\b/,
+  ];
+
+  const isRejected = rejections.some(re => re.test(t));
+  const hasFEOverride = /\b(frontend|front-end|react|ui engineer|web engineer)\b/i.test(t);
+
+  if (isRejected && !hasFEOverride) return true;
+
+  // If it's a generic title, we let it pass to the next stage of scrutiny
+  if (/\b(software|product|design|application)\s+engineer\b/i.test(t) || /\bsoftware\s+developer\b/i.test(t)) {
+    return false; 
+  }
+
+  // If it's not a generic engineer title and not in our whitelist, reject.
+  return !FE_TITLE_WHITELIST.test(t);
 }
 
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
-  // TASK C: Relaxed gate
-  if (RELAXED_FE_GATE.test(t)) return false;
-
-  if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
-  if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b/.test(t)) return false;
-
-  // Explicit backend language anywhere in title (catches "React/Java", "- Kotlin", "(Fullstack) - React/Java")
-  if (/\b(kotlin|java|ruby|python|go|rust|c\+\+|php|scala)\b/.test(t)) return true;
-
   const desc = description.toLowerCase();
 
-  // Any fullstack title + ANY JVM/backend signal in description → reject
-  const isFullstack = /\bfull[\s-]?stack\b|\bfullstack\b/.test(t);
-  if (isFullstack) {
-    const backendSignals = [
-      /\bjvm\b/, /\bspring\s*boot\b/, /\bspring\s+framework\b/, /\bkotlin\b/,
-      /\bjava\b/, /\bruby\b/, /\brails\b/, /\bpython\b/,
-      /\bnode\.js\b/, /\bexpress\b/, /\bpostgresql\b|\bpostgres\b/,
-      /\bmongodb\b/, /\bkafka\b/, /\bdocker\b/, /\bkubernetes\b/,
-      /\bmicroservices\b/, /\brest\s+api\b/, /\bgraphql\b.*\bserver\b/,
-    ];
-    if (backendSignals.filter(re => re.test(desc)).length >= 2) return true;
-  }
+  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(t)) return true;
+  
+  // If it's explicitly frontend or react in title, it's NOT a backend role
+  if (/\b(frontend|front-end|react)\b/i.test(t)) return false;
 
   const backendSignals = [
     /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
@@ -150,9 +101,24 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bsite\s+reliability\b/, /\bci\/cd\s+pipeline\b/,
     /\bspring\s*boot\b/, /\bjvm\b/, /\bdistributed\s+systems\b/,
     /\bmicroservices\b/, /\brabbitmq\b/, /\belasticsearch\b/,
-    /\bbackend\s+api\b/, /\brest\s+api\b.*\bserver\b/,
+    /\bbackend\s+api\b/, /\brest\s+api\b/,
   ];
-  return backendSignals.filter(re => re.test(desc)).length >= 3;
+
+  const feSignals = [
+    /\breact\b/, /\bnext\.?js\b/, /\btypescript\b/, /\bjavascript\b/,
+    /\btailwind\b/, /\bcss\b/, /\bhtml\b/, /\bfrontend\b/,
+  ];
+
+  const bCount = backendSignals.filter(re => re.test(desc)).length;
+  const fCount = feSignals.filter(re => re.test(desc)).length;
+
+  // Generic roles (Software Engineer) must have Frontend dominance.
+  // Reject if backend signals are equal to or greater than frontend signals,
+  // or if there are 2+ backend signals and < 2 frontend signals.
+  if (bCount >= 2 && fCount < 2) return true;
+  if (bCount > fCount) return true;
+
+  return false;
 }
 
 export function isTooSenior(title: string): boolean {
@@ -160,7 +126,6 @@ export function isTooSenior(title: string): boolean {
   return [
     /\blead\b/, /\bprincipal\b/, /\bstaff\b/, /\bmanager\b/, /\bhead\s+of\b/,
     /\bdirector\b/, /\bvp\b/, /\bvice\s+president\b/, /\bchief\b/, /\bcto\b/, /\bcpo\b/,
-    /\bdistinguished\s+engineer\b/, /\bfellow\b/,
   ].some(re => re.test(t));
 }
 
@@ -170,8 +135,6 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /must\s+be\s+a?\s*(us|uk|eu|canadian|australian)?\s*citizen/,
     /citizenship\s+required/,
     /security\s+clearance\s+required/,
-    /(secret|top\s+secret)\s+clearance/,
-    /must\s+(hold|have|maintain)\s+(active\s+)?clearance/,
     /cannot\s+(provide|offer|give)\s+visa\s+sponsorship/,
     /unable\s+to\s+(provide|offer|give|support)\s+visa\s+sponsorship/,
     /we\s+are\s+unable\s+to\s+offer\s+visa/,
@@ -179,10 +142,8 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /unable\s+to\s+sponsor/,
     /we\s+(do\s+not|don'?t)\s+sponsor/,
     /no\s+visa\s+sponsorship/,
-    /sponsorship\s+(is\s+)?not\s+(available|provided|offered)/,
-    /not\s+eligible\s+for\s+sponsorship/,
-    /must\s+be\s+authorized\s+to\s+work\s+without\s+sponsorship/,
-    /preferred:\s*able\s+to\s+work\s+without\s+sponsorship/,
+    /must\s+have\s+the\s+right\s+to\s+work\s+in/,
+    /only\s+candidates\s+with\s+the\s+right\s+to\s+work/,
   ].some(re => re.test(t));
 }
 
@@ -190,8 +151,8 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
 
 export interface ScoreInput { title: string; description: string; location: string; postedAt: string; }
 export interface ScoreResult {
-  matchedSkills: string[];    // Tier 2 frontend skills found (shown as green chips)
-  bonusSkills: string[];      // Tier 3 backend/infra skills found (shown as grey chips)
+  matchedSkills: string[];
+  bonusSkills: string[];
   missingSkills: string[];
   skillMatchScore: number;
   recencyScore: number;
@@ -199,10 +160,6 @@ export interface ScoreResult {
   totalScore: number;
 }
 
-/**
- * Word-boundary skill match.
- * Prevents false positives: "vite" in "invite", "git" in "digital", etc.
- */
 function skillMatch(text: string, skill: string): boolean {
   const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
   return new RegExp(`\\b${escaped}\\b`).test(text);
@@ -212,47 +169,42 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
   const companyName = company ?? "unknown";
 
-  // ── GATE 1: Relaxed FE Gate or React must be present ──────────────────────────────────────
-  if (!RELAXED_FE_GATE.test(input.title) && !REACT_GATE.test(text)) {
+  if (!TECH_GATE.test(text)) {
     if (process.env.LOG_FILTER_REASONS === 'true') {
       console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-frontend-keyword`);
     }
-    return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
+    return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: 0, relocationBonus: 0, totalScore: 0 };
   }
 
-  // ── GATE 2: Must have React + at least 1 more frontend core term (relaxed if FE keyword in title) ────────
-  const coreMatched = CORE_FRONTEND_TERMS.filter(s => skillMatch(text, s));
-  if (coreMatched.length < MIN_CORE && !RELAXED_FE_GATE.test(input.title)) {
-    if (process.env.LOG_FILTER_REASONS === 'true') {
-      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-frontend-keyword`);
-    }
-    return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
-  }
-
-  // ── TIER 2: Score only frontend skills ─────────────────────────────────
   const matchedExpert    = EXPERT_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
   const matchedSecondary = SECONDARY_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
 
-  // Expert skills worth 3pts, secondary worth 1pt. Backend skills = 0.
-  const skillMatchScore = Math.min(100, Math.round(
+  let skillMatchScore = Math.min(100, Math.round(
     ((matchedExpert.length * 3 + matchedSecondary.length * 1) / SCORE_DENOMINATOR) * 100
   ));
 
-  // ── TIER 3: Bonus skills (shown but not scored) ─────────────────────────
-  const bonusSkills = BONUS_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
+  if (/\b(frontend|front-end|react)\b/i.test(input.title)) {
+    skillMatchScore = Math.min(100, skillMatchScore + 20);
+  }
 
+  // Generic titles need higher skill matches to pass
+  const isGeneric = !/\b(frontend|front-end|react|ui|web)\b/i.test(input.title);
+  const threshold = isGeneric ? 40 : 5;
+
+  if (skillMatchScore < threshold) {
+    if (process.env.LOG_FILTER_REASONS === 'true') {
+      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: score-below-threshold (${skillMatchScore})`);
+    }
+    return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: 0, relocationBonus: 0, totalScore: 0 };
+  }
+
+  const bonusSkills = BONUS_SKILLS.filter(s => skillMatch(text, s.toLowerCase()));
   const matchedSet = new Set([...matchedExpert, ...matchedSecondary].map(s => s.toLowerCase()));
   const missingSkills = EXPERT_SKILLS.filter(s => !matchedSet.has(s.toLowerCase())).slice(0, 6);
 
   const recencyScore = computeRecencyScore(input.postedAt);
   const relocationBonus = /\brelocation\b/.test(input.description.toLowerCase()) ? 10 : 0;
   const totalScore = Math.round(skillMatchScore * 0.6 + recencyScore * 0.3 + relocationBonus * 0.1);
-
-  if (totalScore < 10) { 
-     if (process.env.LOG_FILTER_REASONS === 'true') {
-       console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: score-below-threshold (${totalScore})`);
-     }
-  }
 
   return { matchedSkills: [...matchedExpert, ...matchedSecondary], bonusSkills, missingSkills, skillMatchScore, recencyScore, relocationBonus, totalScore };
 }
