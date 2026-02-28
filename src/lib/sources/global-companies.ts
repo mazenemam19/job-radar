@@ -12,6 +12,10 @@ const COMPANIES: ATSConfig[] = [
   // ── Stable Core (Verified Greenhouse) ───────────────────────────────────
   { ats: "greenhouse", name: "Webflow",        slug: "webflow",          country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Mercury",        slug: "mercury",          country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Vercel",         slug: "vercel",           country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Airbnb",         slug: "airbnb",           country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Discord",        slug: "discord",          country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Coinbase",       slug: "coinbase",         country: "Global", countryFlag: "🌍" },
 
   // ── Stable Core (Verified Ashby) ────────────────────────────────────────
   { ats: "ashby",      name: "Posthog",        slug: "posthog",          country: "Global", countryFlag: "🌍" },

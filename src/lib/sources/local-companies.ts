@@ -8,10 +8,14 @@ const MODE = "local";
 const VISA = false;
 
 const COMPANIES: ATSConfig[] = [
-  // ── Stable Core (Verified Ashby) ──────────────────────────────────────
+  // ── Verified Lever ────────────────────────────────────────────────────
+  { ats: "lever",           name: "Bosta",           slug: "Bosta",              country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+
+  // ── Verified Ashby ────────────────────────────────────────────────────
   { ats: "ashby",           name: "Thndr",           slug: "thndr",              country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-  // ── Stable Core (Verified Workable) ─────────────────────────────────────
+  // ── Verified Workable ─────────────────────────────────────────────────
+  { ats: "workable",        name: "Swvl",            slug: "swvl",               country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Nawy",            slug: "nawy-real-estate",   country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Dubizzle",        slug: "bayutdubizzle",      country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Rubikal",         slug: "rubikal",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
@@ -32,10 +36,14 @@ const COMPANIES: ATSConfig[] = [
   { ats: "workable",        name: "Dev-Point",       slug: "dev-point",          country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Atomica",         slug: "atomica",            country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-  // ── Stable Core (Verified Other ATS) ───────────────────────────────────
+  // ── SmartRecruiters ───────────────────────────────────────────────────
   { ats: "smartrecruiters", name: "Yassir",          slug: "YassirGmbh",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "smartrecruiters", name: "Algoriza",        slug: "Algoriza",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+
+  // ── BambooHR ──────────────────────────────────────────────────────────
   { ats: "bamboohr",        name: "Instabug",        slug: "instabug",           country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
+
+  // ── Breezy ────────────────────────────────────────────────────────────
   { ats: "breezy",          name: "MaxAB",           slug: "maxab",              country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 ];
 
@@ -68,7 +76,6 @@ export async function fetchLocalJobs(): Promise<Job[]> {
   }
 
   // ── Custom fetchers (Verified direct APIs) ───────────────────────────
-  // Giza Systems and Pharos are currently broken/returning 0 jobs.
   const customResults = await Promise.allSettled([
     // fetchGizaSystems(MODE),
     fetchBrightSkies(MODE),

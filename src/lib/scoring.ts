@@ -152,7 +152,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bmicroservices\b/, /\brabbitmq\b/, /\belasticsearch\b/,
     /\bbackend\s+api\b/, /\brest\s+api\b.*\bserver\b/,
   ];
-  return backendSignals.filter(re => re.test(desc)).length >= 2;
+  return backendSignals.filter(re => re.test(desc)).length >= 3;
 }
 
 export function isTooSenior(title: string): boolean {
