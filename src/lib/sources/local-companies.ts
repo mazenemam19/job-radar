@@ -11,7 +11,7 @@ const COMPANIES: ATSConfig[] = [
   // ── Ashby (verified working) ──────────────────────────────────────────
   { ats: "ashby",           name: "Thndr",          slug: "thndr",         country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
 
-  // ── Workable (will work with queue fix) ───────────────────────────────
+  // ── Workable (keep-list ≤6, budget=3 so first 3 fetched) ─────────────
   { ats: "workable",        name: "Nawy",            slug: "nawy-real-estate",country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Dubizzle",        slug: "bayutdubizzle", country: COUNTRY, countryFlag: FLAG, city: "Cairo" },
   { ats: "workable",        name: "Rubikal",         slug: "rubikal",       country: COUNTRY, countryFlag: FLAG, city: "Cairo" },

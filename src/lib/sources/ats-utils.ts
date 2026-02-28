@@ -1,6 +1,8 @@
 // src/lib/sources/ats-utils.ts
 import type { Job, JobMode } from "../types";
 import { isClearlyNonFrontend, isTooSenior, isGenericTitleButBackendRole, requiresCitizenshipOrClearance, scoreJob, BONUS_SKILLS } from "../scoring";
+import fs from "fs";
+import path from "path";
 
 // ── Shared Types ────────────────────────────────────────────────────────────
 
@@ -52,6 +54,244 @@ function detectCountry(location: string, fallback: { name: string, flag: string 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+const TMP_DIR = "/tmp";
+const REQ_COUNTS_PATH = path.resolve(TMP_DIR, "req-counts.json");
+const WORKABLE_COOLDOWN_PATH = path.resolve(TMP_DIR, "workable-cooldown.json");
+const WORKABLE_SKIPPED_PATH = path.resolve(TMP_DIR, "workable-skipped.json");
+const WORKABLE_FAILURES_PATH = path.resolve(TMP_DIR, "workable-failures.json");
+const WORKABLE_BLOCKED_PATH = path.resolve(TMP_DIR, "workable-blocked.json");
+
+type DomainCounts = Record<string, number>;
+
+interface WorkableCooldownEntry {
+  slug: string;
+  until: string; // ISO timestamp
+}
+
+interface WorkableSkippedEntry {
+  slug: string;
+  name: string;
+  reason: string;
+}
+
+let domainCountsCache: DomainCounts | null = null;
+let workableCooldownCache: WorkableCooldownEntry[] | null = null;
+let workableSkippedCache: WorkableSkippedEntry[] = [];
+let workableSkippedInitialized = false;
+const LOG_FILTER_REASONS = process.env.LOG_FILTER_REASONS === "true";
+
+type WorkableBudgetConfig = { visa: number; global: number; local: number };
+// Per-pipeline Workable allocation: total=6 → visa:2, global:1, local:3
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 2, global: 1, local: 3 };
+let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
+const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
+
+export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): void {
+  workableBudget = { ...DEFAULT_BUDGET, ...config };
+  workableUsedByMode.visa = 0;
+  workableUsedByMode.global = 0;
+  workableUsedByMode.local = 0;
+}
+
+
+function ensureTmpDir(filePath: string): void {
+  const dir = path.dirname(filePath);
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    // best-effort only; if this fails we still proceed without persistence
+  }
+}
+
+function loadDomainCounts(): DomainCounts {
+  if (domainCountsCache) return domainCountsCache;
+  try {
+    const raw = fs.readFileSync(REQ_COUNTS_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as DomainCounts;
+    domainCountsCache = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    domainCountsCache = {};
+  }
+  return domainCountsCache;
+}
+
+function saveDomainCounts(counts: DomainCounts): void {
+  try {
+    ensureTmpDir(REQ_COUNTS_PATH);
+    fs.writeFileSync(REQ_COUNTS_PATH, JSON.stringify(counts, null, 2), "utf-8");
+  } catch {
+    // ignore persistence failures
+  }
+}
+
+function trackDomainRequest(url: string): void {
+  let host: string;
+  try {
+    host = new URL(url).host || "unknown";
+  } catch {
+    host = "unknown";
+  }
+  const counts = loadDomainCounts();
+  counts[host] = (counts[host] ?? 0) + 1;
+  domainCountsCache = counts;
+  saveDomainCounts(counts);
+}
+
+function loadWorkableCooldowns(): WorkableCooldownEntry[] {
+  if (workableCooldownCache) return workableCooldownCache;
+  try {
+    const raw = fs.readFileSync(WORKABLE_COOLDOWN_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as WorkableCooldownEntry[] | Record<string, string>;
+    if (Array.isArray(parsed)) {
+      workableCooldownCache = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      workableCooldownCache = Object.entries(parsed).map(([slug, until]) => ({
+        slug,
+        until: String(until),
+      }));
+    } else {
+      workableCooldownCache = [];
+    }
+  } catch {
+    workableCooldownCache = [];
+  }
+  return workableCooldownCache;
+}
+
+function saveWorkableCooldowns(entries: WorkableCooldownEntry[]): void {
+  try {
+    ensureTmpDir(WORKABLE_COOLDOWN_PATH);
+    fs.writeFileSync(WORKABLE_COOLDOWN_PATH, JSON.stringify(entries, null, 2), "utf-8");
+    workableCooldownCache = entries;
+  } catch {
+    // ignore persistence failures
+  }
+}
+
+function getWorkableCooldownUntil(slug: string): Date | null {
+  const entries = loadWorkableCooldowns();
+  const entry = entries.find(e => e.slug === slug);
+  if (!entry) return null;
+  const ms = Date.parse(entry.until);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms);
+}
+
+function setWorkableCooldown(slug: string, until: Date): void {
+  const entries = loadWorkableCooldowns();
+  const iso = until.toISOString();
+  const existing = entries.find(e => e.slug === slug);
+  if (existing) existing.until = iso;
+  else entries.push({ slug, until: iso });
+  saveWorkableCooldowns(entries);
+}
+
+function initWorkableSkippedCache(): void {
+  if (workableSkippedInitialized) return;
+  workableSkippedInitialized = true;
+  workableSkippedCache = [];
+  try {
+    // Reset file per run – historical data isn't useful for debugging next run
+    ensureTmpDir(WORKABLE_SKIPPED_PATH);
+    fs.writeFileSync(WORKABLE_SKIPPED_PATH, JSON.stringify(workableSkippedCache, null, 2), "utf-8");
+  } catch {
+    // ignore
+  }
+}
+
+function recordWorkableSkipped(slug: string, name: string, reason: string): void {
+  initWorkableSkippedCache();
+  workableSkippedCache.push({ slug, name, reason });
+  try {
+    ensureTmpDir(WORKABLE_SKIPPED_PATH);
+    fs.writeFileSync(WORKABLE_SKIPPED_PATH, JSON.stringify(workableSkippedCache, null, 2), "utf-8");
+  } catch {
+    // ignore
+  }
+}
+
+interface WorkableFailureEntry { slug: string; status: number; ts: string; }
+
+function recordWorkableFailure(slug: string, status: number): void {
+  let entries: WorkableFailureEntry[] = [];
+  try {
+    if (fs.existsSync(WORKABLE_FAILURES_PATH)) {
+      entries = JSON.parse(fs.readFileSync(WORKABLE_FAILURES_PATH, "utf-8")) as WorkableFailureEntry[];
+    }
+  } catch { entries = []; }
+  entries.push({ slug, status, ts: new Date().toISOString() });
+  try {
+    ensureTmpDir(WORKABLE_FAILURES_PATH);
+    fs.writeFileSync(WORKABLE_FAILURES_PATH, JSON.stringify(entries, null, 2), "utf-8");
+  } catch { /* ignore */ }
+}
+
+function loadWorkableBlocked(): WorkableCooldownEntry[] {
+  try {
+    const raw = fs.readFileSync(WORKABLE_BLOCKED_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as WorkableCooldownEntry[] | Record<string, string>;
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === "object") return Object.entries(parsed).map(([slug, until]) => ({ slug, until: String(until) }));
+  } catch { /* ignore */ }
+  return [];
+}
+
+function setWorkableBlocked(slug: string, until: Date): void {
+  const entries = loadWorkableBlocked();
+  const iso = until.toISOString();
+  const existing = entries.find(e => e.slug === slug);
+  if (existing) existing.until = iso;
+  else entries.push({ slug, until: iso });
+  try {
+    ensureTmpDir(WORKABLE_BLOCKED_PATH);
+    fs.writeFileSync(WORKABLE_BLOCKED_PATH, JSON.stringify(entries, null, 2), "utf-8");
+  } catch { /* ignore */ }
+}
+
+function isWorkableBlocked(slug: string): boolean {
+  const entries = loadWorkableBlocked();
+  const entry = entries.find(e => e.slug === slug);
+  if (!entry) return false;
+  const ms = Date.parse(entry.until);
+  return !Number.isNaN(ms) && new Date(ms).getTime() > Date.now();
+}
+
+const workable429SlugsThisRun = new Set<string>();
+
+export function getWorkable429SlugsThisRun(): string[] {
+  return Array.from(workable429SlugsThisRun);
+}
+
+export function markWorkableSlugsBlocked24h(slugs: string[]): void {
+  const until = new Date(Date.now() + 864e5);
+  for (const slug of slugs) {
+    setWorkableBlocked(slug, until);
+  }
+}
+
+function getMaxWorkableRequests(): number {
+  const fromEnv = process.env.MAX_WORKABLE_REQUESTS;
+  if (fromEnv) {
+    const n = Number(fromEnv);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  const argv = process.argv || [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith("--maxWorkable=")) {
+      const v = Number(arg.split("=")[1]);
+      if (Number.isFinite(v) && v > 0) return Math.floor(v);
+    }
+    if (arg === "--maxWorkable" && i + 1 < argv.length) {
+      const v = Number(argv[i + 1]);
+      if (Number.isFinite(v) && v > 0) return Math.floor(v);
+    }
+  }
+  return 6; // default from system-state
+}
+
+const MAX_WORKABLE_REQUESTS = getMaxWorkableRequests();
+
 export function stripHtml(html: string): string {
   if (!html) return "";
   return html
@@ -64,12 +304,15 @@ export function stripHtml(html: string): string {
 }
 
 export async function safeFetch(url: string, timeout = 30_000): Promise<Response | null> {
+  trackDomainRequest(url);
   try {
     return await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       signal: AbortSignal.timeout(timeout),
     });
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // ── Shared Pipeline ────────────────────────────────────────────────────────
@@ -117,27 +360,44 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
 
   for (const r of raw) {
     const title = r.title.trim();
-    if (isClearlyNonFrontend(title)) continue;
-    if (isTooSenior(title)) continue;
-    if (isGenericTitleButBackendRole(title, r.description)) continue;
-    if (isTooBackendForFrontend(r.description)) continue; // New filter using BONUS_SKILLS
+    if (isClearlyNonFrontend(title)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isClearlyNonFrontend|{}`);
+      continue;
+    }
+    if (isTooSenior(title)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isTooSenior|{}`);
+      continue;
+    }
+    if (isGenericTitleButBackendRole(title, r.description)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isGenericTitleButBackendRole|{}`);
+      continue;
+    }
+    if (isTooBackendForFrontend(r.description)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isTooBackendForFrontend|{}`);
+      continue;
+    }
 
-    // ── 14-day hard cap ──
     const postedMs = Date.parse(r.postedAt);
-    if (!isNaN(postedMs) && postedMs < cutoff) continue;
-    
-    // For local mode: NO location filtering — we only ever scrape Egyptian company ATSs,
-    // so every job that passes title/skill filters IS a Cairo/Egypt job by definition.
-    // We do extract a display city below for the UI.
+    if (!isNaN(postedMs) && postedMs < cutoff) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|age-cap|{}`);
+      continue;
+    }
 
-    // Only check citizenship/clearance for visa mode (known international companies)
-    if (mode === "visa" && requiresCitizenshipOrClearance(r.description)) continue;
+    if (mode === "visa" && requiresCitizenshipOrClearance(r.description)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|citizenship-clearance|{}`);
+      continue;
+    }
 
-    // For global mode — reject timezone-incompatible listings
-    if (mode === "global" && isTimezoneIncompatible(r.description + " " + r.location)) continue;
+    if (mode === "global" && isTimezoneIncompatible(r.description + " " + r.location)) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|timezone-incompatible|{}`);
+      continue;
+    }
 
-    const scored = scoreJob({ title, description: r.description, location: r.location, postedAt: r.postedAt });
-    if (scored.skillMatchScore === 0) continue;
+    const scored = scoreJob({ title, description: r.description, location: r.location, postedAt: r.postedAt }, company.name);
+    if (scored.skillMatchScore === 0) {
+      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|skillMatchScore=0|${JSON.stringify({ n: (scored.matchedSkills || []).length })}`);
+      continue;
+    }
 
     // Sponsorship logic
     const explicitlyDenied = requiresCitizenshipOrClearance(r.description);
@@ -258,6 +518,20 @@ interface WorkableDetail { full_description?: string; description?: string; }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+function parseRetryAfterMs(headerValue: string | null): number {
+  if (!headerValue) return 60_000;
+  const asNumber = Number(headerValue);
+  if (Number.isFinite(asNumber) && asNumber >= 0) {
+    return asNumber * 1000;
+  }
+  const parsed = Date.parse(headerValue);
+  if (!Number.isNaN(parsed)) {
+    const delta = parsed - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+  return 60_000;
+}
+
 // ── Global Workable rate limiter ─────────────────────────────────────────
 // Workable is aggressive with 429s. Queue ALL requests globally, 1.5s apart.
 let workableQueue: Promise<unknown> = Promise.resolve();
@@ -280,6 +554,29 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
+  const now = Date.now();
+  if (isWorkableBlocked(c.slug)) {
+    console.warn(`[Workable] ⏭ ${c.name}: slug "${c.slug}" blocked (persistent)`);
+    recordWorkableSkipped(c.slug, c.name, "blocked-persistent");
+    return [];
+  }
+  const cooldownUntil = getWorkableCooldownUntil(c.slug);
+  if (cooldownUntil && cooldownUntil.getTime() > now) {
+    console.warn(`[Workable] ⏭ ${c.name}: slug "${c.slug}" on cooldown until ${cooldownUntil.toISOString()}`);
+    recordWorkableSkipped(c.slug, c.name, `cooldown-until-${cooldownUntil.toISOString()}`);
+    return [];
+  }
+
+  const budget = workableBudget;
+  const limit = budget[mode];
+  const used = workableUsedByMode[mode];
+  if (limit <= 0 || used >= limit) {
+    console.warn(`[Workable] ⏭ ${c.name}: ${mode} budget exhausted (${used}/${limit}), skipping slug "${c.slug}"`);
+    recordWorkableSkipped(c.slug, c.name, `per-run-cap-${mode}`);
+    return [];
+  }
+  workableUsedByMode[mode] += 1;
+
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
 
   const doFetch = () => fetch(listUrl, {
@@ -291,20 +588,40 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
       "Origin": "https://apply.workable.com",
     },
     signal: AbortSignal.timeout(30_000),
+  }).then(res => {
+    if (res) trackDomainRequest(listUrl);
+    return res;
   }).catch(() => null);
 
   let res = await queueWorkable(doFetch);
 
-  // Handle 429 with Retry-After
+  // Handle 429: persist cooldown, no retry. If repeated across runs, escalate to 24h block.
   if (res?.status === 429) {
-    const retryAfter = parseInt(res.headers.get("Retry-After") ?? "60", 10);
-    const waitMs = (isNaN(retryAfter) ? 60 : retryAfter) * 1000;
-    console.warn(`[Workable] ⏳ ${c.name}: 429 — waiting ${waitMs / 1000}s (Retry-After)`);
-    await sleep(waitMs);
-    res = await doFetch();
+    workable429SlugsThisRun.add(c.slug);
+    const waitMs = parseRetryAfterMs(res.headers.get("Retry-After"));
+    const cooldownUntil = new Date(Date.now() + waitMs);
+    setWorkableCooldown(c.slug, cooldownUntil);
+    let prior429Count = 0;
+    try {
+      if (fs.existsSync(WORKABLE_FAILURES_PATH)) {
+        const entries = JSON.parse(fs.readFileSync(WORKABLE_FAILURES_PATH, "utf-8")) as WorkableFailureEntry[];
+        prior429Count = entries.filter(e => e.slug === c.slug && e.status === 429).length;
+      }
+    } catch { /* ignore */ }
+    recordWorkableFailure(c.slug, 429);
+    if (prior429Count >= 1) {
+      const blockMs = Math.min(864e5, (waitMs || 60_000) * 10);
+      const blockedUntil = new Date(Date.now() + blockMs);
+      setWorkableBlocked(c.slug, blockedUntil);
+      console.warn(`[Workable] ⏳ ${c.name}: 429 (repeat) — cooldown until ${cooldownUntil.toISOString()}, blocked until ${blockedUntil.toISOString()}`);
+    } else {
+      console.warn(`[Workable] ⏳ ${c.name}: 429 — cooldown until ${cooldownUntil.toISOString()} (no retry this run)`);
+    }
+    return [];
   }
 
   if (!res || !res.ok) {
+    recordWorkableFailure(c.slug, res?.status ?? 0);
     console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${listUrl}`);
     return [];
   }

@@ -37,6 +37,10 @@ export const BONUS_SKILLS = [
   "Docker", "Git", "Redis", "Kubernetes",
 ];
 
+const LOG_FILTER_REASONS = process.env.LOG_FILTER_REASONS === "true";
+const DEBUG_RELAX_FRONTEND = process.env.DEBUG_RELAX_FRONTEND === "true";
+const FRONTEND_BYPASS_TERMS = /\bfrontend\b|\bfront[\s-]end\b|\breact\b|\bui\b|\bjsx\b|\btypescript\b|\btsx\b/i;
+
 // ── Gate: ALL these must match for a job to pass ───────────────────────────
 // React is non-negotiable. At least 1 more frontend term also required.
 const REACT_GATE = /\breact\b/;  // strict word boundary — won't match "React Native" without "react"
@@ -194,6 +198,12 @@ export interface ScoreResult {
   totalScore: number;
 }
 
+function logFilterReason(company: string, title: string, reasonKey: string, metrics: Record<string, unknown>): void {
+  if (!LOG_FILTER_REASONS) return;
+  const metricsJson = JSON.stringify(metrics);
+  console.log(`[filter-debug] ${company}|${title}|${reasonKey}|${metricsJson}`);
+}
+
 /**
  * Word-boundary skill match.
  * Prevents false positives: "vite" in "invite", "git" in "digital", etc.
@@ -203,17 +213,21 @@ function skillMatch(text: string, skill: string): boolean {
   return new RegExp(`\\b${escaped}\\b`).test(text);
 }
 
-export function scoreJob(input: ScoreInput): ScoreResult {
+export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
+  const companyName = company ?? "unknown";
 
   // ── GATE 1: React must be present ──────────────────────────────────────
   if (!REACT_GATE.test(text)) {
+    logFilterReason(companyName, input.title, "missing-react", {});
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
   }
 
-  // ── GATE 2: Must have React + at least 1 more frontend core term ────────
+  // ── GATE 2: Must have React + at least 1 more frontend core term (or DEBUG_RELAX bypass) ────
   const coreMatched = CORE_FRONTEND_TERMS.filter(s => skillMatch(text, s));
-  if (coreMatched.length < MIN_CORE) {
+  const bypassCore = DEBUG_RELAX_FRONTEND && FRONTEND_BYPASS_TERMS.test(input.title);
+  if (coreMatched.length < MIN_CORE && !bypassCore) {
+    logFilterReason(companyName, input.title, "core-gate", { coreMatched: coreMatched.join(",") || "none" });
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
   }
 
