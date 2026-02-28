@@ -280,46 +280,68 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
-  // Workable JSON API is blocked from Vercel IPs by Cloudflare.
-  // RSS feed is less aggressively protected (RSS readers are server-side by design).
-  const rssUrl = `https://apply.workable.com/${c.slug}/jobs/rss`;
-  const res = await queueWorkable(() => fetch(rssUrl, {
+  const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
+
+  const doFetch = () => fetch(listUrl, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; RSS reader)",
-      "Accept": "application/rss+xml, application/xml, text/xml, */*",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://apply.workable.com/",
+      "Origin": "https://apply.workable.com",
     },
     signal: AbortSignal.timeout(30_000),
-  }).catch(() => null));
+  }).catch(() => null);
 
-  if (!res || !res.ok) {
-    console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${rssUrl}`);
-    return [];
+  let res = await queueWorkable(doFetch);
+
+  // Handle 429 with Retry-After
+  if (res?.status === 429) {
+    const retryAfter = parseInt(res.headers.get("Retry-After") ?? "60", 10);
+    const waitMs = (isNaN(retryAfter) ? 60 : retryAfter) * 1000;
+    console.warn(`[Workable] ⏳ ${c.name}: 429 — waiting ${waitMs / 1000}s (Retry-After)`);
+    await sleep(waitMs);
+    res = await doFetch();
   }
 
-  let xml: string;
-  try { xml = await res.text(); }
-  catch (err) { console.error(`[Workable] Failed to read RSS for ${c.name}:`, err); return []; }
+  if (!res || !res.ok) {
+    console.error(`[Workable] ❌ ${c.name}: Fetch failed (Status: ${res?.status || "Timeout/Unknown"}) URL: ${listUrl}`);
+    return [];
+  }
+  let data: WorkableResp;
+  try {
+    data = await res.json() as WorkableResp;
+  } catch (err) {
+    console.error(`[Workable] Failed to parse JSON from ${listUrl} for ${c.name}:`, err);
+    return [];
+  }
+  const jobs = data.jobs ?? [];
 
-  // Parse RSS <item> blocks manually (no XML parser needed for this simple structure)
-  const items = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? [];
-  const raw: RawJob[] = items.map(item => {
-    const get = (tag: string) => item.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([^<]*)<\\/${tag}>`))?.[1]
-      ?? item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`))?.[1] ?? "";
-    const title    = get("title").trim();
-    const url      = get("link").trim();
-    const pubDate  = get("pubDate").trim();
-    const desc     = stripHtml(get("description"));
-    const location = get("location").trim() || c.city || c.country;
-    // Extract shortcode from URL: apply.workable.com/{slug}/j/{shortcode}
-    const shortcode = url.match(/\/j\/([A-Z0-9]+)/)?.[1] ?? url;
+  // Step 2: pre-filter by title before fetching descriptions
+  const candidates = jobs.filter(r => !isClearlyNonFrontend(r.title) && !isTooSenior(r.title));
+
+  // Step 3: fetch full description per candidate
+  const withDesc = await pLimit(candidates.map(r => async () => {
+    const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
+    const dr = await safeFetch(detailUrl);
+    let desc = stripHtml(r.description ?? r.body ?? "");
+    if (dr && dr.ok) {
+      try {
+        const detail = await dr.json() as WorkableDetail;
+        desc = stripHtml(detail.full_description ?? detail.description ?? desc);
+      } catch { /* keep listing description */ }
+    }
     return {
-      id: `${mode}_workable_${c.slug}_${shortcode}`,
-      title, url, postedAt: pubDate, description: desc, location,
+      id: `${mode}_workable_${c.slug}_${r.shortcode}`,
+      title: r.title,
+      location: r.city ? `${r.city}, ${r.country}` : c.city ?? c.country,
+      url: r.url,
+      postedAt: r.published_on,
+      description: desc,
     };
-  }).filter(r => r.title && r.url);
+  }), 3);
 
-  console.log(`[Workable RSS] ${c.name}: ${raw.length} items from feed`);
-  return processJobs(raw, c, mode, visaSponsorship);
+  return processJobs(withDesc.filter(Boolean), c, mode, visaSponsorship);
 }
 
 // ── Teamtailor ─────────────────────────────────────────────────────────────
