@@ -20,11 +20,12 @@ export const BONUS_SKILLS = [
 
 // ── Gate Logic ───────────────────────────────────────────────────────────
 
-// Accept these titles ONLY if they don't have backend/fullstack noise
+// Accept these titles even if they don't have frontend/react explicitly
 const FE_TITLE_WHITELIST = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer|product engineer|design engineer|application engineer|software engineer|software developer)\b/i;
 
-// Mandatory tech keywords - MUST HAVE REACT
+// Mandatory tech keywords - React is a MUST
 const REACT_REQUIRED = /\b(react|next\.?js)\b/i;
+const TECH_GATE = /\b(react|next\.?js|typescript|javascript|tailwind|frontend|front-end)\b/i;
 
 const SCORE_DENOMINATOR = 18;
 
@@ -33,9 +34,15 @@ const SCORE_DENOMINATOR = 18;
 export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
 
-  // STRICT REJECTION: If it says Fullstack or Backend, it's NOT a pure frontend role.
+  // NO-GO: If title says Fullstack or Backend, it's not a pure FE role.
   if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(t)) return true;
   if (/\bbackend\b|\bback[\s-]end\b/.test(t)) return true;
+
+  // NO-GO: Explicit non-FE focus in title (e.g. Rust/C++ Software Engineer)
+  if (/\b(rust|c\+\+|cpp|golang|go|python|ruby|rails|java|kotlin|php|scala|elixir)\b/.test(t)) {
+    // Only reject if it doesn't also mention frontend/react in title
+    if (!/\b(frontend|front-end|react)\b/i.test(t)) return true;
+  }
 
   const rejections = [
     /\bdevops\b/, /\bdev[\s-]ops\b/,
@@ -71,7 +78,7 @@ export function isClearlyNonFrontend(title: string): boolean {
 
   if (rejections.some(re => re.test(t))) return true;
 
-  // Accept everything else that fits the whitelist
+  // Pass if it fits the whitelist
   return !FE_TITLE_WHITELIST.test(t);
 }
 
@@ -79,8 +86,14 @@ export function isGenericTitleButBackendRole(title: string, description: string)
   const t = title.toLowerCase();
   const desc = description.toLowerCase();
 
+  // Rejection if description explicitly says Fullstack noise
+  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(desc)) return true;
+
   // If title has "Frontend" or "React", it's a safe pass
   if (/\b(frontend|front-end|react)\b/i.test(t)) return false;
+
+  // React is a MUST for generic titles
+  if (!REACT_REQUIRED.test(desc)) return true;
 
   const backendSignals = [
     /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
@@ -99,20 +112,10 @@ export function isGenericTitleButBackendRole(title: string, description: string)
   const bCount = backendSignals.filter(re => re.test(desc)).length;
   const fCount = feSignals.filter(re => re.test(desc)).length;
 
-  // STRICT REJECTION FOR GENERIC TITLES:
-  // If it's a "Software Engineer" title, it must have React and NO more than 1 backend signal.
-  if (bCount >= 2) return true;
-  if (bCount > fCount) return true;
+  // Lenient check: only reject if backend is dominant (4+ signals AND backend > frontend)
+  if (bCount >= 4 && bCount > fCount) return true;
 
   return false;
-}
-
-export function isTooSenior(title: string): boolean {
-  const t = title.toLowerCase();
-  return [
-    /\blead\b/, /\bprincipal\b/, /\bstaff\b/, /\bmanager\b/, /\bhead\s+of\b/,
-    /\bdirector\b/, /\bvp\b/, /\bvice\s+president\b/, /\bchief\b/, /\bcto\b/, /\bcpo\b/,
-  ].some(re => re.test(t));
 }
 
 export function requiresCitizenshipOrClearance(text: string): boolean {
@@ -124,10 +127,18 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /cannot\s+(provide|offer|give)\s+visa\s+sponsorship/,
     /unable\s+to\s+(provide|offer|give|support)\s+visa\s+sponsorship/,
     /we\s+are\s+unable\s+to\s+offer\s+visa/,
-    /not\s+able\s+to\s+(provide|offer|give)\s+sponsorship/,
+    /not\s+ able\s+to\s+(provide|offer|give)\s+sponsorship/,
     /unable\s+to\s+sponsor/,
     /we\s+(do\s+not|don'?t)\s+sponsor/,
     /no\s+visa\s+sponsorship/,
+  ].some(re => re.test(t));
+}
+
+export function isTooSenior(title: string): boolean {
+  const t = title.toLowerCase();
+  return [
+    /\blead\b/, /\bprincipal\b/, /\bstaff\b/, /\bmanager\b/, /\bhead\s+of\b/,
+    /\bdirector\b/, /\bvp\b/, /\bvice\s+president\b/, /\bchief\b/, /\bcto\b/, /\bcpo\b/,
   ].some(re => re.test(t));
 }
 
@@ -153,7 +164,8 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
   const companyName = company ?? "unknown";
 
-  // ── GATE: MUST HAVE REACT ─────────────────────────────────────────────
+  // ── GATE: Tech Signal Check ─────────────────────────────────────────────
+  // React is now strictly required for all roles
   if (!REACT_REQUIRED.test(text)) {
     if (process.env.LOG_FILTER_REASONS === 'true') {
       console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-react`);
@@ -172,8 +184,8 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
     skillMatchScore = Math.min(100, skillMatchScore + 20);
   }
 
-  // MINIMUM THRESHOLD: Increased to 30% for high signal
-  if (skillMatchScore < 30) {
+  // Threshold lowered to 5% to capture all React roles
+  if (skillMatchScore < 5) {
     if (process.env.LOG_FILTER_REASONS === 'true') {
       console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: low-skill-match (${skillMatchScore})`);
     }

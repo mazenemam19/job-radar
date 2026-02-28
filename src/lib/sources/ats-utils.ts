@@ -52,6 +52,18 @@ function detectCountry(location: string, fallback: { name: string, flag: string 
   return fallback;
 }
 
+/** Returns true if the location or company name indicates an Israeli entity or role. */
+export function isGeographicallyBlacklisted(text: string): boolean {
+  const t = text.toLowerCase();
+  return [
+    /\bisrael\b/,
+    /\btel\s+aviv\b/,
+    /\bhaifa\b/,
+    /\bherzliya\b/,
+    /\bjerusalem\b/,
+  ].some(re => re.test(t));
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const TMP_DIR = "/tmp";
@@ -366,6 +378,15 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
 
   for (const r of raw) {
     const title = r.title.trim();
+
+    // GEOGRAPHICAL BLACKLIST
+    if (isGeographicallyBlacklisted(title + " " + r.location + " " + company.name)) {
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: geographically-blacklisted`);
+      }
+      continue;
+    }
+
     if (isClearlyNonFrontend(title)) {
       if (process.env.LOG_FILTER_REASONS === 'true') {
         const reason = /\b(engineer|developer|architect|programmer|coder)\b/i.test(title) 
@@ -433,7 +454,7 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
                      /remote|work\s+from\s+home|anywhere/i.test(r.location) ||
                      /100%\s+remote|fully\s+remote/i.test(r.description);
 
-    // For local jobs: extract Egyptian city from location string, fallback to company city
+    // For global jobs: extract Egyptian city from location string, fallback to company city
     const displayLocation = mode === "local"
       ? extractEgyptCity(r.location, company.city)
       : r.location;
