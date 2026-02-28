@@ -421,12 +421,12 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
       continue;
     }
 
-    // Sponsorship logic: Be more skeptical.
+    // Sponsorship logic: Strictly evidence-based
     const explicitlyDenied = requiresCitizenshipOrClearance(r.description);
     const explicitlyOffered = /visa\s+sponsorship|relocation\s+assistance|work\s+visa/i.test(r.description);
     const relocationMentioned = /\brelocation\b/i.test(r.description);
     
-    // actualSponsorship is true ONLY if explicitly offered, or if in visa mode AND not denied AND (relocation or explicit)
+    // Marked as visaSponsorship ONLY if explicitly mentioned or in visa mode + relocation
     const actualSponsorship = !explicitlyDenied && (explicitlyOffered || (mode === "visa" && relocationMentioned));
 
     const isRemote = /remote|work\s+from\s+home|anywhere/i.test(title) || 
@@ -454,9 +454,7 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
     });
   }
 
-  if (raw.length === 0) {
-    console.warn(`[${mode}] ⚠️  ${company.name}: Returned 0 jobs (API might be broken or slug changed)`);
-  } else {
+  if (raw.length > 0) {
     console.log(`[${mode}] ${company.name}: ${raw.length} total → ${out.length} matches`);
   }
   return out;
@@ -561,12 +559,13 @@ function parseRetryAfterMs(headerValue: string | null): number {
 }
 
 // ── Global Workable rate limiter ─────────────────────────────────────────
-// Workable is aggressive with 429s. Queue ALL requests globally, 1.5s apart.
+// Workable is aggressive with 429s. Queue ALL requests globally, 5s apart.
 let workableQueue: Promise<unknown> = Promise.resolve();
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
-  // Chain off current tail — result becomes the new tail even on error
-  const result = workableQueue.then(() => sleep(3000)).then(fn);
-  workableQueue = result.catch(() => {}); // swallow error so chain continues
+  const delays = [4000, 5000, 6000, 7000];
+  const randomDelay = delays[Math.floor(Math.random() * delays.length)];
+  const result = workableQueue.then(() => sleep(randomDelay)).then(fn);
+  workableQueue = result.catch(() => {});
   return result;
 }
 
@@ -576,7 +575,7 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
   for (let i = 0; i < fns.length; i += concurrency) {
     const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map(f => f()));
     for (const r of batch) results.push(r.status === "fulfilled" ? r.value : null as T);
-    if (i + concurrency < fns.length) await sleep(2000); // 2s delay between batches
+    if (i + concurrency < fns.length) await sleep(3000); 
   }
   return results;
 }
@@ -584,14 +583,10 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
 export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship: boolean): Promise<Job[]> {
   const now = Date.now();
   if (isWorkableBlocked(c.slug)) {
-    console.warn(`[Workable] ⏭ ${c.name}: slug "${c.slug}" blocked (persistent)`);
-    recordWorkableSkipped(c.slug, c.name, "blocked-persistent");
     return [];
   }
   const cooldownUntil = getWorkableCooldownUntil(c.slug);
   if (cooldownUntil && cooldownUntil.getTime() > now) {
-    console.warn(`[Workable] ⏭ ${c.name}: slug "${c.slug}" on cooldown until ${cooldownUntil.toISOString()}`);
-    recordWorkableSkipped(c.slug, c.name, `cooldown-until-${cooldownUntil.toISOString()}`);
     return [];
   }
 
@@ -599,17 +594,21 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
   const limit = budget[mode];
   const used = workableUsedByMode[mode];
   if (limit <= 0 || used >= limit) {
-    console.warn(`[Workable] ⏭ ${c.name}: ${mode} budget exhausted (${used}/${limit}), skipping slug "${c.slug}"`);
-    recordWorkableSkipped(c.slug, c.name, `per-run-cap-${mode}`);
     return [];
   }
   workableUsedByMode[mode] += 1;
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
 
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+  ];
+
   const doFetch = () => fetch(listUrl, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      "User-Agent": userAgents[Math.floor(Math.random() * userAgents.length)],
       "Accept": "application/json, text/plain, */*",
       "Accept-Language": "en-US,en;q=0.9",
       "Referer": "https://apply.workable.com/",

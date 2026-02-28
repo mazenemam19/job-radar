@@ -20,13 +20,11 @@ export const BONUS_SKILLS = [
 
 // ── Gate Logic ───────────────────────────────────────────────────────────
 
-// Accept these titles even if they don't say "Frontend" explicitly
-// We are now STRICT: Software Engineer / Developer are NOT whitelisted.
-// They must pass the GenericTitleButBackendRole check which is now harder.
-const FE_TITLE_WHITELIST = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer|product engineer|design engineer|application engineer)\b/i;
+// Accept these titles ONLY if they don't have backend/fullstack noise
+const FE_TITLE_WHITELIST = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer|product engineer|design engineer|application engineer|software engineer|software developer)\b/i;
 
-// Mandatory tech keywords
-const TECH_GATE = /\b(react|next\.?js|typescript|javascript|tailwind|css|frontend|front-end)\b/i;
+// Mandatory tech keywords - MUST HAVE REACT
+const REACT_REQUIRED = /\b(react|next\.?js)\b/i;
 
 const SCORE_DENOMINATOR = 18;
 
@@ -35,9 +33,11 @@ const SCORE_DENOMINATOR = 18;
 export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
 
-  // Rejection list (strictly backend/infra/management/FULLSTACK)
+  // STRICT REJECTION: If it says Fullstack or Backend, it's NOT a pure frontend role.
+  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(t)) return true;
+  if (/\bbackend\b|\bback[\s-]end\b/.test(t)) return true;
+
   const rejections = [
-    /\bbackend\b/, /\bback[\s-]end\b/,
     /\bdevops\b/, /\bdev[\s-]ops\b/,
     /\bsite[\s-]reliability\b/, /\bsre\b/,
     /\bplatform\s+engineer\b/,
@@ -52,7 +52,6 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bdata\s+(engineer|scientist|analyst)\b/,
     /\bmachine\s+learning\s+engineer\b/,
     /\b(ai|ml)\s+engineer\b/,
-    /\bfull[\s-]?stack\b/, /\bfullstack\b/, 
     /\bproject\s+manager\b/, /\bprogram\s+manager\b/,
     /\bproduct\s+(manager|owner)\b/, /\baccount\s+manager\b/,
     /\bscrum\s+master\b/, /\boperations\s+manager\b/,
@@ -61,8 +60,6 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bcustomer\s+success\b/,
     /\bsupport\s+(engineer|specialist|analyst)\b/,
     /\bhelpdesk\b/, /\bhelp\s+desk\b/, /\bservice\s+desk\b/,
-    /\bimplementation\s+(consultant|engineer)\b/,
-    /\bsolutions?\s+architect\b/, /\barchitect\b/,
     /\brecruiter\b/, /\bhr\s+(manager|specialist|generalist)\b/,
     /\bfinance\s+(manager|analyst|lead)\b/, /\baccountant\b/,
     /\bmarketing\s+(manager|specialist|analyst|operations)\b/,
@@ -72,17 +69,9 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bhardware\b/, /\bintern\b/,
   ];
 
-  const isRejected = rejections.some(re => re.test(t));
-  const hasFEOverride = /\b(frontend|front-end|react|ui engineer|web engineer)\b/i.test(t);
+  if (rejections.some(re => re.test(t))) return true;
 
-  if (isRejected && !hasFEOverride) return true;
-
-  // If it's a generic title, we let it pass to the next stage of scrutiny
-  if (/\b(software|product|design|application)\s+engineer\b/i.test(t) || /\bsoftware\s+developer\b/i.test(t)) {
-    return false; 
-  }
-
-  // If it's not a generic engineer title and not in our whitelist, reject.
+  // Accept everything else that fits the whitelist
   return !FE_TITLE_WHITELIST.test(t);
 }
 
@@ -90,9 +79,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
   const t = title.toLowerCase();
   const desc = description.toLowerCase();
 
-  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(t)) return true;
-  
-  // If it's explicitly frontend or react in title, it's NOT a backend role
+  // If title has "Frontend" or "React", it's a safe pass
   if (/\b(frontend|front-end|react)\b/i.test(t)) return false;
 
   const backendSignals = [
@@ -106,16 +93,15 @@ export function isGenericTitleButBackendRole(title: string, description: string)
 
   const feSignals = [
     /\breact\b/, /\bnext\.?js\b/, /\btypescript\b/, /\bjavascript\b/,
-    /\btailwind\b/, /\bcss\b/, /\bhtml\b/, /\bfrontend\b/,
+    /\btailwind\b/, /\bcss\b/, /\bhtml\b/,
   ];
 
   const bCount = backendSignals.filter(re => re.test(desc)).length;
   const fCount = feSignals.filter(re => re.test(desc)).length;
 
-  // Generic roles (Software Engineer) must have Frontend dominance.
-  // Reject if backend signals are equal to or greater than frontend signals,
-  // or if there are 2+ backend signals and < 2 frontend signals.
-  if (bCount >= 2 && fCount < 2) return true;
+  // STRICT REJECTION FOR GENERIC TITLES:
+  // If it's a "Software Engineer" title, it must have React and NO more than 1 backend signal.
+  if (bCount >= 2) return true;
   if (bCount > fCount) return true;
 
   return false;
@@ -142,8 +128,6 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /unable\s+to\s+sponsor/,
     /we\s+(do\s+not|don'?t)\s+sponsor/,
     /no\s+visa\s+sponsorship/,
-    /must\s+have\s+the\s+right\s+to\s+work\s+in/,
-    /only\s+candidates\s+with\s+the\s+right\s+to\s+work/,
   ].some(re => re.test(t));
 }
 
@@ -169,9 +153,10 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
   const companyName = company ?? "unknown";
 
-  if (!TECH_GATE.test(text)) {
+  // ── GATE: MUST HAVE REACT ─────────────────────────────────────────────
+  if (!REACT_REQUIRED.test(text)) {
     if (process.env.LOG_FILTER_REASONS === 'true') {
-      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-frontend-keyword`);
+      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-react`);
     }
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: 0, relocationBonus: 0, totalScore: 0 };
   }
@@ -187,13 +172,10 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
     skillMatchScore = Math.min(100, skillMatchScore + 20);
   }
 
-  // Generic titles need higher skill matches to pass
-  const isGeneric = !/\b(frontend|front-end|react|ui|web)\b/i.test(input.title);
-  const threshold = isGeneric ? 40 : 5;
-
-  if (skillMatchScore < threshold) {
+  // MINIMUM THRESHOLD: Increased to 30% for high signal
+  if (skillMatchScore < 30) {
     if (process.env.LOG_FILTER_REASONS === 'true') {
-      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: score-below-threshold (${skillMatchScore})`);
+      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: low-skill-match (${skillMatchScore})`);
     }
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: 0, relocationBonus: 0, totalScore: 0 };
   }
