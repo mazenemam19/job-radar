@@ -20,7 +20,6 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse",     name: "Pleo",            slug: "pleo",             country: "Denmark",      countryFlag: "🇩🇰" },
   { ats: "greenhouse",     name: "Wolt",            slug: "wolt",             country: "Finland",      countryFlag: "🇫🇮" },
   { ats: "greenhouse",     name: "Doctolib",        slug: "doctolib",         country: "France",       countryFlag: "🇫🇷" },
-  { ats: "greenhouse",     name: "Pipedrive",       slug: "pipedrive",        country: "Estonia",      countryFlag: "🇪🇪" },
   { ats: "greenhouse",     name: "Zenjob",         slug: "zenjob",          country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "Solarisbank",    slug: "solarisbank",     country: "Germany",      countryFlag: "🇩🇪" },
   { ats: "greenhouse",     name: "GoCardless",     slug: "gocardless",      country: "UK",           countryFlag: "🇬🇧" },

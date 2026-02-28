@@ -68,10 +68,11 @@ export async function fetchLocalJobs(): Promise<Job[]> {
   }
 
   // ── Custom fetchers (Verified direct APIs) ───────────────────────────
+  // Giza Systems and Pharos are currently broken/returning 0 jobs.
   const customResults = await Promise.allSettled([
-    fetchGizaSystems(MODE),
+    // fetchGizaSystems(MODE),
     fetchBrightSkies(MODE),
-    fetchPharos(MODE),
+    // fetchPharos(MODE),
   ]);
   for (const r of customResults) {
     if (r.status === "fulfilled") {

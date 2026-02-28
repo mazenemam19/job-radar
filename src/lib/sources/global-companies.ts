@@ -12,8 +12,6 @@ const COMPANIES: ATSConfig[] = [
   // ── Stable Core (Verified Greenhouse) ───────────────────────────────────
   { ats: "greenhouse", name: "Webflow",        slug: "webflow",          country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Mercury",        slug: "mercury",          country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Sanity",         slug: "sanity",           country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Clerk",          slug: "clerk",            country: "Global", countryFlag: "🌍" },
 
   // ── Stable Core (Verified Ashby) ────────────────────────────────────────
   { ats: "ashby",      name: "Posthog",        slug: "posthog",          country: "Global", countryFlag: "🌍" },
@@ -28,6 +26,8 @@ const COMPANIES: ATSConfig[] = [
 
   // ── Stable Core (Verified Workable) ──────────────────────────────────────
   { ats: "workable",   name: "Learnworlds",    slug: "learnworlds",      country: "Global", countryFlag: "🌍" },
+  { ats: "workable",   name: "Clerk",          slug: "clerk",            country: "Global", countryFlag: "🌍" },
+  { ats: "workable",   name: "Sanity",         slug: "sanity",           country: "Global", countryFlag: "🌍" },
 ];
 
 export async function fetchGlobalJobs(): Promise<Job[]> {
