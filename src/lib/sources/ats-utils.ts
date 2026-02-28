@@ -78,19 +78,25 @@ let domainCountsCache: DomainCounts | null = null;
 let workableCooldownCache: WorkableCooldownEntry[] | null = null;
 let workableSkippedCache: WorkableSkippedEntry[] = [];
 let workableSkippedInitialized = false;
-const LOG_FILTER_REASONS = process.env.LOG_FILTER_REASONS === "true";
 
 type WorkableBudgetConfig = { visa: number; global: number; local: number };
-// Per-pipeline Workable allocation: total=6 → visa:2, global:1, local:3
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 2, global: 1, local: 3 };
+// Per-pipeline Workable allocation: total=8 → visa:2, global:1, local:5
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 2, global: 1, local: 5 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
 const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
 
+export function resetWorkableUsed(mode?: JobMode): void {
+  if (mode) workableUsedByMode[mode] = 0;
+  else {
+    workableUsedByMode.visa = 0;
+    workableUsedByMode.global = 0;
+    workableUsedByMode.local = 0;
+  }
+}
+
 export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): void {
   workableBudget = { ...DEFAULT_BUDGET, ...config };
-  workableUsedByMode.visa = 0;
-  workableUsedByMode.global = 0;
-  workableUsedByMode.local = 0;
+  resetWorkableUsed();
 }
 
 
@@ -361,41 +367,54 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode, 
   for (const r of raw) {
     const title = r.title.trim();
     if (isClearlyNonFrontend(title)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isClearlyNonFrontend|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: backend-only-title`);
+      }
       continue;
     }
     if (isTooSenior(title)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isTooSenior|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: seniority-mismatch`);
+      }
       continue;
     }
     if (isGenericTitleButBackendRole(title, r.description)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isGenericTitleButBackendRole|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: backend-only-title`);
+      }
       continue;
     }
     if (isTooBackendForFrontend(r.description)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|isTooBackendForFrontend|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: backend-only-title`);
+      }
       continue;
     }
 
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|age-cap|{}`);
       continue;
     }
 
     if (mode === "visa" && requiresCitizenshipOrClearance(r.description)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|citizenship-clearance|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: location-mismatch`);
+      }
       continue;
     }
 
     if (mode === "global" && isTimezoneIncompatible(r.description + " " + r.location)) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|timezone-incompatible|{}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: location-mismatch`);
+      }
       continue;
     }
 
     const scored = scoreJob({ title, description: r.description, location: r.location, postedAt: r.postedAt }, company.name);
     if (scored.skillMatchScore === 0) {
-      if (LOG_FILTER_REASONS) console.log(`[filter-debug] ${company.name}|${title}|skillMatchScore=0|${JSON.stringify({ n: (scored.matchedSkills || []).length })}`);
+      if (process.env.LOG_FILTER_REASONS === 'true') {
+        console.log(`[filter-debug] ${company.name} | ${title} | rejected: missing-frontend-keyword`);
+      }
       continue;
     }
 

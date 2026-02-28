@@ -37,12 +37,9 @@ export const BONUS_SKILLS = [
   "Docker", "Git", "Redis", "Kubernetes",
 ];
 
-const LOG_FILTER_REASONS = process.env.LOG_FILTER_REASONS === "true";
-const DEBUG_RELAX_FRONTEND = process.env.DEBUG_RELAX_FRONTEND === "true";
-const FRONTEND_BYPASS_TERMS = /\bfrontend\b|\bfront[\s-]end\b|\breact\b|\bui\b|\bjsx\b|\btypescript\b|\btsx\b/i;
-
 // ── Gate: ALL these must match for a job to pass ───────────────────────────
 // React is non-negotiable. At least 1 more frontend term also required.
+const RELAXED_FE_GATE = /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer)\b/i;
 const REACT_GATE = /\breact\b/;  // strict word boundary — won't match "React Native" without "react"
 
 const CORE_FRONTEND_TERMS = [
@@ -58,6 +55,9 @@ const SCORE_DENOMINATOR = 18; // Total possible expert points for normalization
 
 export function isClearlyNonFrontend(title: string): boolean {
   const t = title.toLowerCase();
+  // TASK C: Relaxed gate — accept if title includes FE keywords even if backend keywords present
+  if (RELAXED_FE_GATE.test(t)) return false;
+
   return [
     // ── Backend / Infra ──────────────────────────────────────────────────────
     /\bbackend\b/, /\bback[\s-]end\b/,
@@ -120,6 +120,9 @@ export function isClearlyNonFrontend(title: string): boolean {
 
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
+  // TASK C: Relaxed gate
+  if (RELAXED_FE_GATE.test(t)) return false;
+
   if (/\bfrontend\b|\bfront[\s-]end\b|\bui\s+engineer\b|\bweb\s+engineer\b|\breact\s+developer\b/.test(t)) return false;
   if (!/\bsoftware\s+engineer\b|\bsoftware\s+developer\b|\bfull[\s-]stack\b|\bfullstack\b/.test(t)) return false;
 
@@ -138,11 +141,9 @@ export function isGenericTitleButBackendRole(title: string, description: string)
       /\bmongodb\b/, /\bkafka\b/, /\bdocker\b/, /\bkubernetes\b/,
       /\bmicroservices\b/, /\brest\s+api\b/, /\bgraphql\b.*\bserver\b/,
     ];
-    // Fullstack title + 2+ backend signals → reject (was requiring 1 JVM signal, now broader)
     if (backendSignals.filter(re => re.test(desc)).length >= 2) return true;
   }
 
-  // Generic "Software Engineer" title needs stronger backend signal count
   const backendSignals = [
     /\bkubernetes\b/, /\bterraform\b/, /\binfrastructure\b/,
     /\bpostgresql\b|\bpostgres\b/, /\bkafka\b/,
@@ -151,7 +152,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bmicroservices\b/, /\brabbitmq\b/, /\belasticsearch\b/,
     /\bbackend\s+api\b/, /\brest\s+api\b.*\bserver\b/,
   ];
-  return backendSignals.filter(re => re.test(desc)).length >= 3;
+  return backendSignals.filter(re => re.test(desc)).length >= 2;
 }
 
 export function isTooSenior(title: string): boolean {
@@ -198,12 +199,6 @@ export interface ScoreResult {
   totalScore: number;
 }
 
-function logFilterReason(company: string, title: string, reasonKey: string, metrics: Record<string, unknown>): void {
-  if (!LOG_FILTER_REASONS) return;
-  const metricsJson = JSON.stringify(metrics);
-  console.log(`[filter-debug] ${company}|${title}|${reasonKey}|${metricsJson}`);
-}
-
 /**
  * Word-boundary skill match.
  * Prevents false positives: "vite" in "invite", "git" in "digital", etc.
@@ -217,17 +212,20 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
   const companyName = company ?? "unknown";
 
-  // ── GATE 1: React must be present ──────────────────────────────────────
-  if (!REACT_GATE.test(text)) {
-    logFilterReason(companyName, input.title, "missing-react", {});
+  // ── GATE 1: Relaxed FE Gate or React must be present ──────────────────────────────────────
+  if (!RELAXED_FE_GATE.test(input.title) && !REACT_GATE.test(text)) {
+    if (process.env.LOG_FILTER_REASONS === 'true') {
+      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-frontend-keyword`);
+    }
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
   }
 
-  // ── GATE 2: Must have React + at least 1 more frontend core term (or DEBUG_RELAX bypass) ────
+  // ── GATE 2: Must have React + at least 1 more frontend core term (relaxed if FE keyword in title) ────────
   const coreMatched = CORE_FRONTEND_TERMS.filter(s => skillMatch(text, s));
-  const bypassCore = DEBUG_RELAX_FRONTEND && FRONTEND_BYPASS_TERMS.test(input.title);
-  if (coreMatched.length < MIN_CORE && !bypassCore) {
-    logFilterReason(companyName, input.title, "core-gate", { coreMatched: coreMatched.join(",") || "none" });
+  if (coreMatched.length < MIN_CORE && !RELAXED_FE_GATE.test(input.title)) {
+    if (process.env.LOG_FILTER_REASONS === 'true') {
+      console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: missing-frontend-keyword`);
+    }
     return { matchedSkills: [], bonusSkills: [], missingSkills: EXPERT_SKILLS.slice(0, 6), skillMatchScore: 0, recencyScore: computeRecencyScore(input.postedAt), relocationBonus: 0, totalScore: 0 };
   }
 
@@ -249,6 +247,12 @@ export function scoreJob(input: ScoreInput, company?: string): ScoreResult {
   const recencyScore = computeRecencyScore(input.postedAt);
   const relocationBonus = /\brelocation\b/.test(input.description.toLowerCase()) ? 10 : 0;
   const totalScore = Math.round(skillMatchScore * 0.6 + recencyScore * 0.3 + relocationBonus * 0.1);
+
+  if (totalScore < 10) { 
+     if (process.env.LOG_FILTER_REASONS === 'true') {
+       console.log(`[filter-debug] ${companyName} | ${input.title} | rejected: score-below-threshold (${totalScore})`);
+     }
+  }
 
   return { matchedSkills: [...matchedExpert, ...matchedSecondary], bonusSkills, missingSkills, skillMatchScore, recencyScore, relocationBonus, totalScore };
 }
