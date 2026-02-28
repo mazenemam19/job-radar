@@ -69,6 +69,9 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bdatabase\s+engineer\b/, /\bdba\b/,
     /\bsysadmin\b/, /\bsystem\s+administrator\b/,
 
+    // ── Fullstack ─────────────────────────────────────────────────────────────
+    /\bfull[\s-]?stack\b/, /\bfullstack\b/,
+
     // ── Mobile ────────────────────────────────────────────────────────────────
     /\bandroid\b/,
     /\bios\s+engineer\b/, /\bswift\s+developer\b/,
