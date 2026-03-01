@@ -1,5 +1,5 @@
 // src/lib/storage.ts
-import { put, head } from "@vercel/blob";
+import { put, list } from "@vercel/blob";
 import { Job, JobStore, CronLog } from "./types";
 
 const BLOB_KEY = "jobs-store.json";
@@ -13,11 +13,12 @@ function emptyStore(): JobStore {
 // Read from Vercel Blob
 export async function readStore(): Promise<JobStore> {
   try {
-    // Check if blob exists
-    const h = await head(BLOB_KEY).catch(() => null);
-    if (!h) return emptyStore();
+    const { blobs } = await list();
+    const entry = blobs.find(b => b.pathname === BLOB_KEY);
+    if (!entry) return emptyStore();
 
-    const res = await fetch(h.url);
+    // Add cache-busting query param to ensure we get fresh data
+    const res = await fetch(`${entry.url}?t=${Date.now()}`);
     if (!res.ok) return emptyStore();
 
     const store = (await res.json()) as JobStore;
@@ -26,7 +27,7 @@ export async function readStore(): Promise<JobStore> {
     const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
     store.jobs = store.jobs.filter(j => {
       const ms = Date.parse(j.postedAt);
-      return isNaN(ms) || ms >= cutoff;
+      return !isNaN(ms) && ms >= cutoff;
     });
 
     return store;
@@ -40,6 +41,7 @@ export async function writeStore(store: JobStore): Promise<void> {
   await put(BLOB_KEY, JSON.stringify(store, null, 2), {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 

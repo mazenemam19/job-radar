@@ -2,6 +2,12 @@
 // Entry point for: pnpm run cron:now
 // Runs the full scan and prints a summary.
 
+import { config } from "dotenv";
+import path from "path";
+
+// Explicitly load .env.local
+config({ path: path.resolve(process.cwd(), ".env.local") });
+
 import { runAllSources } from "../lib/runner";
 
 (async () => {

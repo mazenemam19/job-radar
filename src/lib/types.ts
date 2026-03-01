@@ -1,6 +1,6 @@
 // src/lib/types.ts
 
-export type JobSource = "company";
+export type JobSource = "company" | "local";
 export type JobMode = "visa" | "local" | "global";  // visa = remote+visa, local = egypt direct, global = worldwide remote Egypt-friendly
 
 export interface Job {

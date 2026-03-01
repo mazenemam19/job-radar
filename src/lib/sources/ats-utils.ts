@@ -41,6 +41,11 @@ const COUNTRY_MAP: Record<string, { name: string, flag: string }> = {
   "united states": { name: "USA", flag: "🇺🇸" },
   "egypt": { name: "Egypt", flag: "🇪🇬" },
   "cairo": { name: "Egypt", flag: "🇪🇬" },
+  "saudi arabia": { name: "Saudi Arabia", flag: "🇸🇦" },
+  "united arab emirates": { name: "UAE", flag: "🇦🇪" },
+  "uae": { name: "UAE", flag: "🇦🇪" },
+  "dubai": { name: "UAE", flag: "🇦🇪" },
+  "riyadh": { name: "Saudi Arabia", flag: "🇸🇦" },
   "remote": { name: "Remote", flag: "🌍" },
 };
 
@@ -998,4 +1003,138 @@ export async function fetchPharos(mode: JobMode): Promise<Job[]> {
     console.log(`[local] Pharos raw: ${jobs.length}`);
     return processJobs(jobs, company, mode, false);
   } catch { return []; }
+}
+
+/**
+ * Wuzzuf — Direct search API.
+ * We fetch the latest Frontend-related roles from Egypt.
+ */
+
+/**
+ * Helper to parse Wuzzuf's relative date strings (e.g. "2 days ago", "1 month ago")
+ * into an ISO timestamp.
+ */
+export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
+  const searchUrl = "https://wuzzuf.net/api/search/job";
+  const queries = ["react", "next.js"];
+  const allWuzzufJobs: Job[] = [];
+  const seenIds = new Set<string>();
+
+  for (const q of queries) {
+    console.log(`[Wuzzuf] API Search: ${q}...`);
+    
+    // Step 1: Search for IDs
+    const searchPayload = {
+      startIndex: 0,
+      pageSize: 20,
+      longitude: "31.2357", // Cairo
+      latitude: "30.0444",
+      query: q,
+      searchFilters: {
+        post_date: ["within_1_week"],
+        years_of_experience_min: ["3"],
+        years_of_experience_max: ["6"]
+      }
+    };
+
+    try {
+      const sRes = await fetch(searchUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          "Referer": "https://wuzzuf.net/search/jobs",
+        },
+        body: JSON.stringify(searchPayload),
+        signal: AbortSignal.timeout(15_000)
+      });
+
+      if (!sRes.ok) continue;
+      const sData = await sRes.json() as any;
+      const ids = (sData?.data || []).map((j: any) => j.id).filter((id: string) => !seenIds.has(id));
+      
+      if (ids.length === 0) continue;
+
+      // Step 2: Fetch full details for these IDs
+      const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
+      const dRes = await fetch(detailUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          "Referer": "https://wuzzuf.net/search/jobs",
+        },
+        signal: AbortSignal.timeout(15_000)
+      });
+
+      if (!dRes.ok) continue;
+      const dData = await dRes.json() as any;
+      const jobs = dData?.data || [];
+
+      const now = new Date().toISOString();
+      const cutoff = Date.now() - AGE_CAP_DAYS * 864e5;
+
+      for (const entry of jobs) {
+        const attr = entry.attributes || {};
+        const title = (attr.title || "").trim();
+        const id = entry.id;
+        
+        if (seenIds.has(id)) continue;
+        seenIds.add(id);
+
+        if (isClearlyNonFrontend(title) || isTooSenior(title)) continue;
+        if (!/react|next|native/i.test(title)) continue;
+
+        const postedAt = attr.postedAt || now;
+        const postedMs = Date.parse(postedAt);
+        if (!isNaN(postedMs) && postedMs < cutoff) continue;
+
+        const description = stripHtml(attr.description || "");
+        const requirements = stripHtml(attr.requirements || "");
+        const fullText = `${description} ${requirements}`;
+
+        const scored = scoreJob({ 
+          title, 
+          description: fullText, 
+          location: attr.location?.city?.name || "MENA", 
+          postedAt 
+        }, "");
+
+        if (scored.skillMatchScore === 0) continue;
+
+        // Find company name in attributes first, then computedFields
+        const companyName = attr.company_name || 
+                           attr.computedFields?.find((f: any) => f.name === "company_name")?.value?.[0] || 
+                           "Wuzzuf Job";
+
+        const countryName = attr.location?.country?.name || "MENA";
+        const cityName = attr.location?.city?.name || "";
+        
+        const countryInfo = detectCountry(countryName + " " + cityName, { name: countryName, flag: "🌍" });
+        const displayLocation = countryInfo.name === "Egypt" ? extractEgyptCity(cityName, cityName) : `${cityName}, ${countryInfo.name}`;
+
+        allWuzzufJobs.push({
+          id: `local_wuzzuf_${id}`,
+          source: "local",
+          mode,
+          title,
+          company: companyName,
+          location: displayLocation,
+          country: countryInfo.name,
+          countryFlag: countryInfo.flag,
+          url: `https://wuzzuf.net/jobs/p/${attr.slug || id}`,
+          description: description.slice(0, 200),
+          isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
+          postedAt,
+          dateUnknown: false,
+          visaSponsorship: false,
+          ...scored,
+          fetchedAt: now,
+        });
+      }
+    } catch (e) {
+      console.error(`[Wuzzuf] API Error for ${q}:`, e);
+    }
+  }
+
+  console.log(`[local] Wuzzuf API: collected ${allWuzzufJobs.length} matches`);
+  return allWuzzufJobs;
 }

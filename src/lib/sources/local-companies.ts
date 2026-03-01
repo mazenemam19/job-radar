@@ -1,6 +1,6 @@
 // src/lib/sources/local-companies.ts
 import type { Job } from "../types";
-import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchBambooHR, fetchGizaSystems, fetchBrightSkies, fetchPharos, type ATSConfig, resetWorkableUsed } from "./ats-utils";
+import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchBambooHR, fetchGizaSystems, fetchBrightSkies, fetchPharos, fetchWuzzuf, type ATSConfig, resetWorkableUsed } from "./ats-utils";
 
 const COUNTRY = "Egypt";
 const FLAG = "🇪🇬";
@@ -87,6 +87,7 @@ export async function fetchLocalJobs(): Promise<Job[]> {
 
   // ── Custom fetchers (Verified direct APIs) ───────────────────────────
   const customResults = await Promise.allSettled([
+    fetchWuzzuf(MODE),
     // fetchGizaSystems(MODE),
     fetchBrightSkies(MODE),
     // fetchPharos(MODE),
