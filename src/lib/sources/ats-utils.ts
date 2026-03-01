@@ -1141,3 +1141,121 @@ export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
   console.log(`[local] Wuzzuf API: collected ${allWuzzufJobs.length} matches`);
   return allWuzzufJobs;
 }
+
+/**
+ * RemoteOK — Official JSON API.
+ */
+export async function fetchRemoteOK(mode: JobMode): Promise<Job[]> {
+  const url = "https://remoteok.com/api";
+  console.log("[RemoteOK] Fetching API...");
+  const res = await safeFetch(url);
+  if (!res || !res.ok) return [];
+
+  try {
+    const data = await res.json() as any[];
+    // RemoteOK API: first element is often a legal/info object, not a job
+    const rawJobs = data.filter(item => item.id && item.position);
+    
+    const now = new Date().toISOString();
+    const cutoff = Date.now() - AGE_CAP_DAYS * 864e5;
+    const out: Job[] = [];
+
+    for (const r of rawJobs) {
+      const title = r.position || "";
+      if (isClearlyNonFrontend(title) || isTooSenior(title)) continue;
+      if (!/react|next|native/i.test(title) && !r.tags?.some((t: string) => /react|next/i.test(t))) continue;
+
+      const postedAt = r.date;
+      const postedMs = Date.parse(postedAt);
+      if (!isNaN(postedMs) && postedMs < cutoff) continue;
+
+      const description = stripHtml(r.description || "");
+      const scored = scoreJob({ title, description, location: "Remote", postedAt }, r.company || "");
+      if (scored.skillMatchScore === 0) continue;
+
+      out.push({
+        id: `global_remoteok_${r.id}`,
+        source: "local", // Using local source type for custom fetchers
+        mode,
+        title,
+        company: r.company || "RemoteOK Company",
+        location: "Remote 🌐",
+        country: "Global",
+        countryFlag: "🌍",
+        url: r.url,
+        description: description.slice(0, 200),
+        isRemote: true,
+        postedAt,
+        dateUnknown: false,
+        visaSponsorship: false,
+        ...scored,
+        fetchedAt: now,
+      });
+    }
+    console.log(`[global] RemoteOK: collected ${out.length} matches`);
+    return out;
+  } catch (e) {
+    console.error("[RemoteOK] API Error:", e);
+    return [];
+  }
+}
+
+/**
+ * We Work Remotely — Public JSON Feed.
+ */
+export async function fetchWWR(mode: JobMode): Promise<Job[]> {
+  const url = "https://weworkremotely.com/remote-jobs.json";
+  console.log("[WWR] Fetching JSON feed...");
+  const res = await safeFetch(url);
+  if (!res || !res.ok) return [];
+
+  try {
+    const data = await res.json() as any;
+    const rawJobs = data.jobs || [];
+    
+    const now = new Date().toISOString();
+    const cutoff = Date.now() - AGE_CAP_DAYS * 864e5;
+    const out: Job[] = [];
+
+    for (const r of rawJobs) {
+      const title = r.title || "";
+      if (isClearlyNonFrontend(title) || isTooSenior(title)) continue;
+      
+      // Check title and category/tags for React
+      const isReact = /react|next|native/i.test(title) || /react|next/i.test(r.category || "");
+      if (!isReact) continue;
+
+      const postedAt = r.listed_at;
+      const postedMs = Date.parse(postedAt);
+      if (!isNaN(postedMs) && postedMs < cutoff) continue;
+
+      const description = stripHtml(r.description || "");
+      const scored = scoreJob({ title, description, location: "Remote", postedAt }, r.company || "");
+      if (scored.skillMatchScore === 0) continue;
+
+      out.push({
+        id: `global_wwr_${r.id}`,
+        source: "local",
+        mode,
+        title,
+        company: r.company || "WWR Company",
+        location: "Remote 🌐",
+        country: "Global",
+        countryFlag: "🌍",
+        url: r.url.startsWith("http") ? r.url : `https://weworkremotely.com${r.url}`,
+        description: description.slice(0, 200),
+        isRemote: true,
+        postedAt,
+        dateUnknown: false,
+        visaSponsorship: false,
+        ...scored,
+        fetchedAt: now,
+      });
+    }
+    console.log(`[global] WWR: collected ${out.length} matches`);
+    return out;
+  } catch (e) {
+    console.error("[WWR] API Error:", e);
+    return [];
+  }
+}

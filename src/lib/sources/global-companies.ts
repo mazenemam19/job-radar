@@ -3,7 +3,7 @@
 // Filter: rejects US-timezone-only, must-be-authorized-in-country, EU-resident-only.
 
 import type { Job } from "../types";
-import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, type ATSConfig, resetWorkableUsed } from "./ats-utils";
+import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchRemoteOK, fetchWWR, type ATSConfig, resetWorkableUsed } from "./ats-utils";
 import { getNextBatch } from "../state";
 
 const MODE = "global";
@@ -79,6 +79,20 @@ export async function fetchGlobalJobs(): Promise<Job[]> {
       console.error("[global] Unhandled rejection:", r.reason);
     }
   }
+
+  // ── Custom fetchers (Verified direct APIs) ───────────────────────────
+  const customResults = await Promise.allSettled([
+    fetchRemoteOK(MODE),
+    fetchWWR(MODE),
+  ]);
+  for (const r of customResults) {
+    if (r.status === "fulfilled") {
+      for (const j of r.value) { if (!seen.has(j.id)) { seen.add(j.id); all.push(j); } }
+    } else {
+      console.error("[global] Custom fetcher error:", r.reason);
+    }
+  }
+
   console.log(`[global] Total: ${all.length} jobs`);
   return all;
 }
