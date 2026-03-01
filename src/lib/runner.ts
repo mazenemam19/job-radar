@@ -18,8 +18,7 @@ export async function runAllSources(): Promise<CronLog> {
   }
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
-  const store = readStore();
-  store.jobs = []; // Clear history for fresh validation run
+  const store = await readStore();
   const existingIds = new Set<string>();
 
   const errors: string[] = [];
@@ -76,7 +75,7 @@ export async function runAllSources(): Promise<CronLog> {
     errors,
   };
 
-  writeStore(appendCronLog(updated, log));
+  await writeStore(appendCronLog(updated, log));
   console.log(`[runner] Done in ${(durationMs / 1000).toFixed(1)}s — ${added.length} new, ${updated.jobs.length} total`);
   return log;
 }

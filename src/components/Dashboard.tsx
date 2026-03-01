@@ -30,7 +30,7 @@ function SkeletonGrid() {
   </>;
 }
 
-export default function Dashboard() {
+export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
   const [store, setStore] = useState<JobStore | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -59,7 +59,10 @@ export default function Dashboard() {
     if (running) return;
     setRunning(true); setRunStatus("idle");
     try {
-      const res = await fetch("/api/cron", { method: "POST" });
+      const headers: Record<string, string> = {};
+      if (cronSecret) headers["x-cron-secret"] = cronSecret;
+
+      const res = await fetch("/api/cron", { method: "POST", headers });
       setRunStatus(res.ok ? "ok" : "err");
       if (res.ok) await loadJobs();
     } catch { setRunStatus("err"); }

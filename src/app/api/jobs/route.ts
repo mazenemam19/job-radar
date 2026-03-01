@@ -5,6 +5,6 @@ import { readStore } from "@/lib/storage";
 export const dynamic = "force-dynamic"; // never cache — always fresh from disk
 
 export async function GET() {
-  const store = readStore();
+  const store = await readStore();
   return NextResponse.json(store);
 }
