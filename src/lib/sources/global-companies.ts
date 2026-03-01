@@ -4,6 +4,7 @@
 
 import type { Job } from "../types";
 import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, type ATSConfig, resetWorkableUsed } from "./ats-utils";
+import { getNextBatch } from "../state";
 
 const MODE = "global";
 const VISA = false;
@@ -47,8 +48,15 @@ const COMPANIES: ATSConfig[] = [
 
 export async function fetchGlobalJobs(): Promise<Job[]> {
   resetWorkableUsed(MODE);
+
+  const workables = COMPANIES.filter(c => c.ats === "workable");
+  const others = COMPANIES.filter(c => c.ats !== "workable");
+
+  const batchWorkable = await getNextBatch(workables, 8, "global-workable");
+  const toScan = [...others, ...batchWorkable];
+
   const results = await Promise.allSettled(
-    COMPANIES.map(c => {
+    toScan.map(c => {
       switch (c.ats) {
         case "greenhouse":      return fetchGreenhouse(c, MODE, VISA);
         case "lever":           return fetchLever(c, MODE, VISA);

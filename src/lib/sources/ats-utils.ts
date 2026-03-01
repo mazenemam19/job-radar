@@ -97,8 +97,8 @@ let workableSkippedCache: WorkableSkippedEntry[] = [];
 let workableSkippedInitialized = false;
 
 type WorkableBudgetConfig = { visa: number; global: number; local: number };
-// Per-pipeline Workable allocation: total=8 → visa:2, global:1, local:5
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 2, global: 1, local: 5 };
+// Per-pipeline Workable allocation: total=24 → visa:8, global:8, local:8
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 8, global: 8, local: 8 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
 const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
 
@@ -585,10 +585,10 @@ function parseRetryAfterMs(headerValue: string | null): number {
 }
 
 // ── Global Workable rate limiter ─────────────────────────────────────────
-// Workable is aggressive with 429s. Queue ALL requests globally, 5s apart.
+// Workable is aggressive with 429s. Queue fetches with a smaller delay.
 let workableQueue: Promise<unknown> = Promise.resolve();
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
-  const delays = [4000, 5000, 6000, 7000];
+  const delays = [1500, 2000, 2500, 3000]; // Slashed from 4-7s
   const randomDelay = delays[Math.floor(Math.random() * delays.length)];
   const result = workableQueue.then(() => sleep(randomDelay)).then(fn);
   workableQueue = result.catch(() => {});
@@ -601,7 +601,7 @@ async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[
   for (let i = 0; i < fns.length; i += concurrency) {
     const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map(f => f()));
     for (const r of batch) results.push(r.status === "fulfilled" ? r.value : null as T);
-    if (i + concurrency < fns.length) await sleep(3000); 
+    if (i + concurrency < fns.length) await sleep(1500); // Reduced from 3000ms
   }
   return results;
 }
@@ -632,19 +632,22 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
   ];
 
-  const doFetch = () => fetch(listUrl, {
-    headers: {
-      "User-Agent": userAgents[Math.floor(Math.random() * userAgents.length)],
-      "Accept": "application/json, text/plain, */*",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Referer": "https://apply.workable.com/",
-      "Origin": "https://apply.workable.com",
-    },
-    signal: AbortSignal.timeout(30_000),
-  }).then(res => {
-    if (res) trackDomainRequest(listUrl);
-    return res;
-  }).catch(() => null);
+  const doFetch = () => {
+    console.log(`[Workable] 🔍 Scanning: ${c.name}...`);
+    return fetch(listUrl, {
+      headers: {
+        "User-Agent": userAgents[Math.floor(Math.random() * userAgents.length)],
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://apply.workable.com/",
+        "Origin": "https://apply.workable.com",
+      },
+      signal: AbortSignal.timeout(30_000),
+    }).then(res => {
+      if (res) trackDomainRequest(listUrl);
+      return res;
+    }).catch(() => null);
+  };
 
   let res = await queueWorkable(doFetch);
 
@@ -709,7 +712,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode, visaSponsorship
       postedAt: r.published_on,
       description: desc,
     };
-  }), 3);
+  }), 5); // Increased concurrency to 5
 
   return processJobs(withDesc.filter(Boolean), c, mode, visaSponsorship);
 }

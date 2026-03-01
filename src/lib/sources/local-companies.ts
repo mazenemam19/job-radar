@@ -1,6 +1,7 @@
 // src/lib/sources/local-companies.ts
 import type { Job } from "../types";
 import { fetchGreenhouse, fetchLever, fetchAshby, fetchWorkable, fetchTeamtailor, fetchBreezy, fetchSmartRecruiters, fetchBambooHR, fetchGizaSystems, fetchBrightSkies, fetchPharos, fetchWuzzuf, type ATSConfig, resetWorkableUsed } from "./ats-utils";
+import { getNextBatch } from "../state";
 
 const COUNTRY = "Egypt";
 const FLAG = "🇪🇬";
@@ -59,8 +60,17 @@ const COMPANIES: ATSConfig[] = [
 
 export async function fetchLocalJobs(): Promise<Job[]> {
   resetWorkableUsed(MODE);
+
+  // Split into Workable vs Others
+  const workables = COMPANIES.filter(c => c.ats === "workable");
+  const others = COMPANIES.filter(c => c.ats !== "workable");
+
+  // Get current batch of 8 Workable companies
+  const batchWorkable = await getNextBatch(workables, 8, "local-workable");
+  const toScan = [...others, ...batchWorkable];
+
   const results = await Promise.allSettled(
-    COMPANIES.map(c => {
+    toScan.map(c => {
       switch (c.ats) {
         case "greenhouse":      return fetchGreenhouse(c, MODE, VISA);
         case "lever":           return fetchLever(c, MODE, VISA);

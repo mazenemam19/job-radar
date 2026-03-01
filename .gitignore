@@ -3,3 +3,5 @@ node_modules/
 .env.local
 dist-scripts/
 data/jobs.json
+tsconfig.tsbuildinfo
+data/scan-state.json

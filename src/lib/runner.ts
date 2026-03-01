@@ -4,7 +4,8 @@ import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchGlobalJobs } from "./sources/global-companies";
 import { sendJobAlert } from "./email";
 import { setWorkableBudgetConfig, getWorkable429SlugsThisRun, markWorkableSlugsBlocked24h } from "./sources/ats-utils";
-import type { CronLog } from "./types";
+import { finalizeBatchState } from "./state";
+import type { Job, CronLog } from "./types";
 
 export async function runAllSources(): Promise<CronLog> {
   const budgetArg = process.argv?.find((a: string) =>
@@ -22,38 +23,46 @@ export async function runAllSources(): Promise<CronLog> {
   const existingIds = new Set<string>();
 
   const errors: string[] = [];
-  let visaJobs: Awaited<ReturnType<typeof fetchCompanyJobs>> = [];
-  let localJobs: Awaited<ReturnType<typeof fetchLocalJobs>> = [];
-  let globalJobs: Awaited<ReturnType<typeof fetchGlobalJobs>> = [];
+  let visaJobs: Job[] = [];
+  let localJobs: Job[] = [];
+  let globalJobs: Job[] = [];
 
-  // ── Run local first so it gets reserved Workable budget ──────────────
-  const localResult = await fetchLocalJobs().then(
-    v => ({ status: "fulfilled" as const, value: v }),
-    r => ({ status: "rejected" as const, reason: r }),
-  );
-
-  if (localResult.status === "fulfilled") localJobs = localResult.value;
-  else { errors.push(`local pipeline: ${localResult.reason}`); console.error("[runner] local pipeline failed:", localResult.reason); }
-
-  if (localJobs.length === 0) {
-    const slugs429 = getWorkable429SlugsThisRun();
-    if (slugs429.length) {
-      markWorkableSlugsBlocked24h(slugs429);
-      console.warn(`[runner] local=0; marked ${slugs429.length} Workable slug(s) blocked 24h: ${slugs429.join(", ")}`);
-    }
-  }
-
-  // ── Run visa + global after local (Workable budget: visa:2, global:1, local:3) ───
-  const [visaResult, globalResult] = await Promise.allSettled([
+  // ── Run all pipelines in parallel ──────────────────────────────────────
+  const [localResult, visaResult, globalResult] = await Promise.allSettled([
+    fetchLocalJobs(),
     fetchCompanyJobs(),
     fetchGlobalJobs(),
   ]);
 
-  if (visaResult.status === "fulfilled") visaJobs = visaResult.value;
-  else { errors.push(`visa pipeline: ${visaResult.reason}`); console.error("[runner] visa pipeline failed:", visaResult.reason); }
+  if (localResult.status === "fulfilled") {
+    localJobs = localResult.value;
+  } else {
+    errors.push(`local pipeline: ${localResult.reason}`);
+    console.error("[runner] local pipeline failed:", localResult.reason);
+  }
 
-  if (globalResult.status === "fulfilled") globalJobs = globalResult.value;
-  else { errors.push(`global pipeline: ${globalResult.reason}`); console.error("[runner] global pipeline failed:", globalResult.reason); }
+  if (visaResult.status === "fulfilled") {
+    visaJobs = visaResult.value;
+  } else {
+    errors.push(`visa pipeline: ${visaResult.reason}`);
+    console.error("[runner] visa pipeline failed:", visaResult.reason);
+  }
+
+  if (globalResult.status === "fulfilled") {
+    globalJobs = globalResult.value;
+  } else {
+    errors.push(`global pipeline: ${globalResult.reason}`);
+    console.error("[runner] global pipeline failed:", globalResult.reason);
+  }
+
+  // Handle Workable 429 escalate if nothing was found (indicates a general block)
+  if (localJobs.length === 0 && visaJobs.length === 0 && globalJobs.length === 0) {
+    const slugs429 = getWorkable429SlugsThisRun();
+    if (slugs429.length) {
+      markWorkableSlugsBlocked24h(slugs429);
+      console.warn(`[runner] All pipelines returned 0; marked ${slugs429.length} Workable slug(s) blocked 24h: ${slugs429.join(", ")}`);
+    }
+  }
 
   const fetched = [...visaJobs, ...localJobs, ...globalJobs];
   const { store: updated, added } = mergeJobs(store, fetched);
@@ -75,6 +84,7 @@ export async function runAllSources(): Promise<CronLog> {
     errors,
   };
 
+  await finalizeBatchState();
   await writeStore(appendCronLog(updated, log));
   console.log(`[runner] Done in ${(durationMs / 1000).toFixed(1)}s — ${added.length} new, ${updated.jobs.length} total`);
   return log;
