@@ -69,7 +69,9 @@ function detectCountry(
 ): { name: string; flag: string } {
   const loc = (location || "").toLowerCase();
   for (const [key, val] of Object.entries(COUNTRY_MAP)) {
-    if (loc.includes(key)) return val;
+    // Use regex for whole word matching to avoid "CA" matching "Cairo"
+    const re = new RegExp(`\\b${key}\\b`, "i");
+    if (re.test(loc)) return val;
   }
   return fallback;
 }
@@ -108,7 +110,11 @@ export function isTimezoneIncompatible(text: string): boolean {
     );
   const usTimezones = /\b(pst|est|cst|mst|pacific\s+time|eastern\s+time)\b/.test(t);
 
-  return usOnly || usTimezones;
+  // NEW: Block roles that are explicitly "Remote, US" or "Remote - USA"
+  // unless they passed the global check above.
+  const usRemote = /\bremote[,.\s-]+(us|usa|united\s+states)\b/.test(t);
+
+  return usOnly || usTimezones || usRemote;
 }
 
 /**
@@ -369,7 +375,7 @@ export function processJobs(
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      description: r.description.slice(0, 500),
+      description: r.description.slice(0, 3000), // Increased to 3000
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
@@ -771,7 +777,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
           country: attr.location?.country?.name || "MENA",
           countryFlag: "🌍",
           url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
-          description: stripHtml(attr.description || "").slice(0, 500),
+          description: stripHtml(attr.description || "").slice(0, 3000),
           isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
           postedAt: attr.postedAt,
           dateUnknown: false,
