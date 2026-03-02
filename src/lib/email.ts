@@ -11,7 +11,10 @@ function jobRow(job: Job): string {
   const score = Math.round(job.totalScore);
   const skills = job.matchedSkills
     .slice(0, 6)
-    .map(s => `<span style="display:inline-block;background:rgba(99,102,241,0.18);color:#a5b4fc;font-family:monospace;font-size:10px;padding:2px 7px;border-radius:4px;margin:2px 2px 2px 0;border:1px solid rgba(99,102,241,0.3);">${s}</span>`)
+    .map(
+      (s) =>
+        `<span style="display:inline-block;background:rgba(99,102,241,0.18);color:#a5b4fc;font-family:monospace;font-size:10px;padding:2px 7px;border-radius:4px;margin:2px 2px 2px 0;border:1px solid rgba(99,102,241,0.3);">${s}</span>`,
+    )
     .join("");
 
   return `
@@ -55,7 +58,12 @@ export async function sendJobAlert(newJobs: Job[]): Promise<void> {
   }
 
   const top = [...newJobs].sort((a, b) => b.totalScore - a.totalScore).slice(0, 10);
-  const dateStr = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateStr = new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -80,8 +88,8 @@ export async function sendJobAlert(newJobs: Job[]): Promise<void> {
                   </div>
                 </td>
                 <td width="52" style="text-align:right;vertical-align:top;">
-                  <div style="width:42px;height:42px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);text-align:center;line-height:40px;font-size:18px;color:#6366f1;">
-                    &#x25CB;
+                  <div style="width:42px;height:42px;border-radius:50%;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);text-align:center;line-height:40px;font-size:14px;color:#4ade80;">
+                    &#x25CF;
                   </div>
                 </td>
               </tr>

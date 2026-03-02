@@ -1,6 +1,7 @@
 // src/lib/storage.ts
 import { put, list } from "@vercel/blob";
 import { Job, JobStore, CronLog } from "./types";
+import { isClearlyNonFrontend, isTooSeniorOrTooJunior } from "./scoring";
 
 const BLOB_KEY = "jobs-store.json";
 const MAX_JOBS = 500;
@@ -14,7 +15,7 @@ function emptyStore(): JobStore {
 export async function readStore(): Promise<JobStore> {
   try {
     const { blobs } = await list();
-    const entry = blobs.find(b => b.pathname === BLOB_KEY);
+    const entry = blobs.find((b) => b.pathname === BLOB_KEY);
     if (!entry) return emptyStore();
 
     // Add cache-busting query param to ensure we get fresh data
@@ -25,7 +26,7 @@ export async function readStore(): Promise<JobStore> {
 
     // ── Auto-expire old jobs on every read ──────────────────────────────────
     const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
-    store.jobs = store.jobs.filter(j => {
+    store.jobs = store.jobs.filter((j) => {
       const ms = Date.parse(j.postedAt);
       return !isNaN(ms) && ms >= cutoff;
     });
@@ -52,10 +53,12 @@ export async function writeStore(store: JobStore): Promise<void> {
  * - Caps at MAX_JOBS
  */
 export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; added: Job[] } {
-  const existingIds = new Set(store.jobs.map(j => j.id));
-  const added = incoming.filter(j => !existingIds.has(j.id));
+  const existingIds = new Set(store.jobs.map((j) => j.id));
+  const added = incoming.filter((j) => !existingIds.has(j.id));
 
   const merged = [...store.jobs, ...added]
+    // Re-apply filters to existing jobs in case logic changed (e.g. Junior filter added)
+    .filter((j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title))
     .sort((a, b) => b.totalScore - a.totalScore)
     .slice(0, MAX_JOBS);
 

@@ -1,6 +1,6 @@
 /* src/app/globals.css */
 
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@400;500;600&display=swap");
 
 :root {
   --bg: #08080f;
@@ -18,9 +18,9 @@
   --green: #4ade80;
   --amber: #fbbf24;
   --slate: #64748b;
-  --font-display: 'Syne', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --font-display: "Syne", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "DM Mono", monospace;
   --radius: 10px;
 }
 
@@ -47,7 +47,7 @@ body {
 }
 
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -113,7 +113,7 @@ body::before {
 }
 
 .radar-dot::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
@@ -421,7 +421,7 @@ body::before {
 }
 
 .skeleton::after {
-  content: '';
+  content: "";
   display: block;
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
@@ -429,7 +429,6 @@ body::before {
 }
 
 @keyframes skel-pulse {
-
   0%,
   100% {
     opacity: 0.35;
@@ -480,7 +479,10 @@ body::before {
   flex-direction: column;
   gap: 14px;
   animation: card-in 0.38s ease both;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
   position: relative;
   overflow: hidden;
 }
@@ -498,7 +500,7 @@ body::before {
 }
 
 .job-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -523,7 +525,9 @@ body::before {
 .job-card:hover {
   border-color: var(--border-hi);
   transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border-hi);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--border-hi);
 }
 
 .card-top {
@@ -840,7 +844,9 @@ body::before {
   border-radius: var(--radius);
   cursor: pointer;
   margin-bottom: 32px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .detail-back:hover {
@@ -953,7 +959,9 @@ body::before {
   padding: 11px 22px;
   border-radius: var(--radius);
   text-decoration: none;
-  transition: background 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
 }
 
 .detail-apply-btn:hover {

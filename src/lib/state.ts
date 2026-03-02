@@ -20,15 +20,19 @@ async function readState(): Promise<ScanState> {
   try {
     if (fs.existsSync(LOCAL_STATE_PATH)) {
       currentProcessState = JSON.parse(fs.readFileSync(LOCAL_STATE_PATH, "utf-8"));
-      console.log(`[state] Loaded from local disk. local-workable: ${currentProcessState?.workableOffsets["local-workable"] || 0}`);
+      console.log(
+        `[state] Loaded from local disk. local-workable: ${currentProcessState?.workableOffsets["local-workable"] || 0}`,
+      );
       return currentProcessState!;
     }
-  } catch { /* ignore local error */ }
+  } catch {
+    /* ignore local error */
+  }
 
   // 2. Try Vercel Blob (for production/cloud)
   try {
     const { blobs } = await list();
-    const entry = blobs.find(b => b.pathname === STATE_BLOB_KEY);
+    const entry = blobs.find((b) => b.pathname === STATE_BLOB_KEY);
     if (!entry) {
       currentProcessState = { workableOffsets: {} };
       return currentProcessState;
@@ -37,9 +41,11 @@ async function readState(): Promise<ScanState> {
     const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const res = await fetch(`${entry.url}?t=${cacheBuster}`);
     if (!res.ok) return { workableOffsets: {} };
-    
-    currentProcessState = await res.json() as ScanState;
-    console.log(`[state] Loaded from cloud blob. local-workable: ${currentProcessState.workableOffsets["local-workable"] || 0}`);
+
+    currentProcessState = (await res.json()) as ScanState;
+    console.log(
+      `[state] Loaded from cloud blob. local-workable: ${currentProcessState.workableOffsets["local-workable"] || 0}`,
+    );
     return currentProcessState;
   } catch {
     return { workableOffsets: {} };
@@ -51,10 +57,10 @@ async function readState(): Promise<ScanState> {
  */
 export async function finalizeBatchState() {
   if (!currentProcessState) return;
-  
+
   try {
     const content = JSON.stringify(currentProcessState, null, 2);
-    
+
     // Save to local disk
     const dir = path.dirname(LOCAL_STATE_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -75,14 +81,16 @@ export async function finalizeBatchState() {
 
 export async function getNextBatch<T>(items: T[], batchSize: number, key: string): Promise<T[]> {
   if (items.length === 0) return [];
-  
+
   const state = await readState();
   const currentOffset = state.workableOffsets[key] || 0;
-  
+
   const start = currentOffset >= items.length ? 0 : currentOffset;
   const batch = items.slice(start, start + batchSize);
-  
-  console.log(`[state] Batching: ${key} | Offset ${start} -> ${Math.min(start + batchSize, items.length)}`);
+
+  console.log(
+    `[state] Batching: ${key} | Offset ${start} -> ${Math.min(start + batchSize, items.length)}`,
+  );
 
   if (batch.length < batchSize && items.length > batchSize) {
     const remaining = batchSize - batch.length;
@@ -91,6 +99,6 @@ export async function getNextBatch<T>(items: T[], batchSize: number, key: string
   } else {
     state.workableOffsets[key] = (start + batchSize) % items.length;
   }
-  
+
   return batch;
 }

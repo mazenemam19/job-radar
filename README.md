@@ -6,10 +6,10 @@ A personal job-hunting dashboard that automatically scrapes frontend engineering
 
 ## Pipelines
 
-| Pipeline | What it finds | Companies |
-|----------|--------------|-----------|
-| 🌍 **Visa Sponsors** | EU companies that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more |
-| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs | Instabug, Bosta, Thndr, Nawy, Dubizzle, Paymob, +more |
+| Pipeline             | What it finds                                | Companies                                                  |
+| -------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| 🌍 **Visa Sponsors** | EU companies that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more          |
+| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs      | Instabug, Bosta, Thndr, Nawy, Dubizzle, Paymob, +more      |
 | 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2 | GitLab, Automattic, Netlify, Vercel, Linear, Zapier, +more |
 
 ---
@@ -40,6 +40,7 @@ Jobs with 0 skill match score are **never shown**. Jobs older than **7 days** ar
 ## Setup
 
 ### 1. Clone & install
+
 ```bash
 git clone <your-repo>
 cd job-radar
@@ -47,7 +48,9 @@ npm install
 ```
 
 ### 2. Environment variables
+
 Create `.env.local`:
+
 ```env
 CRON_SECRET=your-random-secret-here
 EMAIL_USER=youremail@gmail.com
@@ -56,15 +59,18 @@ EMAIL_TO=youremail@gmail.com
 ```
 
 ### 3. Run locally
+
 ```bash
 npm run dev
 # Dashboard at http://localhost:3000
 ```
 
 ### 4. Deploy to Vercel
+
 ```bash
 vercel deploy
 ```
+
 - Add the same env vars in Vercel dashboard → Settings → Environment Variables
 - The `vercel.json` already configures the daily cron at **4pm UTC (6pm Cairo)** ✅
 - Set `CRON_SECRET` in Vercel env — Vercel sends it automatically as `Authorization: Bearer <secret>`
@@ -101,6 +107,7 @@ vercel.json                     ← Cron: daily at 4pm UTC (6pm Cairo)
 ## Adding Companies
 
 Edit the relevant source file and add a line:
+
 ```ts
 { ats: "greenhouse", name: "Acme Corp", slug: "acmecorp", country: "Germany", countryFlag: "🇩🇪" }
 ```

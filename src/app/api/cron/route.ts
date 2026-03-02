@@ -26,7 +26,11 @@ async function handleCron(req: NextRequest) {
 }
 
 // GET: called by Vercel Cron scheduler automatically at 4pm UTC (6pm Cairo)
-export async function GET(req: NextRequest) { return handleCron(req); }
+export async function GET(req: NextRequest) {
+  return handleCron(req);
+}
 
 // POST: called by dashboard "Run Scan" button
-export async function POST(req: NextRequest) { return handleCron(req); }
+export async function POST(req: NextRequest) {
+  return handleCron(req);
+}

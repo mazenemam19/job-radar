@@ -20,7 +20,7 @@ import { runAllSources } from "../lib/runner";
     console.log(`  Sources:     ${JSON.stringify(log.sources)}`);
     if (log.errors.length) {
       console.warn(`  Errors (${log.errors.length}):`);
-      log.errors.forEach(e => console.warn(`    • ${e}`));
+      log.errors.forEach((e) => console.warn(`    • ${e}`));
     }
     console.log("─────────────────────────────────────────────────────\n");
     process.exit(0);

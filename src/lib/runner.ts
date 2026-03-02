@@ -3,19 +3,25 @@ import { fetchCompanyJobs } from "./sources/companies";
 import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchGlobalJobs } from "./sources/global-companies";
 import { sendJobAlert } from "./email";
-import { setWorkableBudgetConfig, getWorkable429SlugsThisRun, markWorkableSlugsBlocked24h } from "./sources/ats-utils";
+import {
+  setWorkableBudgetConfig,
+  getWorkable429SlugsThisRun,
+  markWorkableSlugsBlocked24h,
+} from "./sources/ats-utils";
 import { finalizeBatchState } from "./state";
 import type { Job, CronLog } from "./types";
 
 export async function runAllSources(): Promise<CronLog> {
-  const budgetArg = process.argv?.find((a: string) =>
-    a.startsWith("--budget=") || a.startsWith("--budget-config="),
+  const budgetArg = process.argv?.find(
+    (a: string) => a.startsWith("--budget=") || a.startsWith("--budget-config="),
   );
   if (budgetArg) {
     try {
       const raw = budgetArg.split("=", 2)[1]?.replace(/^['"]|['"]$/g, "") ?? "{}";
       setWorkableBudgetConfig(JSON.parse(raw) as Record<string, number>);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
@@ -60,7 +66,9 @@ export async function runAllSources(): Promise<CronLog> {
     const slugs429 = getWorkable429SlugsThisRun();
     if (slugs429.length) {
       markWorkableSlugsBlocked24h(slugs429);
-      console.warn(`[runner] All pipelines returned 0; marked ${slugs429.length} Workable slug(s) blocked 24h: ${slugs429.join(", ")}`);
+      console.warn(
+        `[runner] All pipelines returned 0; marked ${slugs429.length} Workable slug(s) blocked 24h: ${slugs429.join(", ")}`,
+      );
     }
   }
 
@@ -68,10 +76,14 @@ export async function runAllSources(): Promise<CronLog> {
   const { store: updated, added } = mergeJobs(store, fetched);
 
   // Email alert only for brand-new visa-mode jobs
-  const brandNewVisa = added.filter(j => !existingIds.has(j.id) && j.mode === "visa");
+  const brandNewVisa = added.filter((j) => !existingIds.has(j.id) && j.mode === "visa");
   if (brandNewVisa.length) {
-    try { await sendJobAlert(brandNewVisa); }
-    catch (err) { errors.push(`email: ${err}`); console.error("[runner] email failed:", err); }
+    try {
+      await sendJobAlert(brandNewVisa);
+    } catch (err) {
+      errors.push(`email: ${err}`);
+      console.error("[runner] email failed:", err);
+    }
   }
 
   const durationMs = Date.now() - t0;
@@ -86,6 +98,8 @@ export async function runAllSources(): Promise<CronLog> {
 
   await finalizeBatchState();
   await writeStore(appendCronLog(updated, log));
-  console.log(`[runner] Done in ${(durationMs / 1000).toFixed(1)}s — ${added.length} new, ${updated.jobs.length} total`);
+  console.log(
+    `[runner] Done in ${(durationMs / 1000).toFixed(1)}s — ${added.length} new, ${updated.jobs.length} total`,
+  );
   return log;
 }
