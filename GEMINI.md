@@ -48,7 +48,6 @@
 
 ## ❌ Rejected Sources
 
-- **Reed.co.uk**: Rejected — Not "Egypt-friendly," filters are unreliable, and visa sponsorship verification is inconsistent via API.
 - **Arbeitnow**: Rejected — Unreliable filters for visa sponsorship; previous attempts to use the "visa_sponsorship=true" flag failed to yield verified results.
 - **We Work Remotely (WWR)**: Rejected — Requires HTML scraping; lacks a clean, documented JSON API.
 - **Relocate.me**: Rejected — High scraping requirement; lacks a robust, publicly accessible direct API.
