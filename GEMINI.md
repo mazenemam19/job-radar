@@ -45,3 +45,11 @@
 - **Vercel Caching**: `fetch` calls to Blob storage use `?t=timestamp` to bypass edge caching.
 - **Workable URL Typo**: Confirmed that the correct URL is `.../widget/accounts/...`.
 - **Serverless Persistence**: The `finalizeBatchState` function ensures rotation offsets are saved to the cloud only once at the end of a parallel scan to prevent race conditions.
+
+## ❌ Rejected Sources
+
+- **Reed.co.uk**: Rejected — Not "Egypt-friendly," filters are unreliable, and visa sponsorship verification is inconsistent via API.
+- **Arbeitnow**: Rejected — Unreliable filters for visa sponsorship; previous attempts to use the "visa_sponsorship=true" flag failed to yield verified results.
+- **We Work Remotely (WWR)**: Rejected — Requires HTML scraping; lacks a clean, documented JSON API.
+- **Relocate.me**: Rejected — High scraping requirement; lacks a robust, publicly accessible direct API.
+- **The Muse**: Rejected — Heavily US-centric with minimal "Egypt-friendly" or global-remote roles that don't require US citizenship.
