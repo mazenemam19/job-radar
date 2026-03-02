@@ -69,7 +69,6 @@ function detectCountry(
 ): { name: string; flag: string } {
   const loc = (location || "").toLowerCase();
   for (const [key, val] of Object.entries(COUNTRY_MAP)) {
-    // Use regex for whole word matching to avoid "CA" matching "Cairo"
     const re = new RegExp(`\\b${key}\\b`, "i");
     if (re.test(loc)) return val;
   }
@@ -78,7 +77,6 @@ function detectCountry(
 
 // ── Strict Filters ──────────────────────────────────────────────────────────
 
-/** Rejects jobs from companies or locations that are politically/geographically blocked */
 export function isGeographicallyBlacklisted(text: string): boolean {
   const t = text.toLowerCase();
   return [
@@ -94,33 +92,18 @@ export function isGeographicallyBlacklisted(text: string): boolean {
   ].some((re) => re.test(t));
 }
 
-/**
- * Rejects "Remote" jobs that are actually locked to incompatible timezones (e.g. US Only, PST Only)
- * Egypt is GMT+2. We look for EMEA, Europe, Global, or anywhere compatible.
- */
 export function isTimezoneIncompatible(text: string): boolean {
   const t = text.toLowerCase();
-  // If it explicitly says EMEA, Europe, or Global, it's good.
   if (/\b(emea|europe|global|anywhere|africa|egypt|gmt\+2|gmt\+3)\b/.test(t)) return false;
-
-  // If it says US Only or lists US timezones WITHOUT saying global, reject.
   const usOnly =
     /\b(us\s+only|usa\s+only|united\s+states\s+only|north\s+america\s+only|canada\s+only)\b/.test(
       t,
     );
   const usTimezones = /\b(pst|est|cst|mst|pacific\s+time|eastern\s+time)\b/.test(t);
-
-  // NEW: Block roles that are explicitly "Remote, US" or "Remote - USA"
-  // unless they passed the global check above.
   const usRemote = /\bremote[,.\s-]+(us|usa|united\s+states)\b/.test(t);
-
   return usOnly || usTimezones || usRemote;
 }
 
-/**
- * Deep scan of description to catch roles that are actually Backend/DevOps
- * despite having a "Frontend" or generic title.
- */
 export function isTooBackendForFrontend(description: string): boolean {
   const d = description.toLowerCase();
   const backendSignals = [
@@ -135,7 +118,6 @@ export function isTooBackendForFrontend(description: string): boolean {
     /\bgo\s+backend\b/,
   ];
   const bCount = backendSignals.filter((re) => re.test(d)).length;
-  // If description has 4+ strong backend signals, it's not a pure FE role.
   return bCount >= 4;
 }
 
@@ -304,6 +286,12 @@ export interface RawJob {
   description: string;
 }
 
+export interface FetcherResult {
+  jobs: Job[];
+  error?: string;
+  durationMs?: number;
+}
+
 /** For local jobs: extract a specific Egyptian city from the raw location string. */
 function extractEgyptCity(rawLocation: string, companyCity?: string): string {
   const loc = (rawLocation || "").toLowerCase();
@@ -333,14 +321,8 @@ export function processJobs(
   for (const r of raw) {
     const title = r.title.trim();
     if (isClearlyNonFrontend(title) || isTooSeniorOrTooJunior(title)) continue;
-
-    // Restoration: Apply Geographical Blacklist
     if (isGeographicallyBlacklisted(title + r.location + r.description)) continue;
-
-    // Restoration: Apply Timezone Compatibility for Global
     if (mode === "global" && isTimezoneIncompatible(r.description + r.location)) continue;
-
-    // Restoration: Apply Deep Backend Filter
     if (isTooBackendForFrontend(r.description)) continue;
 
     const postedMs = Date.parse(r.postedAt);
@@ -375,7 +357,7 @@ export function processJobs(
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      description: r.description.slice(0, 3000), // Increased to 3000
+      description: r.description.slice(0, 3000),
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
@@ -384,8 +366,6 @@ export function processJobs(
       fetchedAt: now,
     });
   }
-  if (raw.length > 0)
-    console.log(`[${mode}] ${company.name}: ${raw.length} total → ${out.length} matches`);
   return out;
 }
 
@@ -394,13 +374,15 @@ export async function fetchGreenhouse(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { jobs } = (await res.json()) as any;
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_gh_${c.slug}_${r.id}`,
         title: r.title,
@@ -413,8 +395,9 @@ export async function fetchGreenhouse(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -423,13 +406,15 @@ export async function fetchLever(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_lever_${c.slug}_${r.id}`,
         title: r.text,
@@ -442,8 +427,9 @@ export async function fetchLever(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -452,14 +438,16 @@ export async function fetchAshby(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
     const jobs = data.jobs || data.jobPostings || [];
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_ashby_${c.slug}_${r.id}`,
         title: r.title,
@@ -472,8 +460,9 @@ export async function fetchAshby(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -487,7 +476,6 @@ function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-/** Run promises in batches to avoid hammering APIs */
 async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[]> {
   const results: T[] = [];
   for (let i = 0; i < fns.length; i += concurrency) {
@@ -502,30 +490,36 @@ export async function fetchWorkable(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
-  if (isWorkableBlocked(c.slug)) return [];
+): Promise<FetcherResult> {
+  const t0 = Date.now();
+  if (isWorkableBlocked(c.slug)) return { jobs: [], error: "Blocked", durationMs: Date.now() - t0 };
   const cooldownUntil = getWorkableCooldownUntil(c.slug);
-  if (cooldownUntil && cooldownUntil.getTime() > Date.now()) return [];
+  if (cooldownUntil && cooldownUntil.getTime() > Date.now())
+    return { jobs: [], error: "Cooldown", durationMs: Date.now() - t0 };
 
   const budget = workableBudget;
-  const limit = budget[mode];
+  const limit = budget[mode as JobMode];
   const used = workableUsedByMode[mode];
-  if (limit <= 0 || used >= limit) return [];
+  if (limit <= 0 || used >= limit)
+    return { jobs: [], error: "Budget Exceeded", durationMs: Date.now() - t0 };
   workableUsedByMode[mode] += 1;
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
   const doFetch = () => {
-    console.log(`[Workable] 🔍 Scanning: ${c.name}...`);
     return fetch(listUrl, {
       headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
       signal: AbortSignal.timeout(30_000),
     })
-      .then((r) => (r.status === 429 ? r : r))
+      .then((r) => {
+        if (r.status === 429) workable429SlugsThisRun.add(c.slug);
+        return r;
+      })
       .catch(() => null);
   };
 
   let res = await queueWorkable(doFetch);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
     const jobs = (data.jobs || []).filter(
@@ -555,9 +549,10 @@ export async function fetchWorkable(
       }),
       5,
     );
-    return processJobs(withDesc.filter(Boolean) as any[], c, mode, visaSponsorship);
-  } catch {
-    return [];
+    const processed = processJobs(withDesc.filter(Boolean) as any[], c, mode, visaSponsorship);
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -566,16 +561,18 @@ export async function fetchTeamtailor(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
   const res = await fetch(publicUrl, {
     headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
     signal: AbortSignal.timeout(30_000),
   }).catch(() => null);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { data } = (await res.json()) as any;
-    return processJobs(
+    const processed = processJobs(
       data.map((r: any) => ({
         id: `${mode}_tt_${c.slug}_${r.id}`,
         title: r.attributes.title,
@@ -588,8 +585,9 @@ export async function fetchTeamtailor(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -598,13 +596,15 @@ export async function fetchBreezy(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_breezy_${c.slug}_${r.id}`,
         title: r.name,
@@ -617,8 +617,9 @@ export async function fetchBreezy(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -627,10 +628,12 @@ export async function fetchSmartRecruiters(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { content } = (await res.json()) as any;
     const detailedJobs = await Promise.all(
@@ -652,9 +655,10 @@ export async function fetchSmartRecruiters(
         }
       }),
     );
-    return processJobs(detailedJobs.filter(Boolean) as any[], c, mode, visaSponsorship);
-  } catch {
-    return [];
+    const processed = processJobs(detailedJobs.filter(Boolean) as any[], c, mode, visaSponsorship);
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -663,14 +667,16 @@ export async function fetchBambooHR(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
     const jobs = data.result ?? [];
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_bamboohr_${c.slug}_${r.id}`,
         title: r.jobOpeningName,
@@ -683,8 +689,9 @@ export async function fetchBambooHR(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -693,13 +700,15 @@ export async function fetchJazzHR(
   c: ATSConfig,
   mode: JobMode,
   visaSponsorship: boolean,
-): Promise<Job[]> {
+): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = `https://api.resumator.com/v1/jobs/board/public/account/${c.slug}`;
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
-    return processJobs(
+    const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_jazz_${c.slug}_${r.id}`,
         title: r.title,
@@ -712,33 +721,34 @@ export async function fetchJazzHR(
       mode,
       visaSponsorship,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
 // ── Wuzzuf ──────────────────────────────────────────────────────────────────
-export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
+export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
+  const t0 = Date.now();
   const searchUrl = "https://wuzzuf.net/api/search/job";
   const queries = ["react", "next.js"];
   const allWuzzufJobs: Job[] = [];
   const seenIds = new Set<string>();
-
   const now = new Date().toISOString();
-  for (const q of queries) {
-    const searchPayload = {
-      startIndex: 0,
-      pageSize: 20,
-      longitude: "31.2357",
-      latitude: "30.0444",
-      query: q,
-      searchFilters: {
-        post_date: ["within_1_week"],
-        years_of_experience_min: ["3"],
-        years_of_experience_max: ["6"],
-      },
-    };
-    try {
+  try {
+    for (const q of queries) {
+      const searchPayload = {
+        startIndex: 0,
+        pageSize: 20,
+        longitude: "31.2357",
+        latitude: "30.0444",
+        query: q,
+        searchFilters: {
+          post_date: ["within_1_week"],
+          years_of_experience_min: ["3"],
+          years_of_experience_max: ["6"],
+        },
+      };
       const sRes = await fetch(searchUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
@@ -762,7 +772,6 @@ export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
         const title = (attr.title || "").trim();
         if (seenIds.has(entry.id) || !/react|next|native/i.test(title)) continue;
         seenIds.add(entry.id);
-
         const companyName =
           attr.company_name ||
           attr.computedFields?.find((f: any) => f.name === "company_name")?.value?.[0] ||
@@ -791,24 +800,26 @@ export async function fetchWuzzuf(mode: JobMode): Promise<Job[]> {
           fetchedAt: now,
         });
       }
-    } catch {}
+    }
+    return { jobs: allWuzzufJobs, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
-  console.log(`[local] Wuzzuf API: collected ${allWuzzufJobs.length} matches`);
-  return allWuzzufJobs;
 }
 
 // ── RemoteOK ────────────────────────────────────────────────────────────────
-export async function fetchRemoteOK(mode: JobMode): Promise<Job[]> {
+export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
+  const t0 = Date.now();
   const url = "https://remoteok.com/api";
   const res = await safeFetch(url);
-  if (!res || !res.ok) return [];
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any[];
     const rawJobs = data.filter((item) => item.id && item.position);
     const out: Job[] = [];
     for (const r of rawJobs) {
       const title = r.position || "";
-      // if (!/react|next|native/i.test(title)) continue; // Let scoreJob handle it
       const description = stripHtml(r.description || "");
       const scored = scoreJob({ title, description, location: "Remote", postedAt: r.date });
       if (scored.skillMatchScore === 0) continue;
@@ -831,16 +842,16 @@ export async function fetchRemoteOK(mode: JobMode): Promise<Job[]> {
         fetchedAt: new Date().toISOString(),
       });
     }
-    console.log(`[global] RemoteOK: collected ${out.length} matches`);
-    return out;
-  } catch {
-    return [];
+    return { jobs: out, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
 // ── Custom Local Egyptian Company Fetchers ──────────────────────────────────
 
-export async function fetchGizaSystems(mode: JobMode): Promise<Job[]> {
+export async function fetchGizaSystems(mode: JobMode): Promise<FetcherResult> {
+  const t0 = Date.now();
   const company: BaseCompany = {
     name: "Giza Systems",
     country: "Egypt",
@@ -850,52 +861,57 @@ export async function fetchGizaSystems(mode: JobMode): Promise<Job[]> {
   const url =
     "https://www.gizasystemscareers.com/app/control/byt_job_search_manager?action=1&token=9IAKQR&query=trigger%3Ddate_indexed%26job_city%3Deg%2C2%2C0%26page%3D1%26jb_role%3D5%2C21%26date_indexed%3D8&body=job-search-results&lan=en";
   const res = await safeFetch(url);
-  if (!res) return [];
-  const html = await res.text();
-  const jobs: RawJob[] = [];
-  const cards = html.split(/class="[^"]*job[^"]*"/i);
-  for (const card of cards) {
-    const linkMatch = /<a[^>]+href="([^"]+byt_job_details[^"]+)"[^>]*>([^<]{3,80})<\/a>/i.exec(
-      card,
-    );
-    if (!linkMatch) continue;
-    const dateMatch = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}-\d{2}-\d{2})/.exec(card);
-    const postedAt = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
-    jobs.push({
-      id: `local_gizasystems_${Buffer.from(linkMatch[1]).toString("base64").slice(0, 16)}`,
-      title: linkMatch[2].trim(),
-      location: "Cairo",
-      url: linkMatch[1].startsWith("http")
-        ? linkMatch[1]
-        : `https://www.gizasystemscareers.com${linkMatch[1]}`,
-      postedAt,
-      description: "",
-    });
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  try {
+    const html = await res.text();
+    const jobs: RawJob[] = [];
+    const cards = html.split(/class="[^"]*job[^"]*"/i);
+    for (const card of cards) {
+      const linkMatch = /<a[^>]+href="([^"]+byt_job_details[^"]+)"[^>]*>([^<]{3,80})<\/a>/i.exec(
+        card,
+      );
+      if (!linkMatch) continue;
+      const dateMatch = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}-\d{2}-\d{2})/.exec(card);
+      const postedAt = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+      jobs.push({
+        id: `local_gizasystems_${Buffer.from(linkMatch[1]).toString("base64").slice(0, 16)}`,
+        title: linkMatch[2].trim(),
+        location: "Cairo",
+        url: linkMatch[1].startsWith("http")
+          ? linkMatch[1]
+          : `https://www.gizasystemscareers.com${linkMatch[1]}`,
+        postedAt,
+        description: "",
+      });
+    }
+    return { jobs: processJobs(jobs, company, mode, false), durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
-  return processJobs(jobs, company, mode, false);
 }
 
-export async function fetchBrightSkies(mode: JobMode): Promise<Job[]> {
+export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
+  const t0 = Date.now();
   const company: BaseCompany = {
     name: "Bright Skies",
     country: "Egypt",
     countryFlag: "🇪🇬",
     city: "Cairo",
   };
-  const res = await fetch("https://brightskiesinc.com/graphql", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      operationName: "getJobs",
-      variables: { pageSize: 50, page: 1, title: "" },
-      query: `query getJobs($pageSize: Int!, $page: Int!, $title: String, $department: String, $location: String) { jobs(filters: {title: {contains: $title}, department: {contains: $department}, location: {contains: $location}}, pagination: {pageSize: $pageSize, page: $page}) { data { id attributes { title location job_type department } } } }`,
-    }),
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => null);
-  if (!res) return [];
   try {
+    const res = await fetch("https://brightskiesinc.com/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operationName: "getJobs",
+        variables: { pageSize: 50, page: 1, title: "" },
+        query: `query getJobs($pageSize: Int!, $page: Int!, $title: String, $department: String, $location: String) { jobs(filters: {title: {contains: $title}, department: {contains: $department}, location: {contains: $location}}, pagination: {pageSize: $pageSize, page: $page}) { data { id attributes { title location job_type department } } } }`,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
     const data = (await res.json()) as any;
-    return processJobs(
+    const processed = processJobs(
       (data.data?.jobs?.data || []).map((item: any) => ({
         id: `local_brightskies_${item.id}`,
         title: item.attributes.title,
@@ -908,26 +924,28 @@ export async function fetchBrightSkies(mode: JobMode): Promise<Job[]> {
       mode,
       false,
     );
-  } catch {
-    return [];
+    return { jobs: processed, durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
-export async function fetchPharos(mode: JobMode): Promise<Job[]> {
+export async function fetchPharos(mode: JobMode): Promise<FetcherResult> {
+  const t0 = Date.now();
   const company: BaseCompany = {
     name: "Pharos Solutions",
     country: "Egypt",
     countryFlag: "🇪🇬",
     city: "Cairo",
   };
-  const res = await fetch("https://pharos-solutions.de/wp-admin/admin-ajax.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "awsm_job_spec%5Bjob-category%5D=36&awsm_job_spec%5Bjob-type%5D=32&awsm_job_spec%5Bjob-location%5D=&action=jobfilter&listings_per_page=30",
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => null);
-  if (!res) return [];
   try {
+    const res = await fetch("https://pharos-solutions.de/wp-admin/admin-ajax.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "awsm_job_spec%5Bjob-category%5D=36&awsm_job_spec%5Bjob-type%5D=32&awsm_job_spec%5Bjob-location%5D=&action=jobfilter&listings_per_page=30",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
     const html = await res.text();
     const jobs: RawJob[] = [];
     const cards = html.split(/<article|<li[^>]*class="[^"]*job/i);
@@ -947,8 +965,8 @@ export async function fetchPharos(mode: JobMode): Promise<Job[]> {
         description: "",
       });
     }
-    return processJobs(jobs, company, mode, false);
-  } catch {
-    return [];
+    return { jobs: processJobs(jobs, company, mode, false), durationMs: Date.now() - t0 };
+  } catch (e) {
+    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }

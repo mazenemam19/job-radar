@@ -9,7 +9,7 @@ import {
   markWorkableSlugsBlocked24h,
 } from "./sources/ats-utils";
 import { finalizeBatchState } from "./state";
-import type { Job, CronLog } from "./types";
+import type { Job, CronLog, SourceHealth } from "./types";
 
 export async function runAllSources(): Promise<CronLog> {
   const budgetArg = process.argv?.find(
@@ -26,9 +26,11 @@ export async function runAllSources(): Promise<CronLog> {
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
   const store = await readStore();
-  const existingIds = new Set<string>();
+  const existingIds = new Set(store.jobs.map((j) => j.id));
 
   const errors: string[] = [];
+  const sourceDetails: Record<string, SourceHealth> = {};
+
   let visaJobs: Job[] = [];
   let localJobs: Job[] = [];
   let globalJobs: Job[] = [];
@@ -41,21 +43,24 @@ export async function runAllSources(): Promise<CronLog> {
   ]);
 
   if (localResult.status === "fulfilled") {
-    localJobs = localResult.value;
+    localJobs = localResult.value.jobs;
+    Object.assign(sourceDetails, localResult.value.health);
   } else {
     errors.push(`local pipeline: ${localResult.reason}`);
     console.error("[runner] local pipeline failed:", localResult.reason);
   }
 
   if (visaResult.status === "fulfilled") {
-    visaJobs = visaResult.value;
+    visaJobs = visaResult.value.jobs;
+    Object.assign(sourceDetails, visaResult.value.health);
   } else {
     errors.push(`visa pipeline: ${visaResult.reason}`);
     console.error("[runner] visa pipeline failed:", visaResult.reason);
   }
 
   if (globalResult.status === "fulfilled") {
-    globalJobs = globalResult.value;
+    globalJobs = globalResult.value.jobs;
+    Object.assign(sourceDetails, globalResult.value.health);
   } else {
     errors.push(`global pipeline: ${globalResult.reason}`);
     console.error("[runner] global pipeline failed:", globalResult.reason);
@@ -92,6 +97,7 @@ export async function runAllSources(): Promise<CronLog> {
     newJobs: added.length,
     totalJobs: updated.jobs.length,
     sources: { visa: visaJobs.length, local: localJobs.length, global: globalJobs.length },
+    sourceDetails,
     durationMs,
     errors,
   };

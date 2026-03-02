@@ -2,7 +2,7 @@
 // "Global Remote" pipeline — worldwide remote companies that accept Egypt/GMT+2 applicants.
 // Filter: rejects US-timezone-only, must-be-authorized-in-country, EU-resident-only.
 
-import type { Job } from "../types";
+import type { Job, SourceHealth } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -14,6 +14,7 @@ import {
   fetchRemoteOK,
   type ATSConfig,
   resetWorkableUsed,
+  type FetcherResult,
 } from "./ats-utils";
 import { fetchHimalayas } from "./himalayas";
 import { getNextBatch } from "../state";
@@ -70,7 +71,10 @@ const COMPANIES: ATSConfig[] = [
   { ats: "workable", name: "Sanity", slug: "sanity", country: "Global", countryFlag: "🌍" },
 ];
 
-export async function fetchGlobalJobs(): Promise<Job[]> {
+export async function fetchGlobalJobs(): Promise<{
+  jobs: Job[];
+  health: Record<string, SourceHealth>;
+}> {
   resetWorkableUsed(MODE);
 
   const workables = COMPANIES.filter((c) => c.ats === "workable");
@@ -81,32 +85,41 @@ export async function fetchGlobalJobs(): Promise<Job[]> {
 
   const results = await Promise.allSettled(
     toScan.map((c) => {
-      switch (c.ats) {
-        case "greenhouse":
-          return fetchGreenhouse(c, MODE, VISA);
-        case "lever":
-          return fetchLever(c, MODE, VISA);
-        case "ashby":
-          return fetchAshby(c, MODE, VISA);
-        case "workable":
-          return fetchWorkable(c, MODE, VISA);
-        case "teamtailor":
-          return fetchTeamtailor(c, MODE, VISA);
-        case "breezy":
-          return fetchBreezy(c, MODE, VISA);
-        case "smartrecruiters":
-          return fetchSmartRecruiters(c, MODE, VISA);
-        default:
-          return Promise.resolve([] as Job[]);
-      }
+      const p = (() => {
+        switch (c.ats) {
+          case "greenhouse":
+            return fetchGreenhouse(c, MODE, VISA);
+          case "lever":
+            return fetchLever(c, MODE, VISA);
+          case "ashby":
+            return fetchAshby(c, MODE, VISA);
+          case "workable":
+            return fetchWorkable(c, MODE, VISA);
+          case "teamtailor":
+            return fetchTeamtailor(c, MODE, VISA);
+          case "breezy":
+            return fetchBreezy(c, MODE, VISA);
+          case "smartrecruiters":
+            return fetchSmartRecruiters(c, MODE, VISA);
+          default:
+            return Promise.resolve({ jobs: [] } as FetcherResult);
+        }
+      })();
+      return p.then((res) => ({ ...res, sourceName: c.name }));
     }),
   );
 
   const all: Job[] = [];
+  const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
+
   for (const r of results) {
     if (r.status === "fulfilled") {
-      for (const j of r.value) {
+      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+        sourceName: string;
+      };
+      health[sourceName] = { count: jobs.length, error, durationMs };
+      for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
           all.push(j);
@@ -118,10 +131,22 @@ export async function fetchGlobalJobs(): Promise<Job[]> {
   }
 
   // ── Custom fetchers (Verified direct APIs) ───────────────────────────
-  const customResults = await Promise.allSettled([fetchRemoteOK(MODE), fetchHimalayas(MODE)]);
+  const customFetchers = [
+    { name: "RemoteOK", fn: () => fetchRemoteOK(MODE) },
+    { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
+  ];
+
+  const customResults = await Promise.allSettled(
+    customFetchers.map((cf) => cf.fn().then((res) => ({ ...res, sourceName: cf.name }))),
+  );
+
   for (const r of customResults) {
     if (r.status === "fulfilled") {
-      for (const j of r.value) {
+      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+        sourceName: string;
+      };
+      health[sourceName] = { count: jobs.length, error, durationMs };
+      for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
           all.push(j);
@@ -133,5 +158,5 @@ export async function fetchGlobalJobs(): Promise<Job[]> {
   }
 
   console.log(`[global] Total: ${all.length} jobs`);
-  return all;
+  return { jobs: all, health };
 }

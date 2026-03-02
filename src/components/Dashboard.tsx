@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { JobStore, JobMode } from "@/lib/types";
 import JobCard from "./JobCard";
+import SourceHealthDashboard from "./SourceHealthDashboard";
 
 function relativeTime(iso: string): string {
   const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
@@ -292,6 +293,9 @@ export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
           filtered.map((job, i) => <JobCard key={job.id} job={job} index={i} />)
         )}
       </main>
+
+      {/* ── HEALTH DASHBOARD ────────────────────────────────────────── */}
+      {store?.cronLogs && <SourceHealthDashboard logs={store.cronLogs} />}
     </div>
   );
 }

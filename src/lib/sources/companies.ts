@@ -1,5 +1,5 @@
 // src/lib/sources/companies.ts
-import type { Job } from "../types";
+import type { Job, SourceHealth } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -10,6 +10,7 @@ import {
   fetchSmartRecruiters,
   type ATSConfig,
   resetWorkableUsed,
+  type FetcherResult,
 } from "./ats-utils";
 import { getNextBatch } from "../state";
 
@@ -91,7 +92,10 @@ const COMPANIES: ATSConfig[] = [
   { ats: "workable", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
 ];
 
-export async function fetchCompanyJobs(): Promise<Job[]> {
+export async function fetchCompanyJobs(): Promise<{
+  jobs: Job[];
+  health: Record<string, SourceHealth>;
+}> {
   resetWorkableUsed(MODE);
 
   const workables = COMPANIES.filter((c) => c.ats === "workable");
@@ -102,32 +106,44 @@ export async function fetchCompanyJobs(): Promise<Job[]> {
 
   const results = await Promise.allSettled(
     toScan.map((c) => {
-      switch (c.ats) {
-        case "greenhouse":
-          return fetchGreenhouse(c, MODE, VISA);
-        case "lever":
-          return fetchLever(c, MODE, VISA);
-        case "ashby":
-          return fetchAshby(c, MODE, VISA);
-        case "workable":
-          return fetchWorkable(c, MODE, VISA);
-        case "teamtailor":
-          return fetchTeamtailor(c, MODE, VISA);
-        case "breezy":
-          return fetchBreezy(c, MODE, VISA);
-        case "smartrecruiters":
-          return fetchSmartRecruiters(c, MODE, VISA);
-        default:
-          return Promise.resolve([] as Job[]);
-      }
+      const p = (() => {
+        switch (c.ats) {
+          case "greenhouse":
+            return fetchGreenhouse(c, MODE, VISA);
+          case "lever":
+            return fetchLever(c, MODE, VISA);
+          case "ashby":
+            return fetchAshby(c, MODE, VISA);
+          case "workable":
+            return fetchWorkable(c, MODE, VISA);
+          case "teamtailor":
+            return fetchTeamtailor(c, MODE, VISA);
+          case "breezy":
+            return fetchBreezy(c, MODE, VISA);
+          case "smartrecruiters":
+            return fetchSmartRecruiters(c, MODE, VISA);
+          default:
+            return Promise.resolve({ jobs: [] } as FetcherResult);
+        }
+      })();
+      return p.then((res) => ({ ...res, sourceName: c.name }));
     }),
   );
 
   const all: Job[] = [];
+  const health: Record<string, SourceHealth> = {};
+
   for (const r of results) {
-    if (r.status === "fulfilled") all.push(...r.value);
-    else console.error("[visa] Unhandled rejection:", r.reason);
+    if (r.status === "fulfilled") {
+      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+        sourceName: string;
+      };
+      all.push(...jobs);
+      health[sourceName] = { count: jobs.length, error, durationMs };
+    } else {
+      console.error("[visa] Unhandled rejection:", r.reason);
+    }
   }
   console.log(`[visa] Total: ${all.length} jobs`);
-  return all;
+  return { jobs: all, health };
 }

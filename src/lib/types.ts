@@ -35,11 +35,18 @@ export interface JobStore {
   cronLogs: CronLog[];
 }
 
+export interface SourceHealth {
+  count: number;
+  error?: string;
+  durationMs?: number;
+}
+
 export interface CronLog {
   runAt: string;
   newJobs: number;
   totalJobs: number;
-  sources: Record<string, number>;
+  sources: Record<string, number>; // Legacy: per-mode counts
+  sourceDetails?: Record<string, SourceHealth>; // New: granular per-source health
   durationMs: number;
   errors: string[];
 }

@@ -10,7 +10,7 @@
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development or debugging. ALWAYS create a standalone test script (e.g. `src/scripts/test-xxx.ts`) for new integrations. Run the full cron job ONLY ONCE as a final validation after the task is complete.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. Do not scrape HTML unless absolutely necessary and verified.
 - **Fetcher Longevity**: A fetcher that successfully connects to an API but returns 0 jobs _after filtering_ should be kept. Job availability is volatile, and a working fetcher is a valuable asset for catching future listings.
-- **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution. Stick to Next.js defaults and standard TypeScript configurations to avoid broken module resolution chains.
+- **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution. This caused catastrophic module resolution failures. Stick strictly to Next.js defaults and standard TypeScript configurations. DO NOT repeat this mistake.
 - **Filtering Logic**: Stick to the existing regex-based filtering. It is highly effective at strictly focusing on React-related jobs and should not be replaced by LLM-based curation.
 
 ## 💾 Storage & State
