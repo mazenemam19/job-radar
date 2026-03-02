@@ -9,6 +9,7 @@
 - **Rate Limiting**: Workable fetchers use a sequential queue with a **1.5s - 3s delay** and a rotating batch of **8 companies per run** to avoid IP blocks.
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development or debugging. ALWAYS create a standalone test script (e.g. `src/scripts/test-xxx.ts`) for new integrations. Run the full cron job ONLY ONCE as a final validation after the task is complete.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. Do not scrape HTML unless absolutely necessary and verified.
+- **Fetcher Longevity**: A fetcher that successfully connects to an API but returns 0 jobs _after filtering_ should be kept. Job availability is volatile, and a working fetcher is a valuable asset for catching future listings.
 
 ## 💾 Storage & State
 
