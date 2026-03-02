@@ -808,7 +808,7 @@ export async function fetchRemoteOK(mode: JobMode): Promise<Job[]> {
     const out: Job[] = [];
     for (const r of rawJobs) {
       const title = r.position || "";
-      if (!/react|next|native/i.test(title)) continue;
+      // if (!/react|next|native/i.test(title)) continue; // Let scoreJob handle it
       const description = stripHtml(r.description || "");
       const scored = scoreJob({ title, description, location: "Remote", postedAt: r.date });
       if (scored.skillMatchScore === 0) continue;
