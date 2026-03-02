@@ -15,6 +15,7 @@ import {
   type ATSConfig,
   resetWorkableUsed,
 } from "./ats-utils";
+import { fetchHimalayas } from "./himalayas";
 import { getNextBatch } from "../state";
 
 const MODE = "global";
@@ -117,7 +118,7 @@ export async function fetchGlobalJobs(): Promise<Job[]> {
   }
 
   // ── Custom fetchers (Verified direct APIs) ───────────────────────────
-  const customResults = await Promise.allSettled([fetchRemoteOK(MODE)]);
+  const customResults = await Promise.allSettled([fetchRemoteOK(MODE), fetchHimalayas(MODE)]);
   for (const r of customResults) {
     if (r.status === "fulfilled") {
       for (const j of r.value) {
