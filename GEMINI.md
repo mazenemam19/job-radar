@@ -27,7 +27,7 @@
 
 - **Wuzzuf**: Uses the direct 2-step JSON API (Search IDs -> Detail Lookup) with a 3+ years experience filter.
 - **Custom Fetchers**: Bright Skies, Pharos, Giza Systems (Direct APIs).
-- **Workable Batch**: 8 companies per scan, rotating across ~30 companies to ensure full coverage every 4 days.
+- **Workable Batch**: 12 companies per scan, rotating across ~30 companies to ensure full coverage every 3 days.
 
 ### 🌍 Global Remote Board
 

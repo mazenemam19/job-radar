@@ -138,7 +138,7 @@ let domainCountsCache: DomainCounts | null = null;
 let workableCooldownCache: WorkableCooldownEntry[] | null = null;
 
 type WorkableBudgetConfig = { visa: number; global: number; local: number };
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 8, global: 8, local: 8 };
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 12, global: 12, local: 12 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
 const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
 
@@ -288,6 +288,7 @@ export interface RawJob {
 
 export interface FetcherResult {
   jobs: Job[];
+  rawCount?: number;
   error?: string;
   durationMs?: number;
 }
@@ -378,10 +379,12 @@ export async function fetchGreenhouse(
   const t0 = Date.now();
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { jobs } = (await res.json()) as any;
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_gh_${c.slug}_${r.id}`,
@@ -395,9 +398,9 @@ export async function fetchGreenhouse(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -410,10 +413,12 @@ export async function fetchLever(
   const t0 = Date.now();
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_lever_${c.slug}_${r.id}`,
@@ -427,9 +432,9 @@ export async function fetchLever(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -442,11 +447,13 @@ export async function fetchAshby(
   const t0 = Date.now();
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}`;
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
     const jobs = data.jobs || data.jobPostings || [];
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_ashby_${c.slug}_${r.id}`,
@@ -460,9 +467,9 @@ export async function fetchAshby(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -492,16 +499,17 @@ export async function fetchWorkable(
   visaSponsorship: boolean,
 ): Promise<FetcherResult> {
   const t0 = Date.now();
-  if (isWorkableBlocked(c.slug)) return { jobs: [], error: "Blocked", durationMs: Date.now() - t0 };
+  if (isWorkableBlocked(c.slug))
+    return { jobs: [], rawCount: 0, error: "Blocked (Cooldown)", durationMs: Date.now() - t0 };
   const cooldownUntil = getWorkableCooldownUntil(c.slug);
   if (cooldownUntil && cooldownUntil.getTime() > Date.now())
-    return { jobs: [], error: "Cooldown", durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: "Workable Cooldown", durationMs: Date.now() - t0 };
 
   const budget = workableBudget;
   const limit = budget[mode as JobMode];
   const used = workableUsedByMode[mode];
   if (limit <= 0 || used >= limit)
-    return { jobs: [], error: "Budget Exceeded", durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: "Budget Exceeded", durationMs: Date.now() - t0 };
   workableUsedByMode[mode] += 1;
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
@@ -518,11 +526,14 @@ export async function fetchWorkable(
   };
 
   let res = await queueWorkable(doFetch);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
-    const jobs = (data.jobs || []).filter(
+    const rawJobs = data.jobs || [];
+    const rawCount = rawJobs.length;
+    const jobs = rawJobs.filter(
       (r: any) => !isClearlyNonFrontend(r.title) && !isTooSeniorOrTooJunior(r.title),
     );
     const withDesc = await pLimit(
@@ -550,9 +561,9 @@ export async function fetchWorkable(
       5,
     );
     const processed = processJobs(withDesc.filter(Boolean) as any[], c, mode, visaSponsorship);
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -568,10 +579,12 @@ export async function fetchTeamtailor(
     headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
     signal: AbortSignal.timeout(30_000),
   }).catch(() => null);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { data } = (await res.json()) as any;
+    const rawCount = data.length;
     const processed = processJobs(
       data.map((r: any) => ({
         id: `${mode}_tt_${c.slug}_${r.id}`,
@@ -585,9 +598,9 @@ export async function fetchTeamtailor(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -599,11 +612,16 @@ export async function fetchBreezy(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
-  const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+    signal: AbortSignal.timeout(30_000),
+  }).catch(() => null);
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_breezy_${c.slug}_${r.id}`,
@@ -617,9 +635,9 @@ export async function fetchBreezy(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -632,10 +650,12 @@ export async function fetchSmartRecruiters(
   const t0 = Date.now();
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const { content } = (await res.json()) as any;
+    const rawCount = content.length;
     const detailedJobs = await Promise.all(
       content.map(async (r: any) => {
         const detailRes = await safeFetch(r.ref);
@@ -656,9 +676,9 @@ export async function fetchSmartRecruiters(
       }),
     );
     const processed = processJobs(detailedJobs.filter(Boolean) as any[], c, mode, visaSponsorship);
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -671,11 +691,13 @@ export async function fetchBambooHR(
   const t0 = Date.now();
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any;
     const jobs = data.result ?? [];
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_bamboohr_${c.slug}_${r.id}`,
@@ -689,9 +711,9 @@ export async function fetchBambooHR(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -703,11 +725,13 @@ export async function fetchJazzHR(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.resumator.com/v1/jobs/board/public/account/${c.slug}`;
-  const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  const res = await safeFetch(url, 60_000); // Increased timeout to 60s
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const jobs = (await res.json()) as any[];
+    const rawCount = jobs.length;
     const processed = processJobs(
       jobs.map((r: any) => ({
         id: `${mode}_jazz_${c.slug}_${r.id}`,
@@ -721,9 +745,9 @@ export async function fetchJazzHR(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -735,6 +759,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
   const allWuzzufJobs: Job[] = [];
   const seenIds = new Set<string>();
   const now = new Date().toISOString();
+  let rawCount = 0;
   try {
     for (const q of queries) {
       const searchPayload = {
@@ -760,6 +785,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         .map((j: any) => j.id)
         .filter((id: string) => !seenIds.has(id));
       if (ids.length === 0) continue;
+      rawCount += ids.length;
 
       const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
       const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
@@ -801,9 +827,9 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         });
       }
     }
-    return { jobs: allWuzzufJobs, durationMs: Date.now() - t0 };
+    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -812,11 +838,13 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = "https://remoteok.com/api";
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
     const data = (await res.json()) as any[];
     const rawJobs = data.filter((item) => item.id && item.position);
+    const rawCount = rawJobs.length;
     const out: Job[] = [];
     for (const r of rawJobs) {
       const title = r.position || "";
@@ -842,9 +870,9 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
         fetchedAt: new Date().toISOString(),
       });
     }
-    return { jobs: out, durationMs: Date.now() - t0 };
+    return { jobs: out, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -861,7 +889,7 @@ export async function fetchGizaSystems(mode: JobMode): Promise<FetcherResult> {
   const url =
     "https://www.gizasystemscareers.com/app/control/byt_job_search_manager?action=1&token=9IAKQR&query=trigger%3Ddate_indexed%26job_city%3Deg%2C2%2C0%26page%3D1%26jb_role%3D5%2C21%26date_indexed%3D8&body=job-search-results&lan=en";
   const res = await safeFetch(url);
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
   try {
     const html = await res.text();
     const jobs: RawJob[] = [];
@@ -884,9 +912,10 @@ export async function fetchGizaSystems(mode: JobMode): Promise<FetcherResult> {
         description: "",
       });
     }
-    return { jobs: processJobs(jobs, company, mode, false), durationMs: Date.now() - t0 };
+    const rawCount = jobs.length;
+    return { jobs: processJobs(jobs, company, mode, false), rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -909,10 +938,13 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+    if (!res.ok)
+      return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
     const data = (await res.json()) as any;
+    const rawJobs = data.data?.jobs?.data || [];
+    const rawCount = rawJobs.length;
     const processed = processJobs(
-      (data.data?.jobs?.data || []).map((item: any) => ({
+      rawJobs.map((item: any) => ({
         id: `local_brightskies_${item.id}`,
         title: item.attributes.title,
         location: item.attributes.location || "Cairo",
@@ -924,9 +956,9 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       mode,
       false,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }
 
@@ -943,9 +975,10 @@ export async function fetchPharos(mode: JobMode): Promise<FetcherResult> {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "awsm_job_spec%5Bjob-category%5D=36&awsm_job_spec%5Bjob-type%5D=32&awsm_job_spec%5Bjob-location%5D=&action=jobfilter&listings_per_page=30",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(60_000), // Increased timeout to 60s
     });
-    if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+    if (!res.ok)
+      return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
     const html = await res.text();
     const jobs: RawJob[] = [];
     const cards = html.split(/<article|<li[^>]*class="[^"]*job/i);
@@ -965,8 +998,9 @@ export async function fetchPharos(mode: JobMode): Promise<FetcherResult> {
         description: "",
       });
     }
-    return { jobs: processJobs(jobs, company, mode, false), durationMs: Date.now() - t0 };
+    const rawCount = jobs.length;
+    return { jobs: processJobs(jobs, company, mode, false), rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }

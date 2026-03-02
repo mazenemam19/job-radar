@@ -18,6 +18,7 @@ import {
 } from "./ats-utils";
 import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
+import { fetchBerlinStartupJobs } from "./berlinstartupjobs";
 import { getNextBatch } from "../state";
 
 const MODE = "global";
@@ -116,10 +117,10 @@ export async function fetchGlobalJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
@@ -136,6 +137,7 @@ export async function fetchGlobalJobs(): Promise<{
     { name: "RemoteOK", fn: () => fetchRemoteOK(MODE) },
     { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
     { name: "Remotive", fn: () => fetchRemotive(MODE) },
+    { name: "BerlinStartupJobs", fn: () => fetchBerlinStartupJobs(MODE) },
   ];
 
   const customResults = await Promise.allSettled(
@@ -144,10 +146,10 @@ export async function fetchGlobalJobs(): Promise<{
 
   for (const r of customResults) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);

@@ -12,6 +12,8 @@ import {
   resetWorkableUsed,
   type FetcherResult,
 } from "./ats-utils";
+import { fetchBerlinStartupJobs } from "./berlin-startup-jobs";
+import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";
 
 const MODE = "visa";
@@ -90,6 +92,21 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse", name: "Gusto", slug: "gusto", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "Mollie", slug: "mollie", country: "Netherlands", countryFlag: "🇳🇱" },
   { ats: "workable", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
+
+  // ── New Expansion (Slug Hunter) ──────────────────────────────────────
+  { ats: "greenhouse", name: "Raisin", slug: "raisin", country: "Germany", countryFlag: "🇩🇪" },
+  { ats: "ashby", name: "Rasa", slug: "rasa", country: "Global", countryFlag: "🌍" },
+  { ats: "ashby", name: "DeepL", slug: "deepl", country: "Germany", countryFlag: "🇩🇪" },
+  { ats: "smartrecruiters", name: "Enpal", slug: "EnpalBV", country: "Germany", countryFlag: "🇩🇪" },
+  { ats: "workable", name: "Plan A", slug: "plana", country: "Germany", countryFlag: "🇩🇪" },
+  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Netherlands", countryFlag: "🇳🇱" },
+  {
+    ats: "greenhouse",
+    name: "Backbase",
+    slug: "backbase",
+    country: "Netherlands",
+    countryFlag: "🇳🇱",
+  },
 ];
 
 export async function fetchCompanyJobs(): Promise<{
@@ -101,7 +118,8 @@ export async function fetchCompanyJobs(): Promise<{
   const workables = COMPANIES.filter((c) => c.ats === "workable");
   const others = COMPANIES.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 8, "visa-workable");
+  // Increased batch size to 12
+  const batchWorkable = await getNextBatch(workables, 12, "visa-workable");
   const toScan = [...others, ...batchWorkable];
 
   const results = await Promise.allSettled(
@@ -135,15 +153,34 @@ export async function fetchCompanyJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
+        sourceName: string;
+      };
+      all.push(...jobs);
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
+    } else {
+      console.error("[visa] Unhandled rejection:", r.reason);
+    }
+  }
+
+  // ── Custom "Visa Hub" Boards ─────────────────────────────────────────
+  const hubResults = await Promise.allSettled([
+    fetchBerlinStartupJobs(MODE).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs" })),
+    fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
+      (res) => ({ ...res, sourceName: "London Startup Jobs" }),
+    ),
+  ]);
+
+  for (const r of hubResults) {
+    if (r.status === "fulfilled") {
       const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
         sourceName: string;
       };
       all.push(...jobs);
       health[sourceName] = { count: jobs.length, error, durationMs };
-    } else {
-      console.error("[visa] Unhandled rejection:", r.reason);
     }
   }
+
   console.log(`[visa] Total: ${all.length} jobs`);
   return { jobs: all, health };
 }

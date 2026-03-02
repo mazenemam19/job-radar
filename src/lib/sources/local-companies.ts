@@ -45,6 +45,14 @@ const COMPANIES: ATSConfig[] = [
     countryFlag: FLAG,
     city: "Cairo",
   },
+  {
+    ats: "ashby",
+    name: "MoneyHash",
+    slug: "moneyhash",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
 
   // ── Verified SmartRecruiters ──────────────────────────────────────────
   {
@@ -83,6 +91,14 @@ const COMPANIES: ATSConfig[] = [
     ats: "smartrecruiters",
     name: "Homzmart",
     slug: "Homzmart",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "smartrecruiters",
+    name: "Brimore",
+    slug: "Brimore",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -227,22 +243,6 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "Codescalers",
-    slug: "codescalers",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
-    name: "Dev-Point",
-    slug: "devpoint",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
     name: "Atomica",
     slug: "atomica",
     country: COUNTRY,
@@ -291,8 +291,8 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "MNT-Halan",
-    slug: "mnt-halan",
+    name: "ArpuPlus",
+    slug: "arpuplus",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -300,15 +300,15 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "workable",
     name: "Rabbit",
-    slug: "rabbitmart",
+    slug: "rabbit-mart",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
   },
   {
     ats: "workable",
-    name: "ArpuPlus",
-    slug: "arpuplus",
+    name: "Robosta",
+    slug: "robosta",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -329,14 +329,6 @@ const COMPANIES: ATSConfig[] = [
     ats: "breezy",
     name: "MaxAB",
     slug: "maxab",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "breezy",
-    name: "Grinta",
-    slug: "grinta",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -391,10 +383,10 @@ export async function fetchLocalJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
@@ -420,10 +412,10 @@ export async function fetchLocalJobs(): Promise<{
 
   for (const r of customResults) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);

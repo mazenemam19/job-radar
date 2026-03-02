@@ -37,6 +37,7 @@ export interface JobStore {
 
 export interface SourceHealth {
   count: number;
+  rawCount?: number;
   error?: string;
   durationMs?: number;
 }

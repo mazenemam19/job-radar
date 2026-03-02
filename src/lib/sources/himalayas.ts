@@ -35,7 +35,7 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
     }
 
     if (!reactJobsFound) {
-      return { jobs: [], durationMs: Date.now() - t0 };
+      return { jobs: [], rawCount: allRawJobs.length, durationMs: Date.now() - t0 };
     }
 
     const processed = processJobs(
@@ -52,7 +52,7 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
       mode,
       false,
     );
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount: allRawJobs.length, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }

@@ -18,6 +18,7 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
   try {
     const data = (await res.json()) as any;
     const rawJobs = data.jobs || [];
+    const rawCount = rawJobs.length;
     const out: Job[] = [];
     const now = new Date().toISOString();
 
@@ -56,7 +57,7 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
     }
 
     console.log(`[global] Remotive: collected ${out.length} matches`);
-    return { jobs: out, durationMs: Date.now() - t0 };
+    return { jobs: out, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
