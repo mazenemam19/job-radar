@@ -17,6 +17,7 @@ import {
   type FetcherResult,
 } from "./ats-utils";
 import { fetchHimalayas } from "./himalayas";
+import { fetchRemotive } from "./remotive";
 import { getNextBatch } from "../state";
 
 const MODE = "global";
@@ -80,7 +81,7 @@ export async function fetchGlobalJobs(): Promise<{
   const workables = COMPANIES.filter((c) => c.ats === "workable");
   const others = COMPANIES.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 8, "global-workable");
+  const batchWorkable = await getNextBatch(workables, 12, "global-workable");
   const toScan = [...others, ...batchWorkable];
 
   const results = await Promise.allSettled(
@@ -134,6 +135,7 @@ export async function fetchGlobalJobs(): Promise<{
   const customFetchers = [
     { name: "RemoteOK", fn: () => fetchRemoteOK(MODE) },
     { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
+    { name: "Remotive", fn: () => fetchRemotive(MODE) },
   ];
 
   const customResults = await Promise.allSettled(

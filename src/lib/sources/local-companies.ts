@@ -352,7 +352,7 @@ export async function fetchLocalJobs(): Promise<{
   const workables = COMPANIES.filter((c) => c.ats === "workable");
   const others = COMPANIES.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 8, "local-workable");
+  const batchWorkable = await getNextBatch(workables, 12, "local-workable");
   const toScan = [...others, ...batchWorkable];
 
   const results = await Promise.allSettled(

@@ -1,0 +1,16 @@
+name: Remote Cron Trigger
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Job Radar Cron
+        run: |
+          curl -X POST "https://job-radar-mazenemam19s-projects.vercel.app/api/cron" 
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" 
+          -f

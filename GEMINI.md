@@ -19,6 +19,7 @@
 - **`jobs-store.json`**: Contains the full job list and cron logs.
 - **`scan-state.json`**: Persistent memory for the **Rotating Batch** system (stores offsets for Workable queues). Syncs between local disk (for dev) and cloud blob (for prod).
 - **Environment**: Requires `BLOB_READ_WRITE_TOKEN` and `CRON_SECRET` in `.env.local`.
+- **Cron Frequency**: Vercel Hobby tier limits cron jobs to **once per day**. Do not attempt to increase the frequency in `vercel.json` as it will be ignored or cause deployment errors. Use external triggers (like GitHub Actions) if higher frequency is needed.
 
 ## 🔌 Integrations
 
