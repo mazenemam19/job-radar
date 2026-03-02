@@ -47,8 +47,24 @@
 - **Workable URL Typo**: Confirmed that the correct URL is `.../widget/accounts/...`.
 - **Serverless Persistence**: The `finalizeBatchState` function ensures rotation offsets are saved to the cloud only once at the end of a parallel scan to prevent race conditions.
 
+## ✅ Potential New Sources
+
+- **Himalayas.app**: Provides a free, public REST API with all necessary data points and filtering capabilities. It is a promising candidate for integration.
+
 ## ❌ Rejected Sources
 
+- **Careerjet**: Rejected — API access requires an API key, but integration attempts were marred by persistent module resolution issues with `ts-node` in the project's development environment, making the setup unstable. Despite extensive debugging, a reliable execution environment for integrating the API could not be established.
+- **NaukriGulf.com**: Rejected — No public, direct JSON API.
+- **Wellfound.com**: Rejected — No public, documented JSON API.
+- **Stepstone.de**: Rejected — No public JSON API; requires partnership.
+- **Visajobs.xyz**: Rejected — No public API found.
+- **XING.com**: Rejected — No suitable public JSON API for job searching; official API is for recruiters only.
+- **Jobs.joinimagine.com**: Rejected — No JSON API found.
+- **WorkingNomads.com**: Rejected — No public API found.
+- **Toughbyte.com**: Investigation timed out without conclusive API findings.
+- **JustRemote.co**: Rejected — No public API found.
+- **Remoteplatz.com**: Rejected — API endpoint found but returns an empty response.
+- **Dollar.careers**: Rejected — No official public API found.
 - **Arbeitnow**: Rejected — Unreliable filters for visa sponsorship; previous attempts to use the "visa_sponsorship=true" flag failed to yield verified results.
 - **We Work Remotely (WWR)**: Rejected — Requires HTML scraping; lacks a clean, documented JSON API.
 - **Relocate.me**: Rejected — High scraping requirement; lacks a robust, publicly accessible direct API.
