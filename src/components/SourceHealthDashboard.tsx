@@ -12,7 +12,7 @@ interface SourceSummary {
   lastRawCount?: number;
   lastError?: string;
   avgDuration?: number;
-  status: "healthy" | "nomatch" | "warning" | "error";
+  status: "healthy" | "nomatch" | "warning" | "error" | "skipped";
 }
 
 export default function SourceHealthDashboard({
@@ -37,9 +37,6 @@ export default function SourceHealthDashboard({
     const result: SourceSummary[] = Array.from(sourceNames).map((name) => {
       let successes = 0;
       let totalRuns = 0;
-      let lastCount = 0;
-      let lastRawCount: number | undefined;
-      let lastError: string | undefined;
       let totalDuration = 0;
       let durationCount = 0;
 
@@ -47,19 +44,18 @@ export default function SourceHealthDashboard({
         (a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime(),
       );
 
+      const lastLogWithSource = sortedLogs.find((log) => log.sourceDetails?.[name]);
+      const lastDetail = lastLogWithSource?.sourceDetails?.[name];
+      const lastCount = lastDetail?.count ?? 0;
+      const lastRawCount = lastDetail?.rawCount;
+      const lastError = lastDetail?.error;
+      const lastStatus = lastDetail?.status;
+
       sortedLogs.forEach((log) => {
         const detail = log.sourceDetails?.[name];
         if (detail) {
           totalRuns++;
           if (!detail.error) successes++;
-
-          // Use the most recent data for lastCount/lastRawCount/lastError
-          if (lastRawCount === undefined) {
-            lastCount = detail.count;
-            lastRawCount = detail.rawCount;
-            lastError = detail.error;
-          }
-
           if (detail.durationMs) {
             totalDuration += detail.durationMs;
             durationCount++;
@@ -69,9 +65,11 @@ export default function SourceHealthDashboard({
 
       const successRate = totalRuns > 0 ? (successes / totalRuns) * 100 : 0;
 
-      let status: "healthy" | "nomatch" | "warning" | "error" = "healthy";
+      let status: "healthy" | "nomatch" | "warning" | "error" | "skipped" = "healthy";
 
-      if (lastError) {
+      if (lastStatus === "skipped") {
+        status = "skipped";
+      } else if (lastError) {
         status = "error";
       } else if (lastCount > 0) {
         status = "healthy";
@@ -94,7 +92,7 @@ export default function SourceHealthDashboard({
     });
 
     return result.sort((a, b) => {
-      const priority = { error: 0, healthy: 1, warning: 2, nomatch: 3 };
+      const priority = { error: 0, healthy: 1, warning: 2, nomatch: 3, skipped: 4 };
       if (priority[a.status] !== priority[b.status]) return priority[a.status] - priority[b.status];
       return a.name.localeCompare(b.name);
     });
@@ -106,6 +104,7 @@ export default function SourceHealthDashboard({
       active: summaries.filter((s) => s.status === "healthy").length,
       empty: summaries.filter((s) => s.status === "warning").length,
       filtered: summaries.filter((s) => s.status === "nomatch").length,
+      skipped: summaries.filter((s) => s.status === "skipped").length,
     };
   }, [summaries]);
 
@@ -158,6 +157,10 @@ export default function SourceHealthDashboard({
           background: transparent;
           color: #fff;
         }
+        .row-skipped {
+          background: rgba(59, 130, 246, 0.05);
+          color: #93c5fd;
+        }
 
         .status-pill {
           display: inline-flex;
@@ -191,6 +194,11 @@ export default function SourceHealthDashboard({
           border-color: rgba(255, 255, 255, 0.1);
           color: #fff;
         }
+        .status-pill.skipped {
+          background: rgba(59, 130, 246, 0.1);
+          border-color: rgba(59, 130, 246, 0.2);
+          color: #93c5fd;
+        }
 
         .dot {
           width: 4px;
@@ -211,6 +219,9 @@ export default function SourceHealthDashboard({
         }
         .dot.nomatch {
           background: #fff;
+        }
+        .dot.skipped {
+          background: #93c5fd;
         }
 
         @keyframes pulse {
@@ -297,6 +308,10 @@ export default function SourceHealthDashboard({
               <span className="legend-count text-white">{stats.filtered}</span>
               <span className="legend-label">Filtered Out</span>
             </div>
+            <div className="legend-item border-blue-400/20 bg-blue-400/5">
+              <span className="legend-count text-blue-300">{stats.skipped}</span>
+              <span className="legend-label">Skipped</span>
+            </div>
           </div>
 
           <div className="health-table-wrap">
@@ -326,7 +341,9 @@ export default function SourceHealthDashboard({
                               ? "Active"
                               : s.status === "warning"
                                 ? "Empty"
-                                : "Filtered"}
+                                : s.status === "skipped"
+                                  ? "Skipped"
+                                  : "Filtered"}
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }} className="val-mute">
@@ -353,7 +370,9 @@ export default function SourceHealthDashboard({
                             ? "No data found on board"
                             : s.status === "nomatch"
                               ? `${s.lastRawCount} entries dropped by tech-gate`
-                              : "Optimal matching confirmed")}
+                              : s.status === "skipped"
+                                ? "Skipped in current batch rotation"
+                                : "Optimal matching confirmed")}
                       </td>
                     </tr>
                   );

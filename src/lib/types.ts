@@ -41,6 +41,7 @@ export interface SourceHealth {
   error?: string;
   durationMs?: number;
   ats?: string;
+  status?: "ok" | "error" | "zero" | "skipped";
 }
 
 export interface CronLog {

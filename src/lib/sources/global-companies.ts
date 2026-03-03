@@ -85,6 +85,8 @@ export async function fetchGlobalJobs(): Promise<{
   const batchWorkable = await getNextBatch(workables, 12, "global-workable");
   const toScan = [...others, ...batchWorkable];
 
+  const skippedWorkables = workables.filter((c) => !batchWorkable.some((b) => b.name === c.name));
+
   // ── Parallelize everything ─────────────────────────────────────────
   const allFetchers = [
     ...toScan.map((c) => {
@@ -123,6 +125,14 @@ export async function fetchGlobalJobs(): Promise<{
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
+
+  for (const skipped of skippedWorkables) {
+    health[skipped.name] = {
+      count: 0,
+      ats: skipped.ats,
+      status: "skipped",
+    };
+  }
 
   for (const r of results) {
     if (r.status === "fulfilled") {
