@@ -60,6 +60,16 @@
 - **SSL Trust Issues**: Some ATS platforms (like JazzHR for Koinz) have configuration issues that trigger `FetchError` or `Network/Timeout` due to SSL/TLS trust relationship failures in Node.js.
 - **Custom Portals**: Large entities (Fawry, MNT-Halan) use homegrown or enterprise HRIS systems (Oracle/SAP) that lack public JSON endpoints.
 - **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (MaxAB) are common in Egypt but currently unsupported by our fetcher suite.
+- **Volume Expansion**: To increase job count without lowering restrictions, prioritize "Hub Boards" (e.g., Berlin/London Startup Jobs). These often use WordPress REST APIs. Use the generic `fetchWPStartupJobs` fetcher for these.
+- **Age Cap Trap**: Hub boards often return high "Raw Signal" (October 2025 posts) but 0 "Matches" because our **7-day expiry** is strictly enforced. Verify the board's posting frequency before integrating.
+
+## 🏛️ Architecture
+
+- **Signal Analysis Page**: Dedicated route at `/analysis` using `AnalysisView.tsx`.
+- **Component Modularity**:
+  - `AppHeader.tsx`: Shared navigation and "Run Scan" logic.
+  - `SourceHealthDashboard.tsx`: High-tech diagnostic view. Supports an `alwaysOpen` prop for the dedicated analysis page.
+- **Remote Cron**: GitHub Actions (defined in `.github/workflows/cron.yml`) triggers the `/api/cron` endpoint every 6 hours to bypass Vercel's daily limit. Requires `CRON_SECRET` in GitHub Secrets.
 
 ## ❌ Rejected Sources
 
