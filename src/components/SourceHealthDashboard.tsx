@@ -15,8 +15,14 @@ interface SourceSummary {
   status: "healthy" | "nomatch" | "warning" | "error";
 }
 
-export default function SourceHealthDashboard({ logs }: { logs: CronLog[] }) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function SourceHealthDashboard({
+  logs,
+  alwaysOpen = false,
+}: {
+  logs: CronLog[];
+  alwaysOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(alwaysOpen);
 
   const summaries = useMemo(() => {
     if (!logs || logs.length === 0) return [];
@@ -103,7 +109,7 @@ export default function SourceHealthDashboard({ logs }: { logs: CronLog[] }) {
   if (!logs || logs.length === 0) return null;
 
   return (
-    <div className="mt-20 mb-24 px-4 max-w-7xl mx-auto font-body">
+    <div className={`${alwaysOpen ? "" : "mt-20 mb-24"} px-4 max-w-7xl mx-auto font-body`}>
       <style jsx>{`
         .health-table-wrap {
           background: #0f0f1c;
@@ -250,18 +256,22 @@ export default function SourceHealthDashboard({ logs }: { logs: CronLog[] }) {
       <header className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
         <div>
           <h2 className="text-xl font-display font-bold text-white tracking-tight">
-            Signal Analysis v3.3
+            {alwaysOpen ? "Signal Analysis v3.3" : "Engine Diagnostics"}
           </h2>
           <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 mt-1">
-            Fetcher Lifecycle Diagnostics
+            {alwaysOpen
+              ? "Real-time monitoring of engine source health and pipeline volume"
+              : "Fetcher Lifecycle Diagnostics"}
           </p>
         </div>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2 rounded-lg text-[11px] font-mono uppercase tracking-widest text-white/60 transition-all shadow-xl hover:text-white"
-        >
-          {isOpen ? "[ System Offline ]" : "[ Run Diagnostics ]"}
-        </button>
+        {!alwaysOpen && (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2 rounded-lg text-[11px] font-mono uppercase tracking-widest text-white/60 transition-all shadow-xl hover:text-white"
+          >
+            {isOpen ? "[ System Offline ]" : "[ Run Diagnostics ]"}
+          </button>
+        )}
       </header>
 
       {isOpen && (
