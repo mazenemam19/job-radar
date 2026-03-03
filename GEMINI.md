@@ -62,6 +62,7 @@
 - **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (MaxAB) are common in Egypt but currently unsupported by our fetcher suite.
 - **Volume Expansion**: To increase job count without lowering restrictions, prioritize "Hub Boards" (e.g., Berlin/London Startup Jobs). These often use WordPress REST APIs. Use the generic `fetchWPStartupJobs` fetcher for these.
 - **Age Cap Trap**: Hub boards often return high "Raw Signal" (October 2025 posts) but 0 "Matches" because our **7-day expiry** is strictly enforced. Verify the board's posting frequency before integrating.
+- **Workable Batching**: To avoid IP blocks, Workable fetchers use a rotating batch system. The `SourceHealthDashboard` now displays a "Skipped" status for Workable slugs that were not included in the current cron run's batch. This provides a clear view of which slugs are being rotated.
 
 ## 🏛️ Architecture
 
