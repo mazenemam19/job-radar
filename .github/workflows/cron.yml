@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Trigger Job Radar Cron
         run: |
-          curl -X POST "https://job-radar-lyart.vercel.app/" 
-          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" 
-          -f
+          curl -X POST "https://job-radar-lyart.vercel.app/" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -f
