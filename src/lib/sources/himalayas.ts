@@ -39,15 +39,21 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
     }
 
     const processed = processJobs(
-      allRawJobs.map((rj: any) => ({
-        id: `himalayas-${rj.guid}`,
-        title: rj.title,
-        company: rj.companyName,
-        location: rj.locationRestrictions?.join(", ") || "Remote",
-        url: rj.applicationLink,
-        description: stripHtml(rj.description || ""),
-        postedAt: new Date(rj.pubDate * 1000).toISOString(),
-      })),
+      allRawJobs.map((rj: any) => {
+        // GUIDs in Himalayas are often URLs. Extract the slug part for a safer ID.
+        const guid = (rj.guid || "").replace(/\/$/, "");
+        const slug = guid.split("/").pop() || guid;
+        return {
+          id: `himalayas-${slug}`,
+          title: rj.title,
+          company: rj.companyName,
+          location: rj.locationRestrictions?.join(", ") || "Remote",
+          url: rj.applicationLink,
+          description: stripHtml(rj.description || ""),
+          postedAt: new Date(rj.pubDate * 1000).toISOString(),
+          locationRestrictions: rj.locationRestrictions,
+        };
+      }),
       { name: "Himalayas", country: "Global", countryFlag: "🌍" },
       mode,
       false,

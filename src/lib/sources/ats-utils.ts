@@ -285,6 +285,8 @@ export interface RawJob {
   url: string;
   postedAt: string;
   description: string;
+  company?: string;
+  locationRestrictions?: string[];
 }
 
 export interface FetcherResult {
@@ -324,7 +326,25 @@ export function processJobs(
     const title = r.title.trim();
     if (isClearlyNonFrontend(title) || isTooSeniorOrTooJunior(title)) continue;
     if (isGeographicallyBlacklisted(title + r.location + r.description)) continue;
-    if (mode === "global" && isTimezoneIncompatible(r.description + r.location)) continue;
+
+    // ── Global Mode Restrictions ──
+    if (mode === "global") {
+      if (isTimezoneIncompatible(r.description + r.location)) continue;
+
+      // If there are specific country restrictions and it's not "Remote/Worldwide/Egypt/EMEA"
+      if (r.locationRestrictions && r.locationRestrictions.length > 0) {
+        const isBroad = r.locationRestrictions.some((loc) =>
+          /remote|worldwide|anywhere|emea|europe|global/i.test(loc),
+        );
+        const hasEgypt = r.locationRestrictions.some((loc) => /egypt/i.test(loc));
+
+        // If it's a single country restriction (or multiple specific ones) and none is Egypt/Broad
+        if (!isBroad && !hasEgypt) {
+          continue;
+        }
+      }
+    }
+
     if (isTooBackendForFrontend(r.description)) continue;
 
     const postedMs = Date.parse(r.postedAt);
@@ -354,7 +374,7 @@ export function processJobs(
       source: "company",
       mode,
       title,
-      company: company.name,
+      company: r.company || company.name,
       location: displayLocation,
       country: countryInfo.name,
       countryFlag: countryInfo.flag,

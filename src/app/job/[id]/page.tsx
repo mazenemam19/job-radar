@@ -68,12 +68,14 @@ export default function JobDetailPage() {
 
         <div className="detail-meta">
           <span>📍 {job.location}</span>
-          {job.isRemote && <span className="remote-badge">🌐 Remote</span>}
+          {job.isRemote && <span className="remote-badge">🏠 Remote</span>}
           <span className="meta-date">🕐 {daysAgo(job.postedAt)}</span>
           {job.mode === "visa" ? (
             <span className="visa-badge">✈ Visa ✓</span>
-          ) : (
+          ) : job.mode === "local" ? (
             <span className="local-badge">🇪🇬 Local</span>
+          ) : (
+            <span className="remote-badge">🌐 Global</span>
           )}
         </div>
 

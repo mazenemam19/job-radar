@@ -68,7 +68,12 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
     return true;
   });
 
+  // ── Aggressive Re-filtering ──
+  // We re-scan the entire merged set to ensure old jobs also respect any NEW filtering logic.
+  // Note: Since locationRestrictions aren't stored in the final Job type,
+  // we rely on title/description patterns for persistent cleanup if needed.
   const merged = [...store.jobs, ...added]
+    .filter((j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title))
     .sort((a, b) => b.totalScore - a.totalScore)
     .slice(0, MAX_JOBS);
 
