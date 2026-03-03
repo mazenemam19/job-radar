@@ -1,6 +1,6 @@
 # JOB RADAR - Project Memory
 
-## 🚀 Core Mandates
+- **Honesty & Verification Mandate**: ALWAYS provide a clear, data-backed summary of changes. For any expansion task, explicitly list: 1. Initial count/list, 2. Exactly what was added (names), 3. Exactly what was removed (names), and 4. Final count. Never conflate verification of existing items with the addition of new ones.
 
 - **Tech Gate**: ALL jobs must be **React**, **Next.js**, or **React Native**. Generic frontend roles are strictly filtered out in the scrapers/fetchers.
 - **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. Lead/Managerial roles are also excluded.
