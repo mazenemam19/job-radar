@@ -1,5 +1,5 @@
 // src/lib/sources/local-companies.ts
-import type { Job, SourceHealth } from "../types";
+import type { Job, SourceHealth, ATSConfig, FetcherResult } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -14,9 +14,7 @@ import {
   fetchBrightSkies,
   fetchPharos,
   fetchWuzzuf,
-  type ATSConfig,
   resetWorkableUsed,
-  type FetcherResult,
 } from "./ats-utils";
 import { getNextBatch } from "../state";
 

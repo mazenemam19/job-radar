@@ -1,19 +1,8 @@
 // src/components/SourceHealthDashboard.tsx
 "use client";
 
-import { CronLog } from "@/lib/types";
+import { CronLog, SourceSummary } from "@/lib/types";
 import { useState, useMemo } from "react";
-
-interface SourceSummary {
-  name: string;
-  totalRuns: number;
-  successRate: number;
-  lastCount: number;
-  lastRawCount?: number;
-  lastError?: string;
-  avgDuration?: number;
-  status: "healthy" | "nomatch" | "warning" | "error" | "skipped";
-}
 
 export default function SourceHealthDashboard({
   logs,

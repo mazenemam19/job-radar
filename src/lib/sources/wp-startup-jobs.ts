@@ -1,6 +1,6 @@
 // src/lib/sources/wp-startup-jobs.ts
-import { JobMode } from "../types";
-import { safeFetch, stripHtml, processJobs, FetcherResult, BaseCompany } from "./ats-utils";
+import { JobMode, FetcherResult, BaseCompany, WordPressPost } from "../types";
+import { safeFetch, stripHtml, processJobs } from "./ats-utils";
 
 /**
  * Fetches jobs from WordPress-based startup job boards (Berlin, London).
@@ -22,12 +22,12 @@ export async function fetchWPStartupJobs(
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
 
   try {
-    const posts = (await res.json()) as any[];
+    const posts = (await res.json()) as WordPressPost[];
     const rawCount = posts.length;
     const company: BaseCompany = { name: `${city} Startup`, country, countryFlag: flag, city };
 
     const processed = processJobs(
-      posts.map((p: any) => ({
+      posts.map((p) => ({
         id: `${city.toLowerCase()}-startup-${p.id}`,
         title: stripHtml(p.title?.rendered || ""),
         location: `${city}, ${country}`,

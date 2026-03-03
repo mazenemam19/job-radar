@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import type { AppHeaderProps } from "@/lib/types";
 
 function relativeTime(iso: string): string {
   const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
@@ -13,12 +14,6 @@ function relativeTime(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
-}
-
-interface AppHeaderProps {
-  lastUpdated?: string;
-  onRefresh?: () => Promise<void>;
-  cronSecret?: string;
 }
 
 export default function AppHeader({ lastUpdated, onRefresh, cronSecret }: AppHeaderProps) {

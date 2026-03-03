@@ -1,6 +1,6 @@
 // src/lib/sources/remotive.ts
-import { Job, JobMode } from "../types";
-import { safeFetch, stripHtml, FetcherResult } from "./ats-utils";
+import { Job, JobMode, FetcherResult, RemotiveJob } from "../types";
+import { safeFetch, stripHtml } from "./ats-utils";
 import { scoreJob } from "../scoring";
 
 /**
@@ -16,7 +16,7 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
   if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
 
   try {
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as { jobs: RemotiveJob[] };
     const rawJobs = data.jobs || [];
     const rawCount = rawJobs.length;
     const out: Job[] = [];

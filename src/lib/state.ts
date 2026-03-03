@@ -2,13 +2,10 @@
 import { put, list } from "@vercel/blob";
 import fs from "fs";
 import path from "path";
+import type { ScanState } from "./types";
 
 const STATE_BLOB_KEY = "scan-state.json";
 const LOCAL_STATE_PATH = path.resolve(process.cwd(), "data/scan-state.json");
-
-interface ScanState {
-  workableOffsets: Record<string, number>;
-}
 
 // Global in-memory state to track updates during a single process run
 let currentProcessState: ScanState | null = null;

@@ -1,5 +1,5 @@
-import { JobMode } from "../types";
-import { safeFetch, stripHtml, processJobs, FetcherResult } from "./ats-utils";
+import { JobMode, FetcherResult, HimalayasJob } from "../types";
+import { safeFetch, stripHtml, processJobs } from "./ats-utils";
 
 const MAX_PAGES = 10; // Cap to prevent infinite loops
 
@@ -8,7 +8,7 @@ const MAX_PAGES = 10; // Cap to prevent infinite loops
  */
 export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
-  let allRawJobs: any[] = [];
+  let allRawJobs: HimalayasJob[] = [];
   let reactJobsFound = false;
 
   try {
@@ -18,13 +18,13 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
       const response = await safeFetch(url);
       if (!response) continue;
 
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as { jobs: HimalayasJob[] };
       const rawPageJobs = data.jobs || [];
       if (rawPageJobs.length === 0) break;
 
       allRawJobs = allRawJobs.concat(rawPageJobs);
 
-      const hasReact = rawPageJobs.some((rj: any) =>
+      const hasReact = rawPageJobs.some((rj) =>
         /\b(react|next\.?js)\b/i.test((rj.title || "") + " " + (rj.description || "")),
       );
 
@@ -39,7 +39,7 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
     }
 
     const processed = processJobs(
-      allRawJobs.map((rj: any) => {
+      allRawJobs.map((rj) => {
         // GUIDs in Himalayas are often URLs. Extract the slug part for a safer ID.
         const guid = (rj.guid || "").replace(/\/$/, "");
         const slug = guid.split("/").pop() || guid;

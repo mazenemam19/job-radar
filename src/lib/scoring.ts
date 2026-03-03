@@ -1,4 +1,5 @@
 // src/lib/scoring.ts
+import type { ScoreInput, ScoreResult } from "./types";
 
 // ── Skill Tiers ────────────────────────────────────────────────────────────
 const EXPERT_SKILLS = [
@@ -199,22 +200,6 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
-
-export interface ScoreInput {
-  title: string;
-  description: string;
-  location: string;
-  postedAt: string;
-}
-export interface ScoreResult {
-  matchedSkills: string[];
-  bonusSkills: string[];
-  missingSkills: string[];
-  skillMatchScore: number;
-  recencyScore: number;
-  relocationBonus: number;
-  totalScore: number;
-}
 
 function skillMatch(text: string, skill: string): boolean {
   const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");

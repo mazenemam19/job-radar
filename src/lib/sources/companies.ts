@@ -1,5 +1,5 @@
 // src/lib/sources/companies.ts
-import type { Job, SourceHealth } from "../types";
+import type { Job, SourceHealth, ATSConfig, FetcherResult } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -8,9 +8,7 @@ import {
   fetchTeamtailor,
   fetchBreezy,
   fetchSmartRecruiters,
-  type ATSConfig,
   resetWorkableUsed,
-  type FetcherResult,
 } from "./ats-utils";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";

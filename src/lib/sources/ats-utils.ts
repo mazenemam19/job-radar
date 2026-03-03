@@ -1,30 +1,31 @@
 // src/lib/sources/ats-utils.ts
-import type { Job, JobMode } from "../types";
+import type {
+  Job,
+  JobMode,
+  BaseCompany,
+  ATSConfig,
+  RawJob,
+  FetcherResult,
+  GreenhouseJob,
+  LeverJob,
+  AshbyJob,
+  WorkableJob,
+  WorkableDetail,
+  TeamtailorJob,
+  BreezyJob,
+  SRJob,
+  SRDetail,
+  BambooJob,
+  JazzJob,
+  WuzzufSearchResponse,
+  WuzzufDetailResponse,
+  RemoteOKJob,
+} from "../types";
 import { isClearlyNonFrontend, isTooSeniorOrTooJunior, scoreJob } from "../scoring";
 import fs from "fs";
 import path from "path";
 
-// ── Shared Types ────────────────────────────────────────────────────────────
-
-export interface BaseCompany {
-  name: string;
-  country: string;
-  countryFlag: string;
-  city?: string;
-}
-export interface ATSConfig extends BaseCompany {
-  ats:
-    | "greenhouse"
-    | "lever"
-    | "ashby"
-    | "workable"
-    | "teamtailor"
-    | "breezy"
-    | "smartrecruiters"
-    | "bamboohr"
-    | "jazzhr";
-  slug: string;
-}
+// ── Shared Constants ────────────────────────────────────────────────────────
 
 const COUNTRY_MAP: Record<string, { name: string; flag: string }> = {
   ireland: { name: "Ireland", flag: "🇮🇪" },
@@ -278,23 +279,6 @@ export async function safeFetch(url: string, timeout = 30_000): Promise<Response
 }
 
 const AGE_CAP_DAYS = 7;
-export interface RawJob {
-  id: string;
-  title: string;
-  location: string;
-  url: string;
-  postedAt: string;
-  description: string;
-  company?: string;
-  locationRestrictions?: string[];
-}
-
-export interface FetcherResult {
-  jobs: Job[];
-  rawCount?: number;
-  error?: string;
-  durationMs?: number;
-}
 
 /** For local jobs: extract a specific Egyptian city from the raw location string. */
 function extractEgyptCity(rawLocation: string, companyCity?: string): string {
@@ -392,6 +376,7 @@ export function processJobs(
 }
 
 // ── Greenhouse ─────────────────────────────────────────────────────────────
+
 export async function fetchGreenhouse(
   c: ATSConfig,
   mode: JobMode,
@@ -404,10 +389,10 @@ export async function fetchGreenhouse(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const { jobs } = (await res.json()) as any;
+    const { jobs } = (await res.json()) as { jobs: GreenhouseJob[] };
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_gh_${c.slug}_${r.id}`,
         title: r.title,
         location: r.location?.name ?? c.city ?? c.country,
@@ -426,6 +411,7 @@ export async function fetchGreenhouse(
 }
 
 // ── Lever ──────────────────────────────────────────────────────────────────
+
 export async function fetchLever(
   c: ATSConfig,
   mode: JobMode,
@@ -438,10 +424,10 @@ export async function fetchLever(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const jobs = (await res.json()) as any[];
+    const jobs = (await res.json()) as LeverJob[];
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_lever_${c.slug}_${r.id}`,
         title: r.text,
         location: r.categories?.location ?? c.city ?? c.country,
@@ -460,6 +446,7 @@ export async function fetchLever(
 }
 
 // ── Ashby ──────────────────────────────────────────────────────────────────
+
 export async function fetchAshby(
   c: ATSConfig,
   mode: JobMode,
@@ -472,11 +459,11 @@ export async function fetchAshby(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as { jobs?: AshbyJob[]; jobPostings?: AshbyJob[] };
     const jobs = data.jobs || data.jobPostings || [];
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_ashby_${c.slug}_${r.id}`,
         title: r.title,
         location: r.locationName ?? c.city ?? c.country,
@@ -495,6 +482,7 @@ export async function fetchAshby(
 }
 
 // ── Workable ───────────────────────────────────────────────────────────────
+
 const workableQueues = new Map<JobMode, Promise<unknown>>();
 
 function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
@@ -539,7 +527,7 @@ export async function fetchWorkable(
   const budget = workableBudget;
   const limit = budget[mode as JobMode];
   const used = workableUsedByMode[mode];
-  if (limit <= 0 || used >= limit)
+  if (used >= limit)
     return { jobs: [], rawCount: 0, error: "Budget Exceeded", durationMs: Date.now() - t0 };
   workableUsedByMode[mode] += 1;
 
@@ -556,19 +544,19 @@ export async function fetchWorkable(
       .catch(() => null);
   };
 
-  let res = await queueWorkable(doFetch, mode);
+  const res = await queueWorkable(doFetch, mode);
   if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as { jobs?: WorkableJob[] };
     const rawJobs = data.jobs || [];
     const rawCount = rawJobs.length;
     const jobs = rawJobs.filter(
-      (r: any) => !isClearlyNonFrontend(r.title) && !isTooSeniorOrTooJunior(r.title),
+      (r) => !isClearlyNonFrontend(r.title) && !isTooSeniorOrTooJunior(r.title),
     );
     const withDesc = await pLimit(
-      jobs.map((r: any) => async () => {
+      jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
         const dr = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } }).catch(
           () => null,
@@ -576,7 +564,7 @@ export async function fetchWorkable(
         let desc = stripHtml(r.description || "");
         if (dr && dr.ok) {
           try {
-            const detail = (await dr.json()) as any;
+            const detail = (await dr.json()) as WorkableDetail;
             desc = stripHtml(detail.full_description || detail.description || desc);
           } catch {}
         }
@@ -591,7 +579,7 @@ export async function fetchWorkable(
       }),
       5,
     );
-    const processed = processJobs(withDesc.filter(Boolean) as any[], c, mode, visaSponsorship);
+    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
     return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
@@ -599,6 +587,7 @@ export async function fetchWorkable(
 }
 
 // ── Teamtailor ─────────────────────────────────────────────────────────────
+
 export async function fetchTeamtailor(
   c: ATSConfig,
   mode: JobMode,
@@ -614,10 +603,10 @@ export async function fetchTeamtailor(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const { data } = (await res.json()) as any;
+    const { data } = (await res.json()) as { data: TeamtailorJob[] };
     const rawCount = data.length;
     const processed = processJobs(
-      data.map((r: any) => ({
+      data.map((r) => ({
         id: `${mode}_tt_${c.slug}_${r.id}`,
         title: r.attributes.title,
         location: r.attributes["location-name"] ?? c.city ?? c.country,
@@ -636,6 +625,7 @@ export async function fetchTeamtailor(
 }
 
 // ── Breezy HR ──────────────────────────────────────────────────────────────
+
 export async function fetchBreezy(
   c: ATSConfig,
   mode: JobMode,
@@ -651,10 +641,10 @@ export async function fetchBreezy(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const jobs = (await res.json()) as any[];
+    const jobs = (await res.json()) as BreezyJob[];
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_breezy_${c.slug}_${r.id}`,
         title: r.name,
         location: r.location?.name ?? c.city ?? c.country,
@@ -673,6 +663,7 @@ export async function fetchBreezy(
 }
 
 // ── SmartRecruiters ───────────────────────────────────────────────────────
+
 export async function fetchSmartRecruiters(
   c: ATSConfig,
   mode: JobMode,
@@ -685,14 +676,14 @@ export async function fetchSmartRecruiters(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const { content } = (await res.json()) as any;
+    const { content } = (await res.json()) as { content: SRJob[] };
     const rawCount = content.length;
     const detailedJobs = await Promise.all(
-      content.map(async (r: any) => {
+      content.map(async (r) => {
         const detailRes = await safeFetch(r.ref);
         if (!detailRes || !detailRes.ok) return null;
         try {
-          const detail = (await detailRes.json()) as any;
+          const detail = (await detailRes.json()) as SRDetail;
           return {
             id: `${mode}_sr_${c.slug}_${r.id}`,
             title: r.name,
@@ -706,7 +697,12 @@ export async function fetchSmartRecruiters(
         }
       }),
     );
-    const processed = processJobs(detailedJobs.filter(Boolean) as any[], c, mode, visaSponsorship);
+    const processed = processJobs(
+      detailedJobs.filter((j): j is RawJob => j !== null),
+      c,
+      mode,
+      visaSponsorship,
+    );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
@@ -714,6 +710,7 @@ export async function fetchSmartRecruiters(
 }
 
 // ── BambooHR ───────────────────────────────────────────────────────────────
+
 export async function fetchBambooHR(
   c: ATSConfig,
   mode: JobMode,
@@ -726,11 +723,11 @@ export async function fetchBambooHR(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as { result?: BambooJob[] };
     const jobs = data.result ?? [];
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_bamboohr_${c.slug}_${r.id}`,
         title: r.jobOpeningName,
         location: r.city ? `${r.city}, ${r.country}` : (c.city ?? c.country),
@@ -749,6 +746,7 @@ export async function fetchBambooHR(
 }
 
 // ── JazzHR ──────────────────────────────────────────────────────────────────
+
 export async function fetchJazzHR(
   c: ATSConfig,
   mode: JobMode,
@@ -761,10 +759,10 @@ export async function fetchJazzHR(
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const jobs = (await res.json()) as any[];
+    const jobs = (await res.json()) as JazzJob[];
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r: any) => ({
+      jobs.map((r) => ({
         id: `${mode}_jazz_${c.slug}_${r.id}`,
         title: r.title,
         location: r.location || c.city || c.country,
@@ -783,6 +781,7 @@ export async function fetchJazzHR(
 }
 
 // ── Wuzzuf ──────────────────────────────────────────────────────────────────
+
 export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const searchUrl = "https://wuzzuf.net/api/search/job";
@@ -812,20 +811,18 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
           body: JSON.stringify(searchPayload),
         });
         if (!sRes.ok) return [];
-        const sData = (await sRes.json()) as any;
-        const ids = (sData?.data || [])
-          .map((j: any) => j.id)
-          .filter((id: string) => !seenIds.has(id));
+        const sData = (await sRes.json()) as WuzzufSearchResponse;
+        const ids = (sData?.data || []).map((j) => j.id).filter((id) => !seenIds.has(id));
         if (ids.length === 0) return [];
 
         // Add to seenIds immediately to avoid duplicate detail fetches in other query branches
-        ids.forEach((id: string) => seenIds.add(id));
+        ids.forEach((id) => seenIds.add(id));
         rawCount += ids.length;
 
         const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
         const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
         if (!dRes.ok) return [];
-        const dData = (await dRes.json()) as any;
+        const dData = (await dRes.json()) as WuzzufDetailResponse;
         return dData?.data || [];
       }),
     );
@@ -840,7 +837,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
       seenIds.add(entry.id);
       const companyName =
         attr.company_name ||
-        attr.computedFields?.find((f: any) => f.name === "company_name")?.value?.[0] ||
+        attr.computedFields?.find((f) => f.name === "company_name")?.value?.[0] ||
         "Wuzzuf Job";
       allWuzzufJobs.push({
         id: `local_wuzzuf_${entry.id}`,
@@ -873,6 +870,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
 }
 
 // ── RemoteOK ────────────────────────────────────────────────────────────────
+
 export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = "https://remoteok.com/api";
@@ -881,7 +879,7 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
   try {
-    const data = (await res.json()) as any[];
+    const data = (await res.json()) as RemoteOKJob[];
     const rawJobs = data.filter((item) => item.id && item.position);
     const rawCount = rawJobs.length;
     const out: Job[] = [];
@@ -979,11 +977,20 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
     });
     if (!res.ok)
       return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
-    const data = (await res.json()) as any;
+    const data = (await res.json()) as {
+      data: {
+        jobs: {
+          data: {
+            id: string;
+            attributes: { title: string; location: string; department: string };
+          }[];
+        };
+      };
+    };
     const rawJobs = data.data?.jobs?.data || [];
     const rawCount = rawJobs.length;
     const processed = processJobs(
-      rawJobs.map((item: any) => ({
+      rawJobs.map((item) => ({
         id: `local_brightskies_${item.id}`,
         title: item.attributes.title,
         location: item.attributes.location || "Cairo",
