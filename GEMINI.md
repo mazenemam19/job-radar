@@ -54,21 +54,36 @@
 
 (None currently identified)
 
+## 💡 Integration Insights
+
+- **Public vs. Private Boards**: Many high-growth startups (Paymob, Lucky) restrict their Greenhouse/Workable APIs. If a browser URL works but the `boards-api` or `widget` URL returns 404, it is a "No-Go" for automated fetching without a private API key.
+- **SSL Trust Issues**: Some ATS platforms (like JazzHR for Koinz) have configuration issues that trigger `FetchError` or `Network/Timeout` due to SSL/TLS trust relationship failures in Node.js.
+- **Custom Portals**: Large entities (Fawry, MNT-Halan) use homegrown or enterprise HRIS systems (Oracle/SAP) that lack public JSON endpoints.
+- **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (MaxAB) are common in Egypt but currently unsupported by our fetcher suite.
+
 ## ❌ Rejected Sources
 
-- **Careerjet**: Rejected — API access requires an API key, but integration attempts were marred by persistent module resolution issues with `ts-node` in the project's development environment, making the setup unstable. Despite extensive debugging, a reliable execution environment for integrating the API could not be established.
+- **Paymob / Lucky Financial**: Rejected — Use Greenhouse but their API endpoints are restricted/private, returning 404 for public requests.
+- **Trella**: Rejected — Uses Teamtailor but the JSON endpoint is restricted or uses a custom structure that prevents standard fetching.
+- **Yodawy / Sympl / Mozare3**: Rejected — No dedicated international ATS; they rely on Wuzzuf, LinkedIn, or simple website forms.
+- **Breadfast**: Rejected — Uses Freshteam, which lacks a standard public JSON API.
+- **Rabbit / ExpandCart**: Rejected — Workable slugs (`rabbit-mart`, `expandcart`) returned consistent 404s for the widget API.
+- **elmenus**: Rejected — Uses Recruitee, which is not currently supported.
+- **Koinz**: Rejected — Uses JazzHR but the API connection fails due to persistent SSL/TLS trust issues.
+- **Siemens EDA / Orange Business / Speer**: Rejected — Local Egyptian branches use restricted global boards or returned 404s for local slugs.
+- **Careerjet**: Rejected — API access requires an API key, but integration attempts were marred by persistent module resolution issues with `ts-node` in the project's development environment.
 - **NaukriGulf.com**: Rejected — No public, direct JSON API.
 - **Wellfound.com**: Rejected — No public, documented JSON API.
 - **Stepstone.de**: Rejected — No public JSON API; requires partnership.
 - **Visajobs.xyz**: Rejected — No public API found.
-- **XING.com**: Rejected — No suitable public JSON API for job searching; official API is for recruiters only.
+- **XING.com**: Rejected — No suitable public JSON API for job searching.
 - **Jobs.joinimagine.com**: Rejected — No JSON API found.
 - **WorkingNomads.com**: Rejected — No public API found.
 - **Toughbyte.com**: Investigation timed out without conclusive API findings.
 - **JustRemote.co**: Rejected — No public API found.
-- **Remoteplatz.com**: Rejected — API endpoint found but returns an empty response.
-- **Dollar.careers**: Rejected — No official public API found.
-- **Arbeitnow**: Rejected — Unreliable filters for visa sponsorship; previous attempts to use the "visa_sponsorship=true" flag failed to yield verified results.
-- **We Work Remotely (WWR)**: Rejected — Requires HTML scraping; lacks a clean, documented JSON API.
-- **Relocate.me**: Rejected — High scraping requirement; lacks a robust, publicly accessible direct API.
-- **The Muse**: Rejected — Heavily US-centric with minimal "Egypt-friendly" or global-remote roles that don't require US citizenship.
+- **Remoteplatz.com**: API endpoint found but returns an empty response.
+- **Dollar.careers**: No official public API found.
+- **Arbeitnow**: Rejected — Unreliable filters for visa sponsorship.
+- **We Work Remotely (WWR)**: Rejected — Requires HTML scraping.
+- **Relocate.me**: Rejected — High scraping requirement.
+- **The Muse**: Rejected — Heavily US-centric with minimal "Egypt-friendly" roles.
