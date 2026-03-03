@@ -186,14 +186,6 @@ const COMPANIES: ATSConfig[] = [
     city: "Cairo",
   },
   {
-    ats: "jazzhr",
-    name: "Koinz",
-    slug: "koinz",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
     ats: "workable",
     name: "Flextock",
     slug: "flextock",
@@ -299,52 +291,8 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "Rabbit",
-    slug: "rabbit-mart",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
-    name: "ExpandCart",
-    slug: "expandcart",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
     name: "Sary",
     slug: "sary",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-
-  // ── Verified Greenhouse ──────────────────────────────────────────────
-  {
-    ats: "greenhouse",
-    name: "Lucky",
-    slug: "lucky",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "greenhouse",
-    name: "Paymob",
-    slug: "paymob",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-
-  // ── Verified Teamtailor ──────────────────────────────────────────────
-  {
-    ats: "teamtailor",
-    name: "Trella",
-    slug: "trella",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",

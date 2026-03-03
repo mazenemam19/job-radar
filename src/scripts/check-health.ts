@@ -12,7 +12,7 @@ async function main() {
     return;
   }
   console.log("Run At:", log.runAt);
-  console.log("--- Egyptian Company Health ---");
+  console.log("--- Full Egyptian Tech Health ---");
   const egy = [
     "Bosta",
     "Paymob",
@@ -29,6 +29,38 @@ async function main() {
     "Trella",
     "ExpandCart",
     "Rabbit",
+    "Siemens EDA",
+    "Orange Business",
+    "Speer",
+    "Yassir",
+    "Algoriza",
+    "Khazna Tech",
+    "valU",
+    "Homzmart",
+    "Swvl",
+    "Klivvr",
+    "Nawy",
+    "Dubizzle",
+    "Rubikal",
+    "Blink22",
+    "Squadio",
+    "Vezeeta",
+    "Moneyfellows",
+    "Flextock",
+    "Sideup",
+    "Cartona",
+    "Taager",
+    "NearPay",
+    "Lean Technologies",
+    "Atomica",
+    "Advansys",
+    "Sumerge",
+    "Integrant",
+    "Eva Pharma",
+    "SWATX",
+    "ArpuPlus",
+    "Instabug",
+    "MaxAB",
   ];
   Object.entries(log.sourceDetails || {}).forEach(([name, health]) => {
     if (egy.includes(name)) {
