@@ -4,17 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { JobStore, JobMode } from "@/lib/types";
 import JobCard from "./JobCard";
-import SourceHealthDashboard from "./SourceHealthDashboard";
-
-function relativeTime(iso: string): string {
-  const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+import AppHeader from "./AppHeader";
 
 function Stat({ value, label }: { value: number | string; label: string }) {
   return (
@@ -42,8 +32,6 @@ function SkeletonGrid() {
 export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
   const [store, setStore] = useState<JobStore | null>(null);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [runStatus, setRunStatus] = useState<"idle" | "ok" | "err">("idle");
 
   const [mode, setMode] = useState<"all" | JobMode>("all");
 
@@ -68,25 +56,6 @@ export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
   useEffect(() => {
     loadJobs();
   }, [loadJobs]);
-
-  const runScan = async () => {
-    if (running) return;
-    setRunning(true);
-    setRunStatus("idle");
-    try {
-      const headers: Record<string, string> = {};
-      if (cronSecret) headers["x-cron-secret"] = cronSecret;
-
-      const res = await fetch("/api/cron", { method: "POST", headers });
-      setRunStatus(res.ok ? "ok" : "err");
-      if (res.ok) await loadJobs();
-    } catch {
-      setRunStatus("err");
-    } finally {
-      setRunning(false);
-      setTimeout(() => setRunStatus("idle"), 4000);
-    }
-  };
 
   const allJobs = store?.jobs ?? [];
 
@@ -140,47 +109,11 @@ export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
 
   return (
     <div className="app-shell">
-      {/* ── HEADER ─────────────────────────────────────────────── */}
-      <header className="app-header">
-        <div className="header-inner">
-          <div className="brand">
-            <div className="radar-dot">
-              <span className="radar-pulse" />
-            </div>
-            <div>
-              <h1 className="brand-title">JOB RADAR</h1>
-              <p className="brand-sub">
-                Frontend roles · Direct from company career pages · No aggregators
-              </p>
-            </div>
-          </div>
-          <div className="header-actions">
-            {store?.lastUpdated && (
-              <span className="last-updated">Updated {relativeTime(store.lastUpdated)}</span>
-            )}
-            {runStatus === "ok" && (
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--green)" }}>
-                ✓ Done
-              </span>
-            )}
-            {runStatus === "err" && (
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#f87171" }}>
-                ✗ Error
-              </span>
-            )}
-            <button
-              className={`btn-run ${running ? "running" : ""}`}
-              onClick={runScan}
-              disabled={running}
-            >
-              <span className="run-icon">⟳</span>
-              {running ? "Scanning…" : "Run Scan"}
-            </button>
-          </div>
-        </div>
+      <AppHeader lastUpdated={store?.lastUpdated} onRefresh={loadJobs} cronSecret={cronSecret} />
 
-        {/* Mode dropdown */}
-        <div className="mode-tabs">
+      <div className="dashboard-content">
+        {/* Mode selection + Stats */}
+        <div className="mode-tabs-row">
           <select
             className="mode-dropdown"
             value={mode}
@@ -191,111 +124,129 @@ export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
             <option value="local">🇪🇬 Local Egypt ({localCount})</option>
             <option value="global">🌍 Global Remote ({globalCount})</option>
           </select>
+
+          <div className="stats-strip-mini">
+            <Stat value={modeJobs.length} label="total" />
+            <div className="stat-divider" />
+            <Stat value={companies.length} label="cos" />
+            <div className="stat-divider" />
+            <Stat value={Math.round(bestScore)} label="best" />
+            <div className="stat-divider" />
+            <Stat value={filtered.length} label="show" />
+          </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="stats-strip">
-          <Stat value={modeJobs.length} label="total jobs" />
-          <div className="stat-divider" />
-          <Stat value={companies.length} label="companies" />
-          <div className="stat-divider" />
-          <Stat value={Math.round(bestScore)} label="best score" />
-          <div className="stat-divider" />
-          <Stat value={filtered.length} label="showing" />
-        </div>
-      </header>
-
-      {/* ── FILTERS ────────────────────────────────────────────── */}
-      <div className="filters-bar">
-        <input
-          type="text"
-          className="filter-input"
-          placeholder="Search title, company, skill…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="filter-select"
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-        >
-          <option value="all">All Companies</option>
-          {companies.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        {(mode === "visa" || mode === "all") && (
+        {/* ── FILTERS ────────────────────────────────────────────── */}
+        <div className="filters-bar">
+          <input
+            type="text"
+            className="filter-input"
+            placeholder="Search title, company, skill…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <select
             className="filter-select"
-            value={countryFilter}
-            onChange={(e) => setCountryFilter(e.target.value)}
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
           >
-            <option value="all">All Countries</option>
-            {countries.map((c) => (
+            <option value="all">All Companies</option>
+            {companies.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
-        )}
-        <div className="filter-score-wrap">
-          <label className="filter-score-label">Score ≥ {minScore}</label>
-          <input
-            type="range"
-            className="filter-range"
-            min={0}
-            max={100}
-            value={minScore}
-            onChange={(e) => setMinScore(Number(e.target.value))}
-          />
-        </div>
-        <select
-          className="filter-select"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-        >
-          <option value="score">Best Match</option>
-          <option value="recency">Newest First</option>
-          <option value="company">By Company</option>
-        </select>
-      </div>
-
-      {/* Mode description */}
-      <div className="mode-desc">
-        {mode === "all"
-          ? "🔍 All jobs across all pipelines — visa sponsorship, local Egypt, and global remote. Use the dropdown to filter by pipeline."
-          : mode === "visa"
-            ? "🌍 Remote positions at European tech companies — all actively sponsor visas. Senior-only & off-discipline roles are automatically filtered out."
-            : mode === "local"
-              ? "🇪🇬 On-site / hybrid roles at Egyptian tech companies in Cairo & Alexandria. Same skill-match scoring — no visa assumption."
-              : "🌐 Worldwide remote roles at companies known to hire globally — pre-filtered to reject US-timezone-only, EU-resident-only, and work-authorization restrictions incompatible with Egypt (GMT+2). No sponsorship needed."}
-      </div>
-
-      {/* ── GRID ───────────────────────────────────────────────── */}
-      <main className="jobs-grid">
-        {loading ? (
-          <SkeletonGrid />
-        ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-icon">◌</span>
-            <p>
-              {modeJobs.length === 0
-                ? mode === "local"
-                  ? "No local jobs yet. Run a scan — we&apos;re probing Egyptian company career pages."
-                  : "No jobs yet. Run a scan to fetch from company career pages."
-                : "No jobs match your filters. Try lowering the score or clearing search."}
-            </p>
-            <p className="empty-sub">Click &quot;Run Scan&quot; to fetch latest openings.</p>
+          {(mode === "visa" || mode === "all") && (
+            <select
+              className="filter-select"
+              value={countryFilter}
+              onChange={(e) => setCountryFilter(e.target.value)}
+            >
+              <option value="all">All Countries</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="filter-score-wrap">
+            <label className="filter-score-label">Score ≥ {minScore}</label>
+            <input
+              type="range"
+              className="filter-range"
+              min={0}
+              max={100}
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+            />
           </div>
-        ) : (
-          filtered.map((job, i) => <JobCard key={job.id} job={job} index={i} />)
-        )}
-      </main>
+          <select
+            className="filter-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          >
+            <option value="score">Best Match</option>
+            <option value="recency">Newest First</option>
+            <option value="company">By Company</option>
+          </select>
+        </div>
 
-      {/* ── HEALTH DASHBOARD ────────────────────────────────────────── */}
-      {store?.cronLogs && <SourceHealthDashboard logs={store.cronLogs} />}
+        {/* Mode description */}
+        <div className="mode-desc">
+          {mode === "all"
+            ? "All jobs across all pipelines — visa sponsorship, local Egypt, and global remote."
+            : mode === "visa"
+              ? "Remote positions at European tech companies — all actively sponsor visas."
+              : mode === "local"
+                ? "On-site / hybrid roles at Egyptian tech companies in Cairo & Alexandria."
+                : "Worldwide remote roles at companies known to hire globally."}
+        </div>
+
+        {/* ── GRID ───────────────────────────────────────────────── */}
+        <main className="jobs-grid">
+          {loading ? (
+            <SkeletonGrid />
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-icon">◌</span>
+              <p>
+                {modeJobs.length === 0
+                  ? "No jobs yet. Run a scan to fetch latest openings."
+                  : "No jobs match your filters. Try lowering the requirements."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((job, i) => <JobCard key={job.id} job={job} index={i} />)
+          )}
+        </main>
+      </div>
+
+      <style jsx>{`
+        .mode-tabs-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 8px;
+          padding-top: 12px;
+        }
+        .stats-strip-mini {
+          display: flex;
+          align-items: center;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 0 4px;
+        }
+        @media (max-width: 720px) {
+          .mode-tabs-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -225,6 +225,44 @@ body::before {
   }
 }
 
+/* ── View Switcher ───────────────────────────────────────────────────────── */
+.view-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.view-tab:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.view-tab.active {
+  color: #fff;
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border-hi);
+}
+
+.tab-icon {
+  font-size: 14px;
+}
+
 /* ── Mode tabs ───────────────────────────────────────────────────────────── */
 .mode-tabs {
   display: flex;
