@@ -138,7 +138,7 @@ export async function fetchGlobalJobs(): Promise<{
     { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
     { name: "Remotive", fn: () => fetchRemotive(MODE) },
     {
-      name: "BerlinStartupJobs",
+      name: "Berlin Startup Jobs",
       fn: () =>
         fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE),
     },
