@@ -13,14 +13,17 @@ export async function fetchWPStartupJobs(
   mode: JobMode,
 ): Promise<FetcherResult> {
   const t0 = Date.now();
-  const url = `${baseUrl}/wp-json/wp/v2/posts?search=react&per_page=20`;
+  // Using 'search=react' is the most efficient way to query WP-based boards
+  const url = `${baseUrl}/wp-json/wp/v2/posts?search=react&per_page=30`;
   const res = await safeFetch(url);
 
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
+  if (!res.ok)
+    return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
 
   try {
     const posts = (await res.json()) as any[];
+    const rawCount = posts.length;
     const company: BaseCompany = { name: `${city} Startup`, country, countryFlag: flag, city };
 
     const processed = processJobs(
@@ -37,8 +40,8 @@ export async function fetchWPStartupJobs(
       true, // These boards are highly likely to support visa/relocation
     );
 
-    return { jobs: processed, durationMs: Date.now() - t0 };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    return { jobs: [], rawCount: 0, error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
   }
 }

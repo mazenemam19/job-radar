@@ -307,8 +307,44 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "Robosta",
-    slug: "robosta",
+    name: "ExpandCart",
+    slug: "expandcart",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "workable",
+    name: "Sary",
+    slug: "sary",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+
+  // ── Verified Greenhouse ──────────────────────────────────────────────
+  {
+    ats: "greenhouse",
+    name: "Lucky",
+    slug: "lucky",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "greenhouse",
+    name: "Paymob",
+    slug: "paymob",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+
+  // ── Verified Teamtailor ──────────────────────────────────────────────
+  {
+    ats: "teamtailor",
+    name: "Trella",
+    slug: "trella",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -383,10 +419,10 @@ export async function fetchLocalJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
+      health[sourceName] = { count: jobs.length, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
@@ -412,10 +448,10 @@ export async function fetchLocalJobs(): Promise<{
 
   for (const r of customResults) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
         sourceName: string;
       };
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
+      health[sourceName] = { count: jobs.length, error, durationMs };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);

@@ -18,7 +18,7 @@ import {
 } from "./ats-utils";
 import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
-import { fetchBerlinStartupJobs } from "./berlinstartupjobs";
+import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";
 
 const MODE = "global";
@@ -137,7 +137,11 @@ export async function fetchGlobalJobs(): Promise<{
     { name: "RemoteOK", fn: () => fetchRemoteOK(MODE) },
     { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
     { name: "Remotive", fn: () => fetchRemotive(MODE) },
-    { name: "BerlinStartupJobs", fn: () => fetchBerlinStartupJobs(MODE) },
+    {
+      name: "BerlinStartupJobs",
+      fn: () =>
+        fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE),
+    },
   ];
 
   const customResults = await Promise.allSettled(

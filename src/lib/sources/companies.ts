@@ -12,7 +12,6 @@ import {
   resetWorkableUsed,
   type FetcherResult,
 } from "./ats-utils";
-import { fetchBerlinStartupJobs } from "./berlin-startup-jobs";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";
 
@@ -165,7 +164,9 @@ export async function fetchCompanyJobs(): Promise<{
 
   // ── Custom "Visa Hub" Boards ─────────────────────────────────────────
   const hubResults = await Promise.allSettled([
-    fetchBerlinStartupJobs(MODE).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs" })),
+    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
+      (res) => ({ ...res, sourceName: "Berlin Startup Jobs" }),
+    ),
     fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
       (res) => ({ ...res, sourceName: "London Startup Jobs" }),
     ),
@@ -173,11 +174,11 @@ export async function fetchCompanyJobs(): Promise<{
 
   for (const r of hubResults) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
         sourceName: string;
       };
       all.push(...jobs);
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
     }
   }
 
