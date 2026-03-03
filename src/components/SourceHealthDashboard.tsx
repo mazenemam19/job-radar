@@ -47,16 +47,19 @@ export default function SourceHealthDashboard({
         (a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime(),
       );
 
-      sortedLogs.forEach((log, index) => {
+      sortedLogs.forEach((log) => {
         const detail = log.sourceDetails?.[name];
         if (detail) {
           totalRuns++;
           if (!detail.error) successes++;
-          if (index === 0) {
+
+          // Use the most recent data for lastCount/lastRawCount/lastError
+          if (lastRawCount === undefined) {
             lastCount = detail.count;
             lastRawCount = detail.rawCount;
             lastError = detail.error;
           }
+
           if (detail.durationMs) {
             totalDuration += detail.durationMs;
             durationCount++;

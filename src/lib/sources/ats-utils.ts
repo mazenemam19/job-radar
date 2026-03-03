@@ -94,7 +94,8 @@ export function isGeographicallyBlacklisted(text: string): boolean {
 
 export function isTimezoneIncompatible(text: string): boolean {
   const t = text.toLowerCase();
-  if (/\b(emea|europe|global|anywhere|africa|egypt|gmt\+2|gmt\+3)\b/.test(t)) return false;
+  if (/\b(emea|europe|global|anywhere|africa|egypt|london|berlin|gmt\+2|gmt\+3)\b/.test(t))
+    return false;
   const usOnly =
     /\b(us\s+only|usa\s+only|united\s+states\s+only|north\s+america\s+only|canada\s+only)\b/.test(
       t,
