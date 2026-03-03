@@ -85,8 +85,9 @@ export async function fetchGlobalJobs(): Promise<{
   const batchWorkable = await getNextBatch(workables, 12, "global-workable");
   const toScan = [...others, ...batchWorkable];
 
-  const results = await Promise.allSettled(
-    toScan.map((c) => {
+  // ── Parallelize everything ─────────────────────────────────────────
+  const allFetchers = [
+    ...toScan.map((c) => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -107,9 +108,17 @@ export async function fetchGlobalJobs(): Promise<{
             return Promise.resolve({ jobs: [] } as FetcherResult);
         }
       })();
-      return p.then((res) => ({ ...res, sourceName: c.name }));
+      return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-  );
+    fetchRemoteOK(MODE).then((res) => ({ ...res, sourceName: "RemoteOK", ats: "custom" })),
+    fetchHimalayas(MODE).then((res) => ({ ...res, sourceName: "Himalayas", ats: "custom" })),
+    fetchRemotive(MODE).then((res) => ({ ...res, sourceName: "Remotive", ats: "custom" })),
+    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
+      (res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" }),
+    ),
+  ];
+
+  const results = await Promise.allSettled(allFetchers);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
@@ -117,10 +126,11 @@ export async function fetchGlobalJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount, ats } = r.value as FetcherResult & {
         sourceName: string;
+        ats: string;
       };
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
@@ -129,39 +139,6 @@ export async function fetchGlobalJobs(): Promise<{
       }
     } else {
       console.error("[global] Unhandled rejection:", r.reason);
-    }
-  }
-
-  // ── Custom fetchers (Verified direct APIs) ───────────────────────────
-  const customFetchers = [
-    { name: "RemoteOK", fn: () => fetchRemoteOK(MODE) },
-    { name: "Himalayas", fn: () => fetchHimalayas(MODE) },
-    { name: "Remotive", fn: () => fetchRemotive(MODE) },
-    {
-      name: "Berlin Startup Jobs",
-      fn: () =>
-        fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE),
-    },
-  ];
-
-  const customResults = await Promise.allSettled(
-    customFetchers.map((cf) => cf.fn().then((res) => ({ ...res, sourceName: cf.name }))),
-  );
-
-  for (const r of customResults) {
-    if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
-        sourceName: string;
-      };
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
-      for (const j of jobs) {
-        if (!seen.has(j.id)) {
-          seen.add(j.id);
-          all.push(j);
-        }
-      }
-    } else {
-      console.error("[global] Custom fetcher error:", r.reason);
     }
   }
 

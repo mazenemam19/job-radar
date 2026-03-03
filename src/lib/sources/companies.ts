@@ -121,8 +121,9 @@ export async function fetchCompanyJobs(): Promise<{
   const batchWorkable = await getNextBatch(workables, 12, "visa-workable");
   const toScan = [...others, ...batchWorkable];
 
-  const results = await Promise.allSettled(
-    toScan.map((c) => {
+  // ── Parallelize everything ─────────────────────────────────────────
+  const allFetchers = [
+    ...toScan.map((c) => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -143,42 +144,31 @@ export async function fetchCompanyJobs(): Promise<{
             return Promise.resolve({ jobs: [] } as FetcherResult);
         }
       })();
-      return p.then((res) => ({ ...res, sourceName: c.name }));
+      return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-  );
+    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
+      (res) => ({ ...res, sourceName: "Berlin Startup Jobs (Visa)", ats: "custom" }),
+    ),
+    fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
+      (res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" }),
+    ),
+  ];
+
+  const results = await Promise.allSettled(allFetchers);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount, ats } = r.value as FetcherResult & {
         sourceName: string;
+        ats: string;
       };
       all.push(...jobs);
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
     } else {
       console.error("[visa] Unhandled rejection:", r.reason);
-    }
-  }
-
-  // ── Custom "Visa Hub" Boards ─────────────────────────────────────────
-  const hubResults = await Promise.allSettled([
-    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
-      (res) => ({ ...res, sourceName: "Berlin Startup Jobs" }),
-    ),
-    fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
-      (res) => ({ ...res, sourceName: "London Startup Jobs" }),
-    ),
-  ]);
-
-  for (const r of hubResults) {
-    if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount } = r.value as FetcherResult & {
-        sourceName: string;
-      };
-      all.push(...jobs);
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs };
     }
   }
 

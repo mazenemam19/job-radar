@@ -283,6 +283,14 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
+    name: "MNT-Halan",
+    slug: "halan",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "workable",
     name: "ArpuPlus",
     slug: "arpuplus",
     country: COUNTRY,
@@ -293,6 +301,14 @@ const COMPANIES: ATSConfig[] = [
     ats: "workable",
     name: "Sary",
     slug: "sary",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "jazzhr",
+    name: "Koinz",
+    slug: "koinz",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -331,8 +347,9 @@ export async function fetchLocalJobs(): Promise<{
   const batchWorkable = await getNextBatch(workables, 12, "local-workable");
   const toScan = [...others, ...batchWorkable];
 
-  const results = await Promise.allSettled(
-    toScan.map((c) => {
+  // ── Parallelize everything ─────────────────────────────────────────
+  const allFetchers = [
+    ...toScan.map((c) => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -357,9 +374,15 @@ export async function fetchLocalJobs(): Promise<{
             return Promise.resolve({ jobs: [] } as FetcherResult);
         }
       })();
-      return p.then((res) => ({ ...res, sourceName: c.name }));
+      return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-  );
+    fetchWuzzuf(MODE).then((res) => ({ ...res, sourceName: "Wuzzuf", ats: "custom" })),
+    fetchGizaSystems(MODE).then((res) => ({ ...res, sourceName: "Giza Systems", ats: "custom" })),
+    fetchBrightSkies(MODE).then((res) => ({ ...res, sourceName: "Bright Skies", ats: "custom" })),
+    fetchPharos(MODE).then((res) => ({ ...res, sourceName: "Pharos Solutions", ats: "custom" })),
+  ];
+
+  const results = await Promise.allSettled(allFetchers);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
@@ -367,10 +390,11 @@ export async function fetchLocalJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
+      const { jobs, error, durationMs, sourceName, rawCount, ats } = r.value as FetcherResult & {
         sourceName: string;
+        ats: string;
       };
-      health[sourceName] = { count: jobs.length, error, durationMs };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);
@@ -379,35 +403,6 @@ export async function fetchLocalJobs(): Promise<{
       }
     } else {
       console.error("[local] Unhandled rejection:", r.reason);
-    }
-  }
-
-  // ── Custom fetchers (Verified direct APIs) ───────────────────────────
-  const customFetchers = [
-    { name: "Wuzzuf", fn: () => fetchWuzzuf(MODE) },
-    { name: "Giza Systems", fn: () => fetchGizaSystems(MODE) },
-    { name: "Bright Skies", fn: () => fetchBrightSkies(MODE) },
-    { name: "Pharos Solutions", fn: () => fetchPharos(MODE) },
-  ];
-
-  const customResults = await Promise.allSettled(
-    customFetchers.map((cf) => cf.fn().then((res) => ({ ...res, sourceName: cf.name }))),
-  );
-
-  for (const r of customResults) {
-    if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName } = r.value as FetcherResult & {
-        sourceName: string;
-      };
-      health[sourceName] = { count: jobs.length, error, durationMs };
-      for (const j of jobs) {
-        if (!seen.has(j.id)) {
-          seen.add(j.id);
-          all.push(j);
-        }
-      }
-    } else {
-      console.error("[local] Custom fetcher error:", r.reason);
     }
   }
 

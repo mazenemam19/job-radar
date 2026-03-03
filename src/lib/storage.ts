@@ -53,12 +53,22 @@ export async function writeStore(store: JobStore): Promise<void> {
  * - Caps at MAX_JOBS
  */
 export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; added: Job[] } {
+  const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
   const existingIds = new Set(store.jobs.map((j) => j.id));
-  const added = incoming.filter((j) => !existingIds.has(j.id));
+
+  // Apply filters BEFORE calculating 'added' so we don't count rejected jobs as new
+  const validIncoming = incoming.filter(
+    (j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title),
+  );
+
+  const added = validIncoming.filter((j) => {
+    if (existingIds.has(j.id)) return false;
+    const ms = Date.parse(j.postedAt);
+    if (isNaN(ms) || ms < cutoff) return false;
+    return true;
+  });
 
   const merged = [...store.jobs, ...added]
-    // Re-apply filters to existing jobs in case logic changed (e.g. Junior filter added)
-    .filter((j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title))
     .sort((a, b) => b.totalScore - a.totalScore)
     .slice(0, MAX_JOBS);
 

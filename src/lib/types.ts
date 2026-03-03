@@ -40,6 +40,7 @@ export interface SourceHealth {
   rawCount?: number;
   error?: string;
   durationMs?: number;
+  ats?: string;
 }
 
 export interface CronLog {

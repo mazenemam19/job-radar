@@ -475,16 +475,26 @@ export async function fetchAshby(
 }
 
 // ── Workable ───────────────────────────────────────────────────────────────
-let workableQueue: Promise<unknown> = Promise.resolve();
-function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
+const workableQueues = new Map<JobMode, Promise<unknown>>();
+
+function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
   const delays = [1500, 2000, 3000];
   const randomDelay = delays[Math.floor(Math.random() * delays.length)];
-  const result = workableQueue.then(() => new Promise((r) => setTimeout(r, randomDelay))).then(fn);
-  workableQueue = result.catch(() => {});
+
+  if (!workableQueues.has(mode)) {
+    workableQueues.set(mode, Promise.resolve());
+  }
+
+  const currentQueue = workableQueues.get(mode)!;
+  const result = currentQueue.then(() => new Promise((r) => setTimeout(r, randomDelay))).then(fn);
+  workableQueues.set(
+    mode,
+    result.catch(() => {}),
+  );
   return result;
 }
 
-async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 5): Promise<T[]> {
+async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Promise<T[]> {
   const results: T[] = [];
   for (let i = 0; i < fns.length; i += concurrency) {
     const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map((f) => f()));
@@ -526,7 +536,7 @@ export async function fetchWorkable(
       .catch(() => null);
   };
 
-  let res = await queueWorkable(doFetch);
+  let res = await queueWorkable(doFetch, mode);
   if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
   if (!res.ok)
     return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
@@ -762,71 +772,79 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
   const now = new Date().toISOString();
   let rawCount = 0;
   try {
-    for (const q of queries) {
-      const searchPayload = {
-        startIndex: 0,
-        pageSize: 20,
-        longitude: "31.2357",
-        latitude: "30.0444",
-        query: q,
-        searchFilters: {
-          post_date: ["within_1_week"],
-          years_of_experience_min: ["3"],
-          years_of_experience_max: ["6"],
-        },
-      };
-      const sRes = await fetch(searchUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
-        body: JSON.stringify(searchPayload),
-      });
-      if (!sRes.ok) continue;
-      const sData = (await sRes.json()) as any;
-      const ids = (sData?.data || [])
-        .map((j: any) => j.id)
-        .filter((id: string) => !seenIds.has(id));
-      if (ids.length === 0) continue;
-      rawCount += ids.length;
-
-      const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
-      const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-      if (!dRes.ok) continue;
-      const dData = (await dRes.json()) as any;
-      const jobs = dData?.data || [];
-
-      for (const entry of jobs) {
-        const attr = entry.attributes || {};
-        const title = (attr.title || "").trim();
-        if (seenIds.has(entry.id) || !/react|next|native/i.test(title)) continue;
-        seenIds.add(entry.id);
-        const companyName =
-          attr.company_name ||
-          attr.computedFields?.find((f: any) => f.name === "company_name")?.value?.[0] ||
-          "Wuzzuf Job";
-        allWuzzufJobs.push({
-          id: `local_wuzzuf_${entry.id}`,
-          source: "local",
-          mode,
-          title,
-          company: companyName,
-          location: attr.location?.city?.name || "MENA",
-          country: attr.location?.country?.name || "MENA",
-          countryFlag: "🌍",
-          url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
-          description: stripHtml(attr.description || "").slice(0, 3000),
-          isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
-          postedAt: attr.postedAt,
-          dateUnknown: false,
-          visaSponsorship: false,
-          ...scoreJob({
-            title,
-            description: attr.description,
-            location: "MENA",
-            postedAt: attr.postedAt,
-          }),
-          fetchedAt: now,
+    const queryResults = await Promise.all(
+      queries.map(async (q) => {
+        const searchPayload = {
+          startIndex: 0,
+          pageSize: 20,
+          longitude: "31.2357",
+          latitude: "30.0444",
+          query: q,
+          searchFilters: {
+            post_date: ["within_1_week"],
+            years_of_experience_min: ["3"],
+            years_of_experience_max: ["6"],
+          },
+        };
+        const sRes = await fetch(searchUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
+          body: JSON.stringify(searchPayload),
         });
-      }
+        if (!sRes.ok) return [];
+        const sData = (await sRes.json()) as any;
+        const ids = (sData?.data || [])
+          .map((j: any) => j.id)
+          .filter((id: string) => !seenIds.has(id));
+        if (ids.length === 0) return [];
+
+        // Add to seenIds immediately to avoid duplicate detail fetches in other query branches
+        ids.forEach((id: string) => seenIds.add(id));
+        rawCount += ids.length;
+
+        const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
+        const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+        if (!dRes.ok) return [];
+        const dData = (await dRes.json()) as any;
+        return dData?.data || [];
+      }),
+    );
+
+    const jobs = queryResults.flat();
+    seenIds.clear(); // Reset for the actual title/dedupe check
+
+    for (const entry of jobs) {
+      const attr = entry.attributes || {};
+      const title = (attr.title || "").trim();
+      if (seenIds.has(entry.id) || !/react|next|native/i.test(title)) continue;
+      seenIds.add(entry.id);
+      const companyName =
+        attr.company_name ||
+        attr.computedFields?.find((f: any) => f.name === "company_name")?.value?.[0] ||
+        "Wuzzuf Job";
+      allWuzzufJobs.push({
+        id: `local_wuzzuf_${entry.id}`,
+        source: "local",
+        mode,
+        title,
+        company: companyName,
+        location: attr.location?.city?.name || "MENA",
+        country: attr.location?.country?.name || "MENA",
+        countryFlag: "🌍",
+        url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
+        description: stripHtml(attr.description || "").slice(0, 3000),
+        isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
+        postedAt: attr.postedAt,
+        dateUnknown: false,
+        visaSponsorship: false,
+        ...scoreJob({
+          title,
+          description: attr.description,
+          location: "MENA",
+          postedAt: attr.postedAt,
+        }),
+        fetchedAt: now,
+      });
     }
     return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
