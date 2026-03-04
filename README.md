@@ -28,6 +28,46 @@ Jobs with 0 skill match score are **never shown**. Jobs older than **7 days** ar
 
 ---
 
+---
+
+## Gemini LLM Filtration Layer
+
+The Job Radar project employs a **two-tier filtering system** to ensure job quality and relevance:
+
+1.  **Regex Tier**: A fast, initial check for tech stack (React, Next.js, etc.), seniority level, and obvious location restrictions (e.g., US-only).
+2.  **Gemini LLM Tier**: A secondary, more nuanced check for:
+    - **Location Alignment**: Ensures roles are friendly to Egypt/EMEA timezones and don't have restrictive US/UK/Canada-only requirements.
+    - **Israel-Related Companies**: Rejects companies based in Israel or known for supporting Israel.
+    - **Tech & Seniority**: Further refines tech stack matches and excludes Lead/Managerial roles.
+    - **Resilience**: Utilizes a cascading fallback queue of models (`gemini-3.1-pro-preview` down to `gemini-2.5-flash-lite`) to handle API load and errors.
+    - **Quota Optimization**: Gemini is only invoked for _new_ jobs that pass the Regex Tier, preserving API quota.
+
+---
+
+## Pipelines
+
+| Pipeline             | What it finds                                           | Companies                                                  |
+| -------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
+| ✈️ **Visa Sponsors** | Companies in EU/UK hubs that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more          |
+| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs                 | Instabug, Bosta, Thndr, Nawy, Blink22, ArpuPlus, +more     |
+| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2            | GitLab, Automattic, Netlify, Vercel, Linear, Zapier, +more |
+
+---
+
+## Gemini LLM Filtration Layer
+
+The Job Radar project employs a **two-tier filtering system** to ensure job quality and relevance:
+
+1.  **Regex Tier**: A fast, initial check for tech stack (React, Next.js, etc.), seniority level, and obvious location restrictions (e.g., US-only).
+2.  **Gemini LLM Tier**: A secondary, more nuanced check for:
+    - **Location Alignment**: Ensures roles are friendly to Egypt/EMEA timezones and don't have restrictive US/UK/Canada-only requirements.
+    - **Israel-Related Companies**: Rejects companies based in Israel or known for supporting Israel.
+    - **Tech & Seniority**: Further refines tech stack matches and excludes Lead/Managerial roles.
+    - **Resilience**: Utilizes a cascading fallback queue of models (`gemini-3.1-pro-preview` down to `gemini-2.5-flash-lite`) to handle API load and errors.
+    - **Quota Optimization**: Gemini is only invoked for _new_ jobs that pass the Regex Tier, preserving API quota.
+
+---
+
 ## Filters Applied
 
 1. **Title filter** — rejects backend, DevOps, Android, MLOps, compliance, hardware, marketing ops, intern roles, etc.
@@ -94,10 +134,11 @@ src/
     ├── scoring.ts              ← Skill matching, title filters, score calculation
     ├── storage.ts              ← jobs.json read/write, 7-day cleanup
     ├── email.ts                ← Gmail alert for new visa jobs
+    ├── gemini.ts               ← Gemini LLM filtration logic
     └── sources/
-        ├── companies.ts        ← EU visa sponsor company list (~65 companies)
+        ├── visa-companies.ts   ← Companies offering visa sponsorship (formerly companies.ts)
         ├── local-companies.ts  ← Egyptian company list
-        ├── global-companies.ts ← Global remote company list
+        ├── remote-companies.ts ← Global remote company list (formerly global-companies.ts)
         └── ats-utils.ts        ← Fetchers for Greenhouse, Lever, Ashby, Workable, BambooHR, SmartRecruiters
 vercel.json                     ← Cron: daily at 4pm UTC (6pm Cairo)
 ```

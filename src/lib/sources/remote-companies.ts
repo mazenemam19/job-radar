@@ -43,7 +43,6 @@ const COMPANIES: ATSConfig[] = [
     country: "Global",
     countryFlag: "🌍",
   },
-  { ats: "greenhouse", name: "HubSpot", slug: "hubspot", country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Twilio", slug: "twilio", country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Okta", slug: "okta", country: "Global", countryFlag: "🌍" },
 
@@ -59,9 +58,6 @@ const COMPANIES: ATSConfig[] = [
   { ats: "ashby", name: "Linear", slug: "linear", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "Airbyte", slug: "airbyte", country: "Global", countryFlag: "🌍" },
 
-  // ── Stable Core (Verified Lever) ────────────────────────────────────────
-  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Global", countryFlag: "🌍" },
-
   // ── Stable Core (Verified Workable) ──────────────────────────────────────
   {
     ats: "workable",
@@ -73,7 +69,7 @@ const COMPANIES: ATSConfig[] = [
   { ats: "workable", name: "Clerk", slug: "clerk", country: "Global", countryFlag: "🌍" },
 ];
 
-export async function fetchGlobalJobs(): Promise<{
+export async function fetchRemoteJobs(): Promise<{
   jobs: Job[];
   health: Record<string, SourceHealth>;
 }> {

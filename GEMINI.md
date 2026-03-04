@@ -27,13 +27,23 @@
 
 ### 🇪🇬 Local Board (Egypt/Regional)
 
-- **Wuzzuf**: Uses the direct 2-step JSON API (Search IDs -> Detail Lookup) with a 3+ years experience filter.
-- **Custom Fetchers**: Bright Skies, Pharos, Giza Systems (Direct APIs).
-- **Workable Batch**: 12 companies per scan, rotating across ~30 companies to ensure full coverage every 3 days.
+- **`local-companies.ts`**: The Egypt-only pipeline.
+  - **Wuzzuf**: Uses the direct 2-step JSON API (Search IDs -> Detail Lookup) with a 3+ years experience filter.
+  - **Custom Fetchers**: Bright Skies (GraphQL), other bespoke direct APIs.
+  - **Workable Batch**: 12 companies per scan, rotating across ~30 companies to ensure full coverage every 3 days.
 
-### 🌍 Global Remote Board
+### ✈️ Visa Board (Relocation)
 
-- **RemoteOK**: Official JSON API.
+- **`visa-companies.ts`**: The Visa Sponsorship pipeline for tech hubs (formerly `companies.ts`).
+  - Focuses on companies in Germany, UK, Netherlands.
+  - **Workable Batch**: 12 companies per scan, rotating.
+
+### 🌍 Remote Board (Global)
+
+- **`remote-companies.ts`**: The Global Remote pipeline (formerly `global-companies.ts`).
+  - **RemoteOK**: Official JSON API.
+  - **Himalayas/Remotive**: Direct API integrations.
+  - **WP Startup Jobs**: For specific job boards (e.g., Berlin/London Startup Jobs).
 
 ## 🛠️ Key Logic
 
@@ -62,11 +72,38 @@
 
 - **Public vs. Private Boards**: Many high-growth startups (Paymob, Lucky) restrict their Greenhouse/Workable APIs. If a browser URL works but the `boards-api` or `widget` URL returns 404, it is a "No-Go" for automated fetching without a private API key.
 - **SSL Trust Issues**: Some ATS platforms (like JazzHR for Koinz) have configuration issues that trigger `FetchError` or `Network/Timeout` due to SSL/TLS trust relationship failures in Node.js.
-- **Custom Portals**: Large entities (Fawry, MNT-Halan) use homegrown or enterprise HRIS systems (Oracle/SAP) that lack public JSON endpoints.
-- **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (MaxAB) are common in Egypt but currently unsupported by our fetcher suite.
+- **Custom Portals**: Large entities (Fawry) use homegrown or enterprise HRIS systems (Oracle/SAP) that lack public JSON endpoints.
+- **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (Vezeeta) are common in Egypt but currently unsupported by our fetcher suite.
 - **Volume Expansion**: To increase job count without lowering restrictions, prioritize "Hub Boards" (e.g., Berlin/London Startup Jobs). These often use WordPress REST APIs. Use the generic `fetchWPStartupJobs` fetcher for these.
 - **Age Cap Trap**: Hub boards often return high "Raw Signal" (October 2025 posts) but 0 "Matches" because our **7-day expiry** is strictly enforced. Verify the board's posting frequency before integrating.
 - **Workable Batching**: To avoid IP blocks, Workable fetchers use a rotating batch system. The `SourceHealthDashboard` now displays a "Skipped" status for Workable slugs that were not included in the current cron run's batch. This provides a clear view of which slugs are being rotated.
+
+## 🏢 Company Specific Insights (March 2026)
+
+This section documents detailed findings and decisions regarding specific companies, based on empirical testing and external research as of March 2026.
+
+### ✅ Verified Working & Active
+
+- **ArpuPlus**: Workable slug `arpu-telecommunication-services` (active).
+- **Blink22**: Workable slug `blink22-3` (active).
+- **Eva Pharma**: Workable slug `eva-pharma` (active).
+- **Flextock**: SmartRecruiters slug `Flextock` (active).
+- **Moonfare**: Greenhouse slug `moonfare` (active).
+- **valU**: SmartRecruiters slug `valu` (active, but currently 0 jobs on public API).
+- **Sary**: Workable slug `sary` (active, but currently 0 jobs on public API).
+- **MaxAB**: Breezy HR `maxab` (API works, but currently 0 jobs).
+
+### ❌ Removed / Unsupported / Zero Jobs
+
+- **Atlassian**: Moved to Workday (no public API support for our fetchers).
+- **HubSpot**: Moved to internal CRM (no public API support).
+- **MNT-Halan**: Custom portal (no public API support).
+- **Giza Systems**: Legacy HTML scraper (removed due to "No Scraping" mandate).
+- **Pharos Solutions**: Legacy HTML scraper (removed due to "No Scraping" mandate).
+- **Zenjob**: Greenhouse `zenjob` (API works, but currently 0 jobs).
+- **Backbase**: Greenhouse `backbase` (API works, but currently 0 jobs).
+- **MoneyHash**: Ashby `moneyhash` (API works, but currently 0 jobs).
+- **Koinz**: JazzHR `koinz` (API fails due to SSL/TLS issues, removed from active local-companies for now).
 
 ## 🤖 Gemini Model Intelligence (March 2026)
 

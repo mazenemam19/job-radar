@@ -915,47 +915,6 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
 
 // ── Custom Local Egyptian Company Fetchers ──────────────────────────────────
 
-export async function fetchGizaSystems(mode: JobMode): Promise<FetcherResult> {
-  const t0 = Date.now();
-  const company: BaseCompany = {
-    name: "Giza Systems",
-    country: "Egypt",
-    countryFlag: "🇪🇬",
-    city: "Cairo",
-  };
-  const url =
-    "https://www.gizasystemscareers.com/app/control/byt_job_search_manager?action=1&token=9IAKQR&query=trigger%3Ddate_indexed%26job_city%3Deg%2C2%2C0%26page%3D1%26jb_role%3D5%2C21%26date_indexed%3D8&body=job-search-results&lan=en";
-  const res = await safeFetch(url);
-  if (!res) return { jobs: [], rawCount: 0, error: "Network/Timeout", durationMs: Date.now() - t0 };
-  try {
-    const html = await res.text();
-    const jobs: RawJob[] = [];
-    const cards = html.split(/class="[^"]*job[^"]*"/i);
-    for (const card of cards) {
-      const linkMatch = /<a[^>]+href="([^"]+byt_job_details[^"]+)"[^>]*>([^<]{3,80})<\/a>/i.exec(
-        card,
-      );
-      if (!linkMatch) continue;
-      const dateMatch = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}-\d{2}-\d{2})/.exec(card);
-      const postedAt = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
-      jobs.push({
-        id: `local_gizasystems_${Buffer.from(linkMatch[1]).toString("base64").slice(0, 16)}`,
-        title: linkMatch[2].trim(),
-        location: "Cairo",
-        url: linkMatch[1].startsWith("http")
-          ? linkMatch[1]
-          : `https://www.gizasystemscareers.com${linkMatch[1]}`,
-        postedAt,
-        description: "",
-      });
-    }
-    const rawCount = jobs.length;
-    return { jobs: processJobs(jobs, company, mode, false), rawCount, durationMs: Date.now() - t0 };
-  } catch (e) {
-    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
-  }
-}
-
 export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const company: BaseCompany = {
@@ -1003,49 +962,6 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       false,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0 };
-  } catch (e) {
-    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
-  }
-}
-
-export async function fetchPharos(mode: JobMode): Promise<FetcherResult> {
-  const t0 = Date.now();
-  const company: BaseCompany = {
-    name: "Pharos Solutions",
-    country: "Egypt",
-    countryFlag: "🇪🇬",
-    city: "Cairo",
-  };
-  try {
-    const res = await fetch("https://pharos-solutions.de/wp-admin/admin-ajax.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "awsm_job_spec%5Bjob-category%5D=36&awsm_job_spec%5Bjob-type%5D=32&awsm_job_spec%5Bjob-location%5D=&action=jobfilter&listings_per_page=30",
-      signal: AbortSignal.timeout(60_000), // Increased timeout to 60s
-    });
-    if (!res.ok)
-      return { jobs: [], rawCount: 0, error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
-    const html = await res.text();
-    const jobs: RawJob[] = [];
-    const cards = html.split(/<article|<li[^>]*class="[^"]*job/i);
-    for (const card of cards) {
-      const linkM =
-        /<a[^>]+href="(https?:\/\/pharos-solutions\.de\/(?:job|jobs)[^"]*)"[^>]*>([^<]{3,100})/i.exec(
-          card,
-        );
-      if (!linkM) continue;
-      const dateM = /<time[^>]+datetime="([^"]+)"/i.exec(card);
-      jobs.push({
-        id: `local_pharos_${Buffer.from(linkM[1]).toString("base64").slice(0, 16)}`,
-        title: linkM[2].replace(/<[^>]+>/g, "").trim(),
-        location: "Cairo",
-        url: linkM[1],
-        postedAt: dateM ? dateM[1] : new Date().toISOString(),
-        description: "",
-      });
-    }
-    const rawCount = jobs.length;
-    return { jobs: processJobs(jobs, company, mode, false), rawCount, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
   }

@@ -96,7 +96,6 @@ const COMPANIES: ATSConfig[] = [
   { ats: "ashby", name: "DeepL", slug: "deepl", country: "Germany", countryFlag: "🇩🇪" },
   { ats: "smartrecruiters", name: "Enpal", slug: "EnpalBV", country: "Germany", countryFlag: "🇩🇪" },
   { ats: "workable", name: "Plan A", slug: "plana", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Global", countryFlag: "🌍" },
   {
     ats: "greenhouse",
     name: "Backbase",
@@ -104,16 +103,9 @@ const COMPANIES: ATSConfig[] = [
     country: "Netherlands",
     countryFlag: "🇳🇱",
   },
-  {
-    ats: "greenhouse",
-    name: "HubSpot",
-    slug: "hubspot",
-    country: "Global",
-    countryFlag: "🌍",
-  },
 ];
 
-export async function fetchCompanyJobs(): Promise<{
+export async function fetchVisaJobs(): Promise<{
   jobs: Job[];
   health: Record<string, SourceHealth>;
 }> {

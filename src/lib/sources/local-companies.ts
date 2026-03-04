@@ -10,9 +10,7 @@ import {
   fetchSmartRecruiters,
   fetchBambooHR,
   fetchJazzHR,
-  fetchGizaSystems,
   fetchBrightSkies,
-  fetchPharos,
   fetchWuzzuf,
   resetWorkableUsed,
 } from "./ats-utils";
@@ -80,7 +78,7 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "smartrecruiters",
     name: "valU",
-    slug: "valU",
+    slug: "valu",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -97,6 +95,14 @@ const COMPANIES: ATSConfig[] = [
     ats: "smartrecruiters",
     name: "Brimore",
     slug: "Brimore",
+    country: COUNTRY,
+    countryFlag: FLAG,
+    city: "Cairo",
+  },
+  {
+    ats: "smartrecruiters",
+    name: "Flextock",
+    slug: "Flextock",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -169,24 +175,8 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "Vezeeta",
-    slug: "vezeeta",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
     name: "Moneyfellows",
     slug: "moneyfellows",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
-    name: "Flextock",
-    slug: "flextock",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -281,14 +271,6 @@ const COMPANIES: ATSConfig[] = [
   },
   {
     ats: "workable",
-    name: "MNT-Halan",
-    slug: "mnt-halan",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
-  {
-    ats: "workable",
     name: "ArpuPlus",
     slug: "arpu-telecommunication-services",
     country: COUNTRY,
@@ -377,9 +359,7 @@ export async function fetchLocalJobs(): Promise<{
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
     fetchWuzzuf(MODE).then((res) => ({ ...res, sourceName: "Wuzzuf", ats: "custom" })),
-    fetchGizaSystems(MODE).then((res) => ({ ...res, sourceName: "Giza Systems", ats: "custom" })),
     fetchBrightSkies(MODE).then((res) => ({ ...res, sourceName: "Bright Skies", ats: "custom" })),
-    fetchPharos(MODE).then((res) => ({ ...res, sourceName: "Pharos Solutions", ats: "custom" })),
   ];
 
   const results = await Promise.allSettled(allFetchers);

@@ -1,7 +1,7 @@
 import { readStore, writeStore, mergeJobs, appendCronLog } from "./storage";
-import { fetchCompanyJobs } from "./sources/companies";
+import { fetchVisaJobs } from "./sources/visa-companies";
 import { fetchLocalJobs } from "./sources/local-companies";
-import { fetchGlobalJobs } from "./sources/global-companies";
+import { fetchRemoteJobs } from "./sources/remote-companies";
 import { sendJobAlert } from "./email";
 import {
   isClearlyNonFrontend,
@@ -43,10 +43,10 @@ export async function runAllSources(): Promise<CronLog> {
   let globalJobs: Job[] = [];
 
   // ── Run all pipelines in parallel ──────────────────────────────────────
-  const [localResult, visaResult, globalResult] = await Promise.allSettled([
+  const [localResult, visaResult, remoteResult] = await Promise.allSettled([
     fetchLocalJobs(),
-    fetchCompanyJobs(),
-    fetchGlobalJobs(),
+    fetchVisaJobs(),
+    fetchRemoteJobs(),
   ]);
 
   if (localResult.status === "fulfilled") {
@@ -65,12 +65,12 @@ export async function runAllSources(): Promise<CronLog> {
     console.error("[runner] visa pipeline failed:", visaResult.reason);
   }
 
-  if (globalResult.status === "fulfilled") {
-    globalJobs = globalResult.value.jobs;
-    Object.assign(sourceDetails, globalResult.value.health);
+  if (remoteResult.status === "fulfilled") {
+    globalJobs = remoteResult.value.jobs;
+    Object.assign(sourceDetails, remoteResult.value.health);
   } else {
-    errors.push(`global pipeline: ${globalResult.reason}`);
-    console.error("[runner] global pipeline failed:", globalResult.reason);
+    errors.push(`remote pipeline: ${remoteResult.reason}`);
+    console.error("[runner] remote pipeline failed:", remoteResult.reason);
   }
 
   // Handle Workable 429 escalate if nothing was found (indicates a general block)
