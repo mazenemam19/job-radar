@@ -16,14 +16,14 @@ export default function SourceHealthDashboard({
   const summaries = useMemo(() => {
     if (!logs || logs.length === 0) return [];
 
-    const sourceNames = new Set<string>();
-    logs.forEach((log) => {
-      if (log.sourceDetails) {
-        Object.keys(log.sourceDetails).forEach((name) => sourceNames.add(name));
-      }
-    });
+    // Only consider sources present in the LATEST log to prune removed/stale sources
+    const latestLog = [...logs].sort(
+      (a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime(),
+    )[0];
 
-    const result: SourceSummary[] = Array.from(sourceNames).map((name) => {
+    const sourceNames = latestLog.sourceDetails ? Object.keys(latestLog.sourceDetails) : [];
+
+    const result: SourceSummary[] = sourceNames.map((name) => {
       let successes = 0;
       let totalRuns = 0;
       let totalDuration = 0;

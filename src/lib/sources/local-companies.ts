@@ -146,7 +146,7 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "workable",
     name: "Blink22",
-    slug: "blink22",
+    slug: "blink22-3",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -266,7 +266,7 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "workable",
     name: "Eva Pharma",
-    slug: "evapharma",
+    slug: "eva-pharma",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -282,7 +282,7 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "workable",
     name: "MNT-Halan",
-    slug: "halan",
+    slug: "mnt-halan",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",
@@ -290,7 +290,7 @@ const COMPANIES: ATSConfig[] = [
   {
     ats: "workable",
     name: "ArpuPlus",
-    slug: "arpuplus",
+    slug: "arpu-telecommunication-services",
     country: COUNTRY,
     countryFlag: FLAG,
     city: "Cairo",

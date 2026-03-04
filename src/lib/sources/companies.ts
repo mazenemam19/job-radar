@@ -88,21 +88,28 @@ const COMPANIES: ATSConfig[] = [
   { ats: "greenhouse", name: "Checkr", slug: "checkr", country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Gusto", slug: "gusto", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "Mollie", slug: "mollie", country: "Netherlands", countryFlag: "🇳🇱" },
-  { ats: "workable", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
+  { ats: "greenhouse", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
 
-  // ── New Expansion (Slug Hunter) ──────────────────────────────────────
+  // ── Expansion ──────────────────────────────────────────────────────
   { ats: "greenhouse", name: "Raisin", slug: "raisin", country: "Germany", countryFlag: "🇩🇪" },
   { ats: "ashby", name: "Rasa", slug: "rasa", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "DeepL", slug: "deepl", country: "Germany", countryFlag: "🇩🇪" },
   { ats: "smartrecruiters", name: "Enpal", slug: "EnpalBV", country: "Germany", countryFlag: "🇩🇪" },
   { ats: "workable", name: "Plan A", slug: "plana", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Netherlands", countryFlag: "🇳🇱" },
+  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Global", countryFlag: "🌍" },
   {
     ats: "greenhouse",
     name: "Backbase",
     slug: "backbase",
     country: "Netherlands",
     countryFlag: "🇳🇱",
+  },
+  {
+    ats: "greenhouse",
+    name: "HubSpot",
+    slug: "hubspot",
+    country: "Global",
+    countryFlag: "🌍",
   },
 ];
 
@@ -115,9 +122,10 @@ export async function fetchCompanyJobs(): Promise<{
   const workables = COMPANIES.filter((c) => c.ats === "workable");
   const others = COMPANIES.filter((c) => c.ats !== "workable");
 
-  // Increased batch size to 12
   const batchWorkable = await getNextBatch(workables, 12, "visa-workable");
   const toScan = [...others, ...batchWorkable];
+
+  const skippedWorkables = workables.filter((c) => !batchWorkable.some((b) => b.name === c.name));
 
   // ── Parallelize everything ─────────────────────────────────────────
   const allFetchers = [
@@ -156,6 +164,14 @@ export async function fetchCompanyJobs(): Promise<{
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
+
+  for (const skipped of skippedWorkables) {
+    health[skipped.name] = {
+      count: 0,
+      ats: skipped.ats,
+      status: "skipped",
+    };
+  }
 
   for (const r of results) {
     if (r.status === "fulfilled") {

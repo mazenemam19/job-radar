@@ -59,6 +59,9 @@ const COMPANIES: ATSConfig[] = [
   { ats: "ashby", name: "Linear", slug: "linear", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "Airbyte", slug: "airbyte", country: "Global", countryFlag: "🌍" },
 
+  // ── Stable Core (Verified Lever) ────────────────────────────────────────
+  { ats: "lever", name: "Atlassian", slug: "atlassian", country: "Global", countryFlag: "🌍" },
+
   // ── Stable Core (Verified Workable) ──────────────────────────────────────
   {
     ats: "workable",
@@ -68,7 +71,6 @@ const COMPANIES: ATSConfig[] = [
     countryFlag: "🌍",
   },
   { ats: "workable", name: "Clerk", slug: "clerk", country: "Global", countryFlag: "🌍" },
-  { ats: "workable", name: "Sanity", slug: "sanity", country: "Global", countryFlag: "🌍" },
 ];
 
 export async function fetchGlobalJobs(): Promise<{
