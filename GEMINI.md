@@ -11,14 +11,16 @@
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. Do not scrape HTML unless absolutely necessary and verified.
 - **Fetcher Longevity**: A fetcher that successfully connects to an API but returns 0 jobs _after filtering_ should be kept. Job availability is volatile, and a working fetcher is a valuable asset for catching future listings.
 - **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution. This caused catastrophic module resolution failures. Stick strictly to Next.js defaults and standard TypeScript configurations. DO NOT repeat this mistake.
-- **Filtering Logic**: Stick to the existing regex-based filtering. It is highly effective at strictly focusing on React-related jobs and should not be replaced by LLM-based curation.
+- **Filtering Logic**: Uses a two-tier system:
+  1. **Regex Tier**: Fast initial gate for tech stack, seniority, and obvious location restrictions.
+  2. **Gemini LLM Tier**: Secondary aggressive check for location alignment (Egypt/EMEA), Israel-related companies, and nuanced tech/seniority mismatches.
+  - **Optimization**: Gemini is ONLY called for _new_ jobs that passed the Regex Tier to save API quota.
 
 ## 💾 Storage & State
 
-- **Vercel Blob Storage**: Primary persistent store for all data.
-- **`jobs-store.json`**: Contains the full job list and cron logs.
-- **`scan-state.json`**: Persistent memory for the **Rotating Batch** system (stores offsets for Workable queues). Syncs between local disk (for dev) and cloud blob (for prod).
-- **Environment**: Requires `BLOB_READ_WRITE_TOKEN` and `CRON_SECRET` in `.env.local`.
+- **Vercel Blob Storage**: Primary persistent store for all data (`jobs-store.json`, `scan-state.json`).
+- **`data/` Folder**: Locally ignored. Used only as a transient cache for scan states during development.
+- **Environment**: Requires `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `GEMINI_API_KEY` in `.env.local`.
 - **Cron Frequency**: Vercel Hobby tier limits cron jobs to **once per day**. Do not attempt to increase the frequency in `vercel.json` as it will be ignored or cause deployment errors. Use external triggers (like GitHub Actions) if higher frequency is needed.
 
 ## 🔌 Integrations
@@ -40,9 +42,11 @@
   - Unknown dates: Default to **4 days ago** (medium recency) to avoid crowding the top while ensuring natural expiry in 3 days.
 - **Cleanup**: Handled in `storage.ts` using `postedAt`. `mergeJobs` actively re-scans and purges any job (old or new) that fails the current filtering logic.
 - **Filter Intelligence**:
-  - **Geographical Blacklist**: Blocks jobs in Israel (`tel-aviv`, `gush dan`, `central district`).
-  - **Timezone Filter**: For global roles, blocks US-only/PST-only jobs unless they explicitly mention EMEA/Global/Europe.
-  - **Backend Guard**: Generic titles ("Software Engineer") are accepted ONLY if frontend keywords outnumber backend signals in the description.
+  - **Geographical Rejection**: Blocks Israel-based companies (Wix, Fiverr, Monday.com, etc.) and those on BDS lists.
+  - **Location & Hubs**: Aggressively rejects US/UK/Canada only roles, "US Hubs", and "Remote in the United States" using both regex and LLM.
+  - **Timezone Filter**: Rejects PST/EST/CST only roles unless Global/EMEA is explicitly mentioned.
+  - **Backend Guard**: Generic titles are accepted only if frontend keywords significantly outnumber backend signals.
+  - **Gemini Fallback Queue**: Resilient filtering using `gemini-3.1-pro-preview` -> `gemini-3.1-flash-lite-preview` -> `gemini-2.5-pro` -> `gemini-2.5-flash` -> `gemini-2.5-flash-lite`.
 
 ## ⚠️ Known Issues / Fixes
 
@@ -63,6 +67,23 @@
 - **Volume Expansion**: To increase job count without lowering restrictions, prioritize "Hub Boards" (e.g., Berlin/London Startup Jobs). These often use WordPress REST APIs. Use the generic `fetchWPStartupJobs` fetcher for these.
 - **Age Cap Trap**: Hub boards often return high "Raw Signal" (October 2025 posts) but 0 "Matches" because our **7-day expiry** is strictly enforced. Verify the board's posting frequency before integrating.
 - **Workable Batching**: To avoid IP blocks, Workable fetchers use a rotating batch system. The `SourceHealthDashboard` now displays a "Skipped" status for Workable slugs that were not included in the current cron run's batch. This provides a clear view of which slugs are being rotated.
+
+## 🤖 Gemini Model Intelligence (March 2026)
+
+To maintain high availability and accuracy, the project uses a cascading fallback queue of Gemini models. This configuration is based on the state of Google's API as of **March 2026**:
+
+- **Active Fallback Queue**:
+  1. `gemini-3.1-pro-preview`: Primary reasoning model.
+  2. `gemini-3.1-flash-lite-preview`: High-speed, cost-efficient (Released March 3, 2026).
+  3. `gemini-2.5-pro`: Stable general availability.
+  4. `gemini-2.5-flash`: Stable high-performance.
+  5. `gemini-2.5-flash-lite`: Maximum reliability.
+
+- **Verified Deprecations / Incompatibilities**:
+  - `gemini-3.1-flash-preview`: **Unavailable** (404) as of March 4, 2026.
+  - `gemini-3-pro-preview`: **Scheduled for shutdown** on March 9, 2026.
+  - `gemini-1.5-pro/flash`: **Deprecated/Shut down** in late 2025.
+  - **SDK**: Must use `@google/genai` (Unified SDK) with `apiVersion: "v1beta"`.
 
 ## 🏛️ Architecture
 

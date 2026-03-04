@@ -186,7 +186,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
 export function requiresCitizenshipOrClearance(text: string): boolean {
   const t = text.toLowerCase();
   return [
-    /must\s+be\s+a?\s*(us|uk|eu|canadian|australian)?\s*citizen/,
+    /must\s+be\s+a?\s*(us|uk|eu|canadian|australian|u\.?s\.?|u\.?k\.?)?\s*citizen/,
     /citizenship\s+required/,
     /security\s+clearance\s+required/,
     /cannot\s+(provide|offer|give)\s+visa\s+sponsorship/,
@@ -196,6 +196,11 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /unable\s+to\s+sponsor/,
     /we\s+(do\s+not|don'?t)\s+sponsor/,
     /no\s+visa\s+sponsorship/,
+    /remotely?\s+in\s+the\s+(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
+    /must\s+be\s+located\s+in\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
+    /\bu\.?s\.?\s+hubs?\b/,
+    /\bu\.?s\.?-only\b/,
+    /only\s+open\s+to\s+(residents|citizens|candidates)\s+of\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
   ].some((re) => re.test(t));
 }
 

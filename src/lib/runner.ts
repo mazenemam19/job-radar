@@ -4,6 +4,13 @@ import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchGlobalJobs } from "./sources/global-companies";
 import { sendJobAlert } from "./email";
 import {
+  isClearlyNonFrontend,
+  isTooSeniorOrTooJunior,
+  isGenericTitleButBackendRole,
+  requiresCitizenshipOrClearance,
+} from "./scoring";
+import { filterJobsWithGemini } from "./gemini";
+import {
   setWorkableBudgetConfig,
   getWorkable429SlugsThisRun,
   markWorkableSlugsBlocked24h,
@@ -77,7 +84,30 @@ export async function runAllSources(): Promise<CronLog> {
     }
   }
 
-  const fetched = [...visaJobs, ...localJobs, ...globalJobs];
+  const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
+
+  // ── Gemini Filtration Layer ──
+  // Identify TRULY new jobs that passed regex but haven't been Gemini-checked yet.
+  const newCandidates = rawFetched.filter((j) => {
+    if (existingIds.has(j.id)) return false;
+    if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title)) return false;
+    if (isGenericTitleButBackendRole(j.title, j.description)) return false;
+    if (requiresCitizenshipOrClearance(j.title + " " + j.description)) return false;
+    return true;
+  });
+
+  console.log(`[runner] Running Gemini filter on ${newCandidates.length} new candidate(s)...`);
+  const { passed: passedNewJobs, rejectedIds } = await filterJobsWithGemini(newCandidates);
+  const rejectedSet = new Set(rejectedIds);
+
+  // Filter rawFetched: keep existing, OR keep new IF it passed Gemini
+  const fetched = rawFetched.filter((j) => {
+    if (existingIds.has(j.id)) return true;
+    if (rejectedSet.has(j.id)) return false;
+    // If it was a candidate, check if it passed
+    return passedNewJobs.some((pj) => pj.id === j.id);
+  });
+
   const { store: updated, added } = mergeJobs(store, fetched);
 
   // Email alert only for brand-new visa-mode jobs

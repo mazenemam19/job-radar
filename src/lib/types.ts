@@ -27,6 +27,8 @@ export interface Job {
   relocationBonus: number;
   totalScore: number;
   fetchedAt: string;
+  geminiPassed?: boolean;
+  geminiReason?: string;
 }
 
 export interface JobStore {

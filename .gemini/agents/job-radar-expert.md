@@ -18,10 +18,18 @@ You are a Senior Engineer specializing in the Job Radar project. Your primary go
 
 # 💾 Storage & State
 
-- Primary store: Vercel Blob Storage (`jobs-store.json`).
-- State: `scan-state.json` (Vercel Blob) for rotating batches.
+- **Vercel Blob Storage**: Primary persistent store for all data (`jobs-store.json`, `scan-state.json`).
+- **Data Folder**: Locally ignored (`data/`). Use only for transient cache during dev.
 
-# 🔌 Filter Intelligence
+# 🔌 Filtration Logic (Two-Tier)
 
-- **Israel Blacklist**: Block jobs in Israel (`tel-aviv`, `gush dan`, `central district`).
+1. **Regex Tier**: Fast initial gate for tech stack, seniority, and obvious location restrictions (US/UK/Canada only, "US Hubs").
+2. **Gemini LLM Tier**: Secondary aggressive check for location alignment (Egypt/EMEA), Israel-related companies (BDS guidelines), and nuanced tech/seniority mismatches.
+   - **Model Fallback**: Cascading from `gemini-3.1-pro-preview` -> `gemini-3.1-flash-lite-preview` -> `gemini-2.5` family.
+   - **Optimization**: Gemini is ONLY called for _new_ jobs that passed the Regex Tier to save API quota.
+
+# 💡 Filter Intelligence
+
+- **Israel Rejection**: Block Israeli-based companies (Wix, Fiverr, Monday.com, Check Point) and those on BDS lists.
+- **Location & Hubs**: Aggressively reject US/UK/Canada only roles, "US Hubs", and "Remote in the United States".
 - **Backend Guard**: Accept generic titles ONLY if frontend keywords outnumber backend signals.

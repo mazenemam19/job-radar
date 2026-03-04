@@ -1,7 +1,12 @@
 // src/lib/storage.ts
 import { put, list } from "@vercel/blob";
 import { Job, JobStore, CronLog } from "./types";
-import { isClearlyNonFrontend, isTooSeniorOrTooJunior } from "./scoring";
+import {
+  isClearlyNonFrontend,
+  isTooSeniorOrTooJunior,
+  isGenericTitleButBackendRole,
+  requiresCitizenshipOrClearance,
+} from "./scoring";
 
 const BLOB_KEY = "jobs-store.json";
 const MAX_JOBS = 500;
@@ -57,9 +62,15 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
   const existingIds = new Set(store.jobs.map((j) => j.id));
 
   // Apply filters BEFORE calculating 'added' so we don't count rejected jobs as new
-  const validIncoming = incoming.filter(
-    (j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title),
-  );
+  const validIncoming = incoming.filter((j) => {
+    const text = `${j.title} ${j.description}`;
+    return (
+      !isClearlyNonFrontend(j.title) &&
+      !isTooSeniorOrTooJunior(j.title) &&
+      !isGenericTitleButBackendRole(j.title, j.description) &&
+      !requiresCitizenshipOrClearance(text)
+    );
+  });
 
   const added = validIncoming.filter((j) => {
     if (existingIds.has(j.id)) return false;
@@ -70,10 +81,16 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
 
   // ── Aggressive Re-filtering ──
   // We re-scan the entire merged set to ensure old jobs also respect any NEW filtering logic.
-  // Note: Since locationRestrictions aren't stored in the final Job type,
-  // we rely on title/description patterns for persistent cleanup if needed.
   const merged = [...store.jobs, ...added]
-    .filter((j) => !isClearlyNonFrontend(j.title) && !isTooSeniorOrTooJunior(j.title))
+    .filter((j) => {
+      const text = `${j.title} ${j.description}`;
+      return (
+        !isClearlyNonFrontend(j.title) &&
+        !isTooSeniorOrTooJunior(j.title) &&
+        !isGenericTitleButBackendRole(j.title, j.description) &&
+        !requiresCitizenshipOrClearance(text)
+      );
+    })
     .sort((a, b) => b.totalScore - a.totalScore)
     .slice(0, MAX_JOBS);
 
