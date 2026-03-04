@@ -96,6 +96,7 @@ CRON_SECRET=your-random-secret-here
 EMAIL_USER=youremail@gmail.com
 EMAIL_PASS=your-gmail-app-password
 EMAIL_TO=youremail@gmail.com
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 3. Run locally

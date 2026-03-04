@@ -1,4 +1,4 @@
-// src/lib/sources/global-companies.ts
+// src/lib/sources/remote-companies.ts
 // "Global Remote" pipeline — worldwide remote companies that accept Egypt/GMT+2 applicants.
 // Filter: rejects US-timezone-only, must-be-authorized-in-country, EU-resident-only.
 
@@ -136,6 +136,7 @@ export async function fetchRemoteJobs(): Promise<{
         sourceName: string;
         ats: string;
       };
+      all.push(...jobs);
       health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
