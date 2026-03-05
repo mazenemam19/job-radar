@@ -1,5 +1,5 @@
-// src/lib/sources/companies.ts
-import type { Job, SourceHealth, ATSConfig, FetcherResult } from "../types";
+// src/lib/sources/visa-companies.ts
+import type { Job, SourceHealth, FetcherResult } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -12,83 +12,10 @@ import {
 } from "./ats-utils";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";
+import { ALL_COMPANIES } from "./companies";
 
 const MODE = "visa";
 const VISA = true;
-
-const COMPANIES: ATSConfig[] = [
-  // ── Verified Visa Hubs ───────────────────────────────────────────────
-  {
-    ats: "greenhouse",
-    name: "Contentful",
-    slug: "contentful",
-    country: "Germany",
-    countryFlag: "🇩🇪",
-  },
-  { ats: "greenhouse", name: "N26", slug: "n26", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "greenhouse", name: "SumUp", slug: "sumup", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "greenhouse", name: "Babbel", slug: "babbel", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "greenhouse", name: "Adyen", slug: "adyen", country: "Netherlands", countryFlag: "🇳🇱" },
-  {
-    ats: "greenhouse",
-    name: "Elastic",
-    slug: "elastic",
-    country: "Netherlands",
-    countryFlag: "🇳🇱",
-  },
-  { ats: "greenhouse", name: "Monzo", slug: "monzo", country: "UK", countryFlag: "🇬🇧" },
-  { ats: "greenhouse", name: "Intercom", slug: "intercom", country: "Ireland", countryFlag: "🇮🇪" },
-  { ats: "greenhouse", name: "Wallapop", slug: "wallapop", country: "Spain", countryFlag: "🇪🇸" },
-  { ats: "greenhouse", name: "Pleo", slug: "pleo", country: "Denmark", countryFlag: "🇩🇰" },
-  { ats: "greenhouse", name: "Wolt", slug: "wolt", country: "Finland", countryFlag: "🇫🇮" },
-  { ats: "greenhouse", name: "Doctolib", slug: "doctolib", country: "France", countryFlag: "🇫🇷" },
-  { ats: "greenhouse", name: "Zenjob", slug: "zenjob", country: "Germany", countryFlag: "🇩🇪" },
-  {
-    ats: "greenhouse",
-    name: "Solarisbank",
-    slug: "solarisbank",
-    country: "Germany",
-    countryFlag: "🇩🇪",
-  },
-  { ats: "greenhouse", name: "GoCardless", slug: "gocardless", country: "UK", countryFlag: "🇬🇧" },
-  {
-    ats: "greenhouse",
-    name: "Catawiki",
-    slug: "catawiki",
-    country: "Netherlands",
-    countryFlag: "🇳🇱",
-  },
-  {
-    ats: "greenhouse",
-    name: "Scandit",
-    slug: "scandit",
-    country: "Switzerland",
-    countryFlag: "🇨🇭",
-  },
-  { ats: "greenhouse", name: "Feedzai", slug: "feedzai", country: "Portugal", countryFlag: "🇵🇹" },
-  {
-    ats: "greenhouse",
-    name: "Squarespace",
-    slug: "squarespace",
-    country: "Ireland",
-    countryFlag: "🇮🇪",
-  },
-  { ats: "ashby", name: "Mollie", slug: "mollie", country: "Netherlands", countryFlag: "🇳🇱" },
-
-  // ── Expansion ──────────────────────────────────────────────────────
-  { ats: "greenhouse", name: "Raisin", slug: "raisin", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "ashby", name: "Rasa", slug: "rasa", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "DeepL", slug: "deepl", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "smartrecruiters", name: "Enpal", slug: "EnpalBV", country: "Germany", countryFlag: "🇩🇪" },
-  { ats: "workable", name: "Plan A", slug: "plana", country: "Germany", countryFlag: "🇩🇪" },
-  {
-    ats: "greenhouse",
-    name: "Backbase",
-    slug: "backbase",
-    country: "Netherlands",
-    countryFlag: "🇳🇱",
-  },
-];
 
 export async function fetchVisaJobs(): Promise<{
   jobs: Job[];
@@ -96,8 +23,11 @@ export async function fetchVisaJobs(): Promise<{
 }> {
   resetWorkableUsed(MODE);
 
-  const workables = COMPANIES.filter((c) => c.ats === "workable");
-  const others = COMPANIES.filter((c) => c.ats !== "workable");
+  // Filter master list for visa companies
+  const companies = ALL_COMPANIES.filter((c) => c.pipelines.includes(MODE));
+
+  const workables = companies.filter((c) => c.ats === "workable");
+  const others = companies.filter((c) => c.ats !== "workable");
 
   const batchWorkable = await getNextBatch(workables, 12, "visa-workable");
   const toScan = [...others, ...batchWorkable];

@@ -2,7 +2,7 @@
 // "Global Remote" pipeline — worldwide remote companies that accept Egypt/GMT+2 applicants.
 // Filter: rejects US-timezone-only, must-be-authorized-in-country, EU-resident-only.
 
-import type { Job, SourceHealth, ATSConfig, FetcherResult } from "../types";
+import type { Job, SourceHealth, FetcherResult } from "../types";
 import {
   fetchGreenhouse,
   fetchLever,
@@ -18,68 +18,10 @@ import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { getNextBatch } from "../state";
+import { ALL_COMPANIES } from "./companies";
 
 const MODE = "global";
 const VISA = false;
-
-const COMPANIES: ATSConfig[] = [
-  // ── Stable Core (Verified Greenhouse) ───────────────────────────────────
-  { ats: "greenhouse", name: "Webflow", slug: "webflow", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Mercury", slug: "mercury", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Vercel", slug: "vercel", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Airbnb", slug: "airbnb", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Discord", slug: "discord", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Coinbase", slug: "coinbase", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Figma", slug: "figma", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Grafana", slug: "grafanalabs", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Netlify", slug: "netlify", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Lyft", slug: "lyft", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Reddit", slug: "reddit", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Pinterest", slug: "pinterest", country: "Global", countryFlag: "🌍" },
-  {
-    ats: "greenhouse",
-    name: "Databricks",
-    slug: "databricks",
-    country: "Global",
-    countryFlag: "🌍",
-  },
-  { ats: "greenhouse", name: "Twilio", slug: "twilio", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Okta", slug: "okta", country: "Global", countryFlag: "🌍" },
-  {
-    ats: "greenhouse",
-    name: "Cloudflare",
-    slug: "cloudflare",
-    country: "Global",
-    countryFlag: "🌍",
-  },
-
-  { ats: "greenhouse", name: "Asana", slug: "asana", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Checkr", slug: "checkr", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Gusto", slug: "gusto", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
-
-  // ── Stable Core (Verified Ashby) ────────────────────────────────────────
-  { ats: "ashby", name: "Posthog", slug: "posthog", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Infisical", slug: "infisical", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Resend", slug: "resend", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Stytch", slug: "stytch", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Raycast", slug: "raycast", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Supabase", slug: "supabase", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Neon", slug: "neon", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Plain", slug: "plain", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Linear", slug: "linear", country: "Global", countryFlag: "🌍" },
-  { ats: "ashby", name: "Airbyte", slug: "airbyte", country: "Global", countryFlag: "🌍" },
-
-  // ── Stable Core (Verified Workable) ──────────────────────────────────────
-  {
-    ats: "workable",
-    name: "Learnworlds",
-    slug: "learnworlds",
-    country: "Global",
-    countryFlag: "🌍",
-  },
-  { ats: "workable", name: "Clerk", slug: "clerk", country: "Global", countryFlag: "🌍" },
-];
 
 export async function fetchRemoteJobs(): Promise<{
   jobs: Job[];
@@ -87,8 +29,11 @@ export async function fetchRemoteJobs(): Promise<{
 }> {
   resetWorkableUsed(MODE);
 
-  const workables = COMPANIES.filter((c) => c.ats === "workable");
-  const others = COMPANIES.filter((c) => c.ats !== "workable");
+  // Filter master list for global companies
+  const companies = ALL_COMPANIES.filter((c) => c.pipelines.includes(MODE));
+
+  const workables = companies.filter((c) => c.ats === "workable");
+  const others = companies.filter((c) => c.ats !== "workable");
 
   const batchWorkable = await getNextBatch(workables, 12, "global-workable");
   const toScan = [...others, ...batchWorkable];
