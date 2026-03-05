@@ -259,7 +259,7 @@ export default function SourceHealthDashboard({
       <header className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
         <div>
           <h2 className="text-xl font-display font-bold text-white tracking-tight">
-            {alwaysOpen ? "Signal Analysis v3.3" : "Engine Diagnostics"}
+            {alwaysOpen ? "Source Health v3.3" : "Engine Diagnostics"}
           </h2>
           <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 mt-1">
             {alwaysOpen

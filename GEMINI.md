@@ -126,7 +126,7 @@ To maintain high availability and accuracy, the project uses a cascading fallbac
 
 ## 🏛️ Architecture
 
-- **Signal Analysis Page**: Dedicated route at `/analysis` using `AnalysisView.tsx`.
+- **Source Health Page**: Dedicated route at `/analysis` using `AnalysisView.tsx`.
 - **Component Modularity**:
   - `AppHeader.tsx`: Shared navigation and "Run Scan" logic.
   - `SourceHealthDashboard.tsx`: High-tech diagnostic view. Supports an `alwaysOpen` prop for the dedicated analysis page.
