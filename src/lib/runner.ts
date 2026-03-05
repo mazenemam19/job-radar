@@ -125,25 +125,6 @@ export async function runAllSources(): Promise<CronLog> {
   const { passed: passedNewJobs, rejectedIds } = await filterJobsWithGemini(newCandidates);
   const rejectedSet = new Set(rejectedIds);
 
-  // Track Gemini rejections in sourceDetails
-  // We use a case-insensitive lookup to be safe
-  const detailKeys = Object.keys(sourceDetails);
-
-  newCandidates.forEach((j) => {
-    if (rejectedSet.has(j.id)) {
-      const sourceKey = j.sourceName || j.company;
-      // Find the key that matches (case-insensitive)
-      const actualKey = detailKeys.find(
-        (k) => k.toLowerCase().trim() === sourceKey.toLowerCase().trim(),
-      );
-
-      if (actualKey && sourceDetails[actualKey]) {
-        sourceDetails[actualKey].geminiFiltered =
-          (sourceDetails[actualKey].geminiFiltered || 0) + 1;
-      }
-    }
-  });
-
   // Filter rawFetched: keep existing, OR keep new IF it passed Gemini
   const fetched = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return true;
@@ -153,6 +134,38 @@ export async function runAllSources(): Promise<CronLog> {
   });
 
   const { store: updated, added } = mergeJobs(store, fetched);
+
+  // ── Final Health Refinement ──
+  // We overwrite the 'count' and 'geminiFiltered' with the real numbers
+  // derived from current unique survivors and current run unique rejections.
+  const detailKeys = Object.keys(sourceDetails);
+
+  for (const key in sourceDetails) {
+    sourceDetails[key].count = 0; // Technical matches (Regex tier)
+    sourceDetails[key].geminiFiltered = 0; // AI Rejections
+  }
+
+  // 1. Count technical survivors (Unique jobs from this run that passed Regex)
+  const uniqueRawFetched = Array.from(new Map(rawFetched.map((j) => [j.id, j])).values());
+  uniqueRawFetched.forEach((j) => {
+    const sName = (j.sourceName || j.company).toLowerCase().trim();
+    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
+    if (key && sourceDetails[key]) {
+      sourceDetails[key].count! += 1;
+    }
+  });
+
+  // 2. Count Gemini rejections (Unique jobs from this run rejected by AI)
+  const uniqueNewCandidates = Array.from(new Map(newCandidates.map((j) => [j.id, j])).values());
+  uniqueNewCandidates.forEach((j) => {
+    if (rejectedSet.has(j.id)) {
+      const sName = (j.sourceName || j.company).toLowerCase().trim();
+      const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
+      if (key && sourceDetails[key]) {
+        sourceDetails[key].geminiFiltered! += 1;
+      }
+    }
+  });
 
   // Email alert only for brand-new visa-mode jobs
   const brandNewVisa = added.filter((j) => !existingIds.has(j.id) && j.mode === "visa");

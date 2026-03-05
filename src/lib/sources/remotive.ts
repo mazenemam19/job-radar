@@ -2,6 +2,7 @@
 import { Job, JobMode, FetcherResult, RemotiveJob } from "../types";
 import { safeFetch, stripHtml } from "./ats-utils";
 import { scoreJob } from "../scoring";
+import { trackApiCall } from "../health-store";
 
 /**
  * Fetches jobs from Remotive.com API.
@@ -12,8 +13,12 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
   const url = "https://remotive.com/api/remote-jobs?category=software-dev";
   const res = await safeFetch(url);
 
-  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0 };
-  if (!res.ok) return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0 };
+  const healthStat = await trackApiCall("Remotive", res?.ok ?? false);
+
+  if (!res)
+    return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0, ...healthStat };
+  if (!res.ok)
+    return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0, ...healthStat };
 
   try {
     const data = (await res.json()) as { jobs: RemotiveJob[] };
@@ -58,8 +63,15 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
     }
 
     console.log(`[global] Remotive: collected ${out.length} matches`);
-    return { jobs: out, rawCount, durationMs: Date.now() - t0 };
+    return { jobs: out, rawCount, durationMs: Date.now() - t0, ...healthStat };
   } catch (e) {
-    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0 };
+    const healthStat = await trackApiCall("Remotive", false);
+    return {
+      jobs: [],
+      rawCount: 0,
+      error: `Parse Error: ${e}`,
+      durationMs: Date.now() - t0,
+      ...healthStat,
+    };
   }
 }

@@ -1,5 +1,5 @@
 // src/lib/sources/ats-utils.ts
-import { trackApiCall } from "../health-store";
+import { trackApiCall, getHealthStat } from "../health-store";
 import type {
   Job,
   JobMode,
@@ -1006,7 +1006,12 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
           headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
           body: JSON.stringify(searchPayload),
         });
-        if (!sRes.ok) return [];
+
+        if (!sRes.ok) {
+          await trackApiCall("Wuzzuf", false);
+          return [];
+        }
+        await trackApiCall("Wuzzuf", true);
         const sData = (await sRes.json()) as WuzzufSearchResponse;
         const ids = (sData?.data || []).map((j) => j.id).filter((id) => !seenIds.has(id));
         if (ids.length === 0) return [];
@@ -1025,6 +1030,9 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
 
     const jobs = queryResults.flat();
     seenIds.clear(); // Reset for the actual title/dedupe check
+
+    // Aggregate health stats without incrementing
+    const { success, total } = await getHealthStat("Wuzzuf");
 
     for (const entry of jobs) {
       const attr = entry.attributes || {};
@@ -1060,9 +1068,17 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         fetchedAt: now,
       });
     }
-    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0 };
+    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0, success, total };
   } catch (e) {
-    return { jobs: [], rawCount: 0, error: `Error: ${e}`, durationMs: Date.now() - t0 };
+    const { success, total } = await trackApiCall("Wuzzuf", false);
+    return {
+      jobs: [],
+      rawCount: 0,
+      error: `Error: ${e}`,
+      durationMs: Date.now() - t0,
+      success,
+      total,
+    };
   }
 }
 

@@ -5,6 +5,7 @@ import { HealthStore, HealthStat } from "./types";
 const BLOB_KEY = "health-store.json";
 
 let healthStoreCache: HealthStore | null = null;
+let updateQueue: Promise<unknown> = Promise.resolve();
 
 // Read from Vercel Blob
 export async function readHealthStore(): Promise<HealthStore> {
@@ -44,23 +45,35 @@ export async function writeHealthStore(store: HealthStore): Promise<void> {
 
 /**
  * Tracks an API call for a given source, updating its lifetime stats.
- * This function reads the store, updates it, and writes it back.
+ * Uses a sequential queue to prevent race conditions during parallel scan runs.
  */
 export async function trackApiCall(sourceName: string, success: boolean): Promise<HealthStat> {
+  const result = updateQueue.then(async () => {
+    const store = await readHealthStore();
+
+    // Ensure the entry exists
+    if (!store[sourceName]) {
+      store[sourceName] = { success: 0, total: 0 };
+    }
+
+    // Update stats
+    store[sourceName].total += 1;
+    if (success) {
+      store[sourceName].success += 1;
+    }
+
+    await writeHealthStore(store);
+    return store[sourceName];
+  });
+
+  updateQueue = result.catch(() => {});
+  return result;
+}
+
+/**
+ * Just retrieves the current stats without incrementing.
+ */
+export async function getHealthStat(sourceName: string): Promise<HealthStat> {
   const store = await readHealthStore();
-
-  // Ensure the entry exists
-  if (!store[sourceName]) {
-    store[sourceName] = { success: 0, total: 0 };
-  }
-
-  // Update stats
-  store[sourceName].total += 1;
-  if (success) {
-    store[sourceName].success += 1;
-  }
-
-  await writeHealthStore(store);
-
-  return store[sourceName];
+  return store[sourceName] || { success: 0, total: 0 };
 }

@@ -107,6 +107,8 @@ export interface FetcherResult {
   rawCount?: number;
   error?: string;
   durationMs?: number;
+  success?: number;
+  total?: number;
 }
 
 // ── ATS Specific Response Types ───────────────────────────────────────────
