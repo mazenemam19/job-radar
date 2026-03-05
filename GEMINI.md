@@ -1,6 +1,8 @@
 # JOB RADAR - Project Memory
 
-- **Honesty & Verification Mandate**: ALWAYS provide a clear, data-backed summary of changes. For any expansion task, explicitly list: 1. Initial count/list, 2. Exactly what was added (names), 3. Exactly what was removed (names), and 4. Final count. Never conflate verification of existing items with the addition of new ones.
+- **IMMUTABLE FILTERING MANDATE**: NEVER loosen or modify the filtering logic in `scoring.ts`, `ats-utils.ts`, or the Gemini prompt. These filters are strictly tailored to the user's personal profile: **Senior React/Next.js Engineer based in Egypt**. Any role that is not a high-match for this specific profile MUST be rejected.
+
+- **Honesty & Verification Mandate**: ALWAYS provide a clear, data-backed summary of changes. For any expansion task, explicitly list: 1. Initial count/list, 2. Exactly what was added (names), 3. Exactly what was added (names), 4. Exactly what was removed (names), and 5. Final count. Never conflate verification of existing items with the addition of new ones.
 
 - **Tech Gate**: ALL jobs must be **React**, **Next.js**, or **React Native**. Generic frontend roles are strictly filtered out in the scrapers/fetchers.
 - **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. Lead/Managerial roles are also excluded.
@@ -123,6 +125,13 @@ To maintain high availability and accuracy, the project uses a cascading fallbac
   - `gemini-3-pro-preview`: **Scheduled for shutdown** on March 9, 2026.
   - `gemini-1.5-pro/flash`: **Deprecated/Shut down** in late 2025.
   - **SDK**: Must use `@google/genai` (Unified SDK) with `apiVersion: "v1beta"`.
+
+### ⚠️ Analysis & Fixes (March 5, 2026)
+
+- **Problem**: Store volatility (dropping to 1-4 total jobs).
+- **Root Cause**: The mismatch between "Sources" and "Total jobs" is by design. "Sources" counts raw collected jobs, while "Total" only includes those passing the strict Regex and Gemini tiers tailored for a Senior React Engineer in Egypt.
+- **Fixes Applied**: Fixed a job duplication bug in the `global` pipeline.
+- **Mandate**: NEVER modify filtering logic to increase volume; quality and profile alignment are the absolute priority.
 
 ## 🏛️ Architecture
 

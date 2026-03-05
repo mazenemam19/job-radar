@@ -136,7 +136,6 @@ export async function fetchRemoteJobs(): Promise<{
         sourceName: string;
         ats: string;
       };
-      all.push(...jobs);
       health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
