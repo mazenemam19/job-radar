@@ -88,11 +88,15 @@ export async function runAllSources(): Promise<CronLog> {
 
   // ── Gemini Filtration Layer ──
   // Identify TRULY new jobs that passed regex but haven't been Gemini-checked yet.
+  const seenCandidateIds = new Set<string>();
   const newCandidates = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return false;
+    if (seenCandidateIds.has(j.id)) return false; // Prevent duplicate Gemini calls in same run
     if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title)) return false;
     if (isGenericTitleButBackendRole(j.title, j.description)) return false;
     if (requiresCitizenshipOrClearance(j.title + " " + j.description)) return false;
+
+    seenCandidateIds.add(j.id);
     return true;
   });
 

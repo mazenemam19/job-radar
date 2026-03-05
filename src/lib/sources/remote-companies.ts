@@ -45,6 +45,18 @@ const COMPANIES: ATSConfig[] = [
   },
   { ats: "greenhouse", name: "Twilio", slug: "twilio", country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Okta", slug: "okta", country: "Global", countryFlag: "🌍" },
+  {
+    ats: "greenhouse",
+    name: "Cloudflare",
+    slug: "cloudflare",
+    country: "Global",
+    countryFlag: "🌍",
+  },
+
+  { ats: "greenhouse", name: "Asana", slug: "asana", country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Checkr", slug: "checkr", country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Gusto", slug: "gusto", country: "Global", countryFlag: "🌍" },
+  { ats: "greenhouse", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
 
   // ── Stable Core (Verified Ashby) ────────────────────────────────────────
   { ats: "ashby", name: "Posthog", slug: "posthog", country: "Global", countryFlag: "🌍" },

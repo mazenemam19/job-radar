@@ -38,7 +38,6 @@ const COMPANIES: ATSConfig[] = [
   },
   { ats: "greenhouse", name: "Monzo", slug: "monzo", country: "UK", countryFlag: "🇬🇧" },
   { ats: "greenhouse", name: "Intercom", slug: "intercom", country: "Ireland", countryFlag: "🇮🇪" },
-  { ats: "greenhouse", name: "Stripe", slug: "stripe", country: "Global", countryFlag: "🌍" },
   { ats: "greenhouse", name: "Wallapop", slug: "wallapop", country: "Spain", countryFlag: "🇪🇸" },
   { ats: "greenhouse", name: "Pleo", slug: "pleo", country: "Denmark", countryFlag: "🇩🇰" },
   { ats: "greenhouse", name: "Wolt", slug: "wolt", country: "Finland", countryFlag: "🇫🇮" },
@@ -74,21 +73,7 @@ const COMPANIES: ATSConfig[] = [
     country: "Ireland",
     countryFlag: "🇮🇪",
   },
-  { ats: "greenhouse", name: "Okta", slug: "okta", country: "Global", countryFlag: "🌍" },
-  {
-    ats: "greenhouse",
-    name: "Cloudflare",
-    slug: "cloudflare",
-    country: "Global",
-    countryFlag: "🌍",
-  },
-  { ats: "greenhouse", name: "DataDog", slug: "datadog", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Twilio", slug: "twilio", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Asana", slug: "asana", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Checkr", slug: "checkr", country: "Global", countryFlag: "🌍" },
-  { ats: "greenhouse", name: "Gusto", slug: "gusto", country: "Global", countryFlag: "🌍" },
   { ats: "ashby", name: "Mollie", slug: "mollie", country: "Netherlands", countryFlag: "🇳🇱" },
-  { ats: "greenhouse", name: "Moonfare", slug: "moonfare", country: "Germany", countryFlag: "🇩🇪" },
 
   // ── Expansion ──────────────────────────────────────────────────────
   { ats: "greenhouse", name: "Raisin", slug: "raisin", country: "Germany", countryFlag: "🇩🇪" },
@@ -144,9 +129,6 @@ export async function fetchVisaJobs(): Promise<{
       })();
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
-      (res) => ({ ...res, sourceName: "Berlin Startup Jobs (Visa)", ats: "custom" }),
-    ),
     fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
       (res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" }),
     ),
