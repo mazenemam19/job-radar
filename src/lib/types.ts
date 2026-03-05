@@ -40,6 +40,7 @@ export interface JobStore {
 export interface SourceHealth {
   count: number;
   rawCount?: number;
+  geminiFiltered?: number;
   error?: string;
   durationMs?: number;
   ats?: string;
@@ -299,13 +300,13 @@ export interface AppHeaderProps {
   onRefresh?: () => Promise<void>;
   cronSecret?: string;
 }
-
 export interface SourceSummary {
   name: string;
   totalRuns: number;
   successRate: number;
   lastCount: number;
   lastRawCount?: number;
+  lastGeminiFiltered?: number;
   lastError?: string;
   avgDuration?: number;
   status: "healthy" | "nomatch" | "warning" | "error" | "skipped";

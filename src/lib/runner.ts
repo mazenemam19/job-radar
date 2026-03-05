@@ -125,6 +125,17 @@ export async function runAllSources(): Promise<CronLog> {
   const { passed: passedNewJobs, rejectedIds } = await filterJobsWithGemini(newCandidates);
   const rejectedSet = new Set(rejectedIds);
 
+  // Track Gemini rejections in sourceDetails
+  newCandidates.forEach((j) => {
+    if (rejectedSet.has(j.id)) {
+      const sourceKey = j.company; // j.company matches the key in sourceDetails
+      if (sourceDetails[sourceKey]) {
+        sourceDetails[sourceKey].geminiFiltered =
+          (sourceDetails[sourceKey].geminiFiltered || 0) + 1;
+      }
+    }
+  });
+
   // Filter rawFetched: keep existing, OR keep new IF it passed Gemini
   const fetched = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return true;

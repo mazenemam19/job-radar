@@ -32,6 +32,7 @@ export default function SourceHealthDashboard({
       const lastDetail = lastLogWithSource?.sourceDetails?.[name];
       const lastCount = lastDetail?.count ?? 0;
       const lastRawCount = lastDetail?.rawCount;
+      const lastGeminiFiltered = lastDetail?.geminiFiltered;
       const lastError = lastDetail?.error;
       const lastStatus = lastDetail?.status;
 
@@ -72,6 +73,7 @@ export default function SourceHealthDashboard({
         successRate: total > 0 ? (success / total) * 100 : 0,
         lastCount,
         lastRawCount,
+        lastGeminiFiltered,
         lastError,
         avgDuration: durationCount > 0 ? totalDuration / durationCount : undefined,
         status,
@@ -312,6 +314,7 @@ export default function SourceHealthDashboard({
                   <th style={{ textAlign: "center" }}>Reliability</th>
                   <th style={{ textAlign: "center" }}>Raw Signal</th>
                   <th style={{ textAlign: "center" }}>Matched Signal</th>
+                  <th style={{ textAlign: "center" }}>Gemini Filter</th>
                   <th style={{ textAlign: "right" }}>Latency</th>
                   <th style={{ textAlign: "left" }}>System Logs</th>
                 </tr>
@@ -350,6 +353,9 @@ export default function SourceHealthDashboard({
                         className={s.status === "healthy" ? "val-bright" : "val-mute"}
                       >
                         {s.lastCount}
+                      </td>
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastGeminiFiltered ?? 0}
                       </td>
                       <td style={{ textAlign: "right" }} className="val-mute">
                         {s.avgDuration ? `${(s.avgDuration / 1000).toFixed(2)}s` : "--"}
