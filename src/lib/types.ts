@@ -44,6 +44,9 @@ export interface SourceHealth {
   durationMs?: number;
   ats?: string;
   status?: "ok" | "error" | "zero" | "skipped";
+  // Lifetime stats
+  success?: number;
+  total?: number;
 }
 
 export interface CronLog {
@@ -55,6 +58,13 @@ export interface CronLog {
   durationMs: number;
   errors: string[];
 }
+
+// ── Lifetime Health Store ───────────────────────────────────────────────────
+export interface HealthStat {
+  success: number;
+  total: number;
+}
+export type HealthStore = Record<string, HealthStat>;
 
 // ── Shared Fetcher Types ──────────────────────────────────────────────────
 
@@ -299,4 +309,6 @@ export interface SourceSummary {
   lastError?: string;
   avgDuration?: number;
   status: "healthy" | "nomatch" | "warning" | "error" | "skipped";
+  success?: number;
+  total?: number;
 }

@@ -89,11 +89,14 @@ export async function fetchRemoteJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount, ats } = r.value as FetcherResult & {
-        sourceName: string;
-        ats: string;
-      };
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
+      const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
+        r.value as FetcherResult & {
+          sourceName: string;
+          ats: string;
+          success?: number;
+          total?: number;
+        };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
       for (const j of jobs) {
         if (!seen.has(j.id)) {
           seen.add(j.id);

@@ -79,12 +79,15 @@ export async function fetchVisaJobs(): Promise<{
 
   for (const r of results) {
     if (r.status === "fulfilled") {
-      const { jobs, error, durationMs, sourceName, rawCount, ats } = r.value as FetcherResult & {
-        sourceName: string;
-        ats: string;
-      };
+      const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
+        r.value as FetcherResult & {
+          sourceName: string;
+          ats: string;
+          success?: number;
+          total?: number;
+        };
       all.push(...jobs);
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats };
+      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
     } else {
       console.error("[visa] Unhandled rejection:", r.reason);
     }

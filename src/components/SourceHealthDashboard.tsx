@@ -24,11 +24,6 @@ export default function SourceHealthDashboard({
     const sourceNames = latestLog.sourceDetails ? Object.keys(latestLog.sourceDetails) : [];
 
     const result: SourceSummary[] = sourceNames.map((name) => {
-      let successes = 0;
-      let totalRuns = 0;
-      let totalDuration = 0;
-      let durationCount = 0;
-
       const sortedLogs = [...logs].sort(
         (a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime(),
       );
@@ -40,19 +35,22 @@ export default function SourceHealthDashboard({
       const lastError = lastDetail?.error;
       const lastStatus = lastDetail?.status;
 
+      // Lifetime stats from the latest log that has them
+      const success = lastDetail?.success ?? 0;
+      const total = lastDetail?.total ?? 0;
+
+      let totalDuration = 0;
+      let durationCount = 0;
+
       sortedLogs.forEach((log) => {
         const detail = log.sourceDetails?.[name];
         if (detail) {
-          totalRuns++;
-          if (!detail.error) successes++;
           if (detail.durationMs) {
             totalDuration += detail.durationMs;
             durationCount++;
           }
         }
       });
-
-      const successRate = totalRuns > 0 ? (successes / totalRuns) * 100 : 0;
 
       let status: "healthy" | "nomatch" | "warning" | "error" | "skipped" = "healthy";
 
@@ -70,13 +68,15 @@ export default function SourceHealthDashboard({
 
       return {
         name,
-        totalRuns,
-        successRate,
+        totalRuns: total,
+        successRate: total > 0 ? (success / total) * 100 : 0,
         lastCount,
         lastRawCount,
         lastError,
         avgDuration: durationCount > 0 ? totalDuration / durationCount : undefined,
         status,
+        success,
+        total,
       };
     });
 
@@ -335,8 +335,9 @@ export default function SourceHealthDashboard({
                                   : "Filtered"}
                         </div>
                       </td>
-                      <td style={{ textAlign: "center" }} className="val-mute">
-                        {Math.round(s.successRate)}%
+                      <td style={{ textAlign: "center" }}>
+                        <span className="val-bright">{s.success ?? 0}</span>
+                        <span className="val-mute"> / {s.total ?? 0}</span>
                       </td>
                       <td
                         style={{ textAlign: "center" }}

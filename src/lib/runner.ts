@@ -51,7 +51,14 @@ export async function runAllSources(): Promise<CronLog> {
 
   if (localResult.status === "fulfilled") {
     localJobs = localResult.value.jobs;
-    Object.assign(sourceDetails, localResult.value.health);
+    for (const key in localResult.value.health) {
+      if (localResult.value.health.hasOwnProperty(key)) {
+        sourceDetails[key] = {
+          ...sourceDetails[key],
+          ...localResult.value.health[key],
+        };
+      }
+    }
   } else {
     errors.push(`local pipeline: ${localResult.reason}`);
     console.error("[runner] local pipeline failed:", localResult.reason);
@@ -59,7 +66,14 @@ export async function runAllSources(): Promise<CronLog> {
 
   if (visaResult.status === "fulfilled") {
     visaJobs = visaResult.value.jobs;
-    Object.assign(sourceDetails, visaResult.value.health);
+    for (const key in visaResult.value.health) {
+      if (visaResult.value.health.hasOwnProperty(key)) {
+        sourceDetails[key] = {
+          ...sourceDetails[key],
+          ...visaResult.value.health[key],
+        };
+      }
+    }
   } else {
     errors.push(`visa pipeline: ${visaResult.reason}`);
     console.error("[runner] visa pipeline failed:", visaResult.reason);
@@ -67,7 +81,14 @@ export async function runAllSources(): Promise<CronLog> {
 
   if (remoteResult.status === "fulfilled") {
     globalJobs = remoteResult.value.jobs;
-    Object.assign(sourceDetails, remoteResult.value.health);
+    for (const key in remoteResult.value.health) {
+      if (remoteResult.value.health.hasOwnProperty(key)) {
+        sourceDetails[key] = {
+          ...sourceDetails[key],
+          ...remoteResult.value.health[key],
+        };
+      }
+    }
   } else {
     errors.push(`remote pipeline: ${remoteResult.reason}`);
     console.error("[runner] remote pipeline failed:", remoteResult.reason);
