@@ -14,16 +14,18 @@ async function readState(): Promise<ScanState> {
   if (currentProcessState) return currentProcessState;
 
   // 1. Try local disk first (for local dev/back-to-back runs)
-  try {
-    if (fs.existsSync(LOCAL_STATE_PATH)) {
-      currentProcessState = JSON.parse(fs.readFileSync(LOCAL_STATE_PATH, "utf-8"));
-      console.log(
-        `[state] Loaded from local disk. local-workable: ${currentProcessState?.workableOffsets["local-workable"] || 0}`,
-      );
-      return currentProcessState!;
+  if (!process.env.VERCEL) {
+    try {
+      if (fs.existsSync(LOCAL_STATE_PATH)) {
+        currentProcessState = JSON.parse(fs.readFileSync(LOCAL_STATE_PATH, "utf-8"));
+        console.log(
+          `[state] Loaded from local disk. local-workable: ${currentProcessState?.workableOffsets["local-workable"] || 0}`,
+        );
+        return currentProcessState!;
+      }
+    } catch {
+      /* ignore local error */
     }
-  } catch {
-    /* ignore local error */
   }
 
   // 2. Try Vercel Blob (for production/cloud)
@@ -58,10 +60,12 @@ export async function finalizeBatchState() {
   try {
     const content = JSON.stringify(currentProcessState, null, 2);
 
-    // Save to local disk
-    const dir = path.dirname(LOCAL_STATE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(LOCAL_STATE_PATH, content);
+    // Save to local disk (skip if in Vercel)
+    if (!process.env.VERCEL) {
+      const dir = path.dirname(LOCAL_STATE_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(LOCAL_STATE_PATH, content);
+    }
 
     // Save to Vercel Blob
     console.log("[state] Finalizing and saving all offsets to cloud...");
