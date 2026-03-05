@@ -58,6 +58,7 @@ export async function fetchHimalayas(mode: JobMode): Promise<FetcherResult> {
       mode,
       false,
     );
+    // processJobs will set sourceName to "Himalayas"
     return { jobs: processed, rawCount: allRawJobs.length, durationMs: Date.now() - t0 };
   } catch (e) {
     return { jobs: [], error: `Error: ${e}`, durationMs: Date.now() - t0 };

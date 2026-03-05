@@ -30,11 +30,14 @@ export default function SourceHealthDashboard({
 
       const lastLogWithSource = sortedLogs.find((log) => log.sourceDetails?.[name]);
       const lastDetail = lastLogWithSource?.sourceDetails?.[name];
-      const lastCount = lastDetail?.count ?? 0;
+      const lastRegexFiltered = lastDetail?.count ?? 0;
       const lastRawCount = lastDetail?.rawCount;
-      const lastGeminiFiltered = lastDetail?.geminiFiltered;
+      const lastGeminiFiltered = lastDetail?.geminiFiltered ?? 0;
       const lastError = lastDetail?.error;
       const lastStatus = lastDetail?.status;
+
+      // Final matched signal is what's left after Gemini
+      const lastCount = Math.max(0, lastRegexFiltered - lastGeminiFiltered);
 
       // Lifetime stats from the latest log that has them
       const success = lastDetail?.success ?? 0;
@@ -61,6 +64,9 @@ export default function SourceHealthDashboard({
         status = "error";
       } else if (lastCount > 0) {
         status = "healthy";
+      } else if (lastRegexFiltered > 0 && lastCount === 0) {
+        // If all matched jobs were filtered by Gemini, status is filtered
+        status = "nomatch";
       } else if ((lastRawCount ?? 0) === 0) {
         status = "warning";
       } else {
@@ -71,15 +77,16 @@ export default function SourceHealthDashboard({
         name,
         totalRuns: total,
         successRate: total > 0 ? (success / total) * 100 : 0,
-        lastCount,
+        lastCount, // Final matched
         lastRawCount,
         lastGeminiFiltered,
+        lastRegexFiltered, // Technical matches (Regex tier)
         lastError,
         avgDuration: durationCount > 0 ? totalDuration / durationCount : undefined,
         status,
         success,
         total,
-      };
+      } as SourceSummary;
     });
 
     return result.sort((a, b) => {
@@ -313,8 +320,9 @@ export default function SourceHealthDashboard({
                   <th style={{ textAlign: "center" }}>Operation State</th>
                   <th style={{ textAlign: "center" }}>Reliability</th>
                   <th style={{ textAlign: "center" }}>Raw Signal</th>
+                  <th style={{ textAlign: "center" }}>Regex Filtered</th>
+                  <th style={{ textAlign: "center" }}>Gemini Filtered</th>
                   <th style={{ textAlign: "center" }}>Matched Signal</th>
-                  <th style={{ textAlign: "center" }}>Gemini Filter</th>
                   <th style={{ textAlign: "right" }}>Latency</th>
                   <th style={{ textAlign: "left" }}>System Logs</th>
                 </tr>
@@ -348,14 +356,20 @@ export default function SourceHealthDashboard({
                       >
                         {s.lastRawCount ?? 0}
                       </td>
+                      {/* Regex Filtered */}
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastRegexFiltered ?? 0}
+                      </td>
+                      {/* Gemini Filtered (Rejections) */}
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastGeminiFiltered ?? 0}
+                      </td>
+                      {/* Matched Signal (Final Active) */}
                       <td
                         style={{ textAlign: "center" }}
                         className={s.status === "healthy" ? "val-bright" : "val-mute"}
                       >
                         {s.lastCount}
-                      </td>
-                      <td style={{ textAlign: "center" }} className="val-mute">
-                        {s.lastGeminiFiltered ?? 0}
                       </td>
                       <td style={{ textAlign: "right" }} className="val-mute">
                         {s.avgDuration ? `${(s.avgDuration / 1000).toFixed(2)}s` : "--"}
@@ -365,7 +379,7 @@ export default function SourceHealthDashboard({
                           (s.status === "warning"
                             ? "No data found on board"
                             : s.status === "nomatch"
-                              ? `${s.lastRawCount} entries dropped by tech-gate`
+                              ? `Filtered by tech-gate or AI`
                               : s.status === "skipped"
                                 ? "Skipped in current batch rotation"
                                 : "Optimal matching confirmed")}

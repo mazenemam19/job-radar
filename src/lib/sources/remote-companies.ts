@@ -17,7 +17,6 @@ import {
 import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
-import { getNextBatch } from "../state";
 import { ALL_COMPANIES } from "./companies";
 
 const MODE = "global";
@@ -35,10 +34,8 @@ export async function fetchRemoteJobs(): Promise<{
   const workables = companies.filter((c) => c.ats === "workable");
   const others = companies.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 12, "global-workable");
-  const toScan = [...others, ...batchWorkable];
-
-  const skippedWorkables = workables.filter((c) => !batchWorkable.some((b) => b.name === c.name));
+  // Scan ALL companies (no more batching/rotation)
+  const toScan = [...others, ...workables];
 
   // ── Parallelize everything ─────────────────────────────────────────
   const allFetchers = [
@@ -68,9 +65,14 @@ export async function fetchRemoteJobs(): Promise<{
     fetchRemoteOK(MODE).then((res) => ({ ...res, sourceName: "RemoteOK", ats: "custom" })),
     fetchHimalayas(MODE).then((res) => ({ ...res, sourceName: "Himalayas", ats: "custom" })),
     fetchRemotive(MODE).then((res) => ({ ...res, sourceName: "Remotive", ats: "custom" })),
-    fetchWPStartupJobs("https://berlinstartupjobs.com", "Berlin", "Germany", "🇩🇪", MODE).then(
-      (res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" }),
-    ),
+    fetchWPStartupJobs(
+      "https://berlinstartupjobs.com",
+      "Berlin",
+      "Germany",
+      "🇩🇪",
+      MODE,
+      "Berlin Startup Jobs (Global)",
+    ).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" })),
   ];
 
   const results = await Promise.allSettled(allFetchers);
@@ -78,14 +80,6 @@ export async function fetchRemoteJobs(): Promise<{
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
-
-  for (const skipped of skippedWorkables) {
-    health[skipped.name] = {
-      count: 0,
-      ats: skipped.ats,
-      status: "skipped",
-    };
-  }
 
   for (const r of results) {
     if (r.status === "fulfilled") {

@@ -40,6 +40,7 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
         id: `global_remotive_${r.id}`,
         source: "company",
         mode,
+        sourceName: "Remotive",
         title,
         company: r.company_name || "Remotive",
         location: r.candidate_required_location || "Remote 🌐",

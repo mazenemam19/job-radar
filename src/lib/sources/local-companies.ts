@@ -15,7 +15,6 @@ import {
   resetWorkableUsed,
 } from "./ats-utils";
 import { ALL_COMPANIES } from "./companies";
-import { getNextBatch } from "../state";
 
 const MODE = "local";
 const VISA = false;
@@ -32,10 +31,8 @@ export async function fetchLocalJobs(): Promise<{
   const workables = companies.filter((c) => c.ats === "workable");
   const others = companies.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 12, "local-workable");
-  const toScan = [...others, ...batchWorkable];
-
-  const skippedWorkables = workables.filter((c) => !batchWorkable.some((b) => b.name === c.name));
+  // Scan ALL companies (no more batching/rotation)
+  const toScan = [...others, ...workables];
 
   // ── Parallelize everything ─────────────────────────────────────────
   const allFetchers = [
@@ -75,14 +72,6 @@ export async function fetchLocalJobs(): Promise<{
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
-
-  for (const skipped of skippedWorkables) {
-    health[skipped.name] = {
-      count: 0,
-      ats: skipped.ats,
-      status: "skipped",
-    };
-  }
 
   for (const r of results) {
     if (r.status === "fulfilled") {

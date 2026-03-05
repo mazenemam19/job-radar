@@ -141,7 +141,7 @@ let domainCountsCache: DomainCounts | null = null;
 let workableCooldownCache: WorkableCooldownEntry[] | null = null;
 
 type WorkableBudgetConfig = { visa: number; global: number; local: number };
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 12, global: 12, local: 12 };
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 999, global: 999, local: 999 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
 const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
 
@@ -358,6 +358,7 @@ export function processJobs(
       id: r.id,
       source: "company",
       mode,
+      sourceName: company.name,
       title,
       company: r.company || company.name,
       location: displayLocation,
@@ -659,6 +660,11 @@ export async function fetchWorkable(
       5,
     );
     const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
+
+    console.log(
+      `[workable] ${c.name.padEnd(20)} | Raw: ${String(rawCount).padStart(3)} | Matched: ${String(processed.length).padStart(2)}`,
+    );
+
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
   } catch (e) {
     return {
@@ -1033,6 +1039,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         id: `local_wuzzuf_${entry.id}`,
         source: "local",
         mode,
+        sourceName: "Wuzzuf",
         title,
         company: companyName,
         location: attr.location?.city?.name || "MENA",
@@ -1097,6 +1104,7 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
         id: `global_remoteok_${r.id}`,
         source: "company",
         mode,
+        sourceName: "RemoteOK",
         title,
         company: r.company || "RemoteOK",
         location: "Remote 🌐",
@@ -1179,6 +1187,7 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       mode,
       false,
     );
+    // processJobs already sets sourceName to company.name ("Bright Skies")
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Unknown Error";

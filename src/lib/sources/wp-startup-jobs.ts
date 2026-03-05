@@ -11,6 +11,7 @@ export async function fetchWPStartupJobs(
   country: string,
   flag: string,
   mode: JobMode,
+  sourceName: string,
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   // Using 'search=react' is the most efficient way to query WP-based boards
@@ -24,7 +25,7 @@ export async function fetchWPStartupJobs(
   try {
     const posts = (await res.json()) as WordPressPost[];
     const rawCount = posts.length;
-    const company: BaseCompany = { name: `${city} Startup`, country, countryFlag: flag, city };
+    const company: BaseCompany = { name: sourceName, country, countryFlag: flag, city };
 
     const processed = processJobs(
       posts.map((p) => ({

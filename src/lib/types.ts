@@ -7,6 +7,7 @@ export interface Job {
   id: string;
   source: JobSource;
   mode: JobMode; // which pipeline produced this job
+  sourceName?: string; // The name of the source (e.g. company name or board name)
   title: string;
   company: string;
   location: string;
@@ -306,6 +307,7 @@ export interface SourceSummary {
   successRate: number;
   lastCount: number;
   lastRawCount?: number;
+  lastRegexFiltered?: number;
   lastGeminiFiltered?: number;
   lastError?: string;
   avgDuration?: number;

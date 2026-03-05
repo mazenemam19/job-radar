@@ -42,11 +42,18 @@ export async function filterJobsWithGemini(
   const results: Job[] = [];
   const rejectedIds: string[] = [];
 
+  // Track the first working model index to avoid repeated fallbacks in the same run
+  let currentModelIndex = 0;
+
   // Batch size: 5-8 jobs per prompt is a good balance for token limit and clarity
   const BATCH_SIZE = 5;
   for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
     const batch = jobs.slice(i, i + BATCH_SIZE);
-    const batchResult = await processBatchWithFallback(batch);
+    const { results: batchResult, modelIndex } = await processBatchWithFallback(
+      batch,
+      currentModelIndex,
+    );
+    currentModelIndex = modelIndex;
 
     for (const res of batchResult) {
       const job = batch.find((j) => j.id === res.id);
@@ -64,14 +71,20 @@ export async function filterJobsWithGemini(
   return { passed: results, rejectedIds };
 }
 
-async function processBatchWithFallback(batch: Job[]): Promise<GeminiFilterResult[]> {
+async function processBatchWithFallback(
+  batch: Job[],
+  startIndex: number,
+): Promise<{ results: GeminiFilterResult[]; modelIndex: number }> {
   let lastError: unknown = null;
 
-  for (const modelName of MODEL_QUEUE) {
+  for (let i = startIndex; i < MODEL_QUEUE.length; i++) {
+    const modelName = MODEL_QUEUE[i];
     try {
       const result = await callGemini(batch, modelName);
-      console.log(`[gemini] Successfully filtered batch using ${modelName}`);
-      return result;
+      if (i > startIndex) {
+        console.log(`[gemini] Successfully filtered batch using ${modelName}`);
+      }
+      return { results: result, modelIndex: i };
     } catch (err: unknown) {
       lastError = err;
       const status =
@@ -91,14 +104,15 @@ async function processBatchWithFallback(batch: Job[]): Promise<GeminiFilterResul
 
   const errorMessage = lastError instanceof Error ? lastError.message : JSON.stringify(lastError);
   console.error("[gemini] All models in queue failed. Last error:", errorMessage);
-  // Default to passing if ALL models fail to avoid losing potential jobs due to API issues,
-  // OR reject them? Usually better to pass and let regex/human decide if AI is down.
-  // However, for this project, let's assume if AI is down, we just skip AI filtering for this batch.
-  return batch.map((j) => ({
-    id: j.id,
-    passed: true,
-    reason: "Gemini analysis skipped due to API failure",
-  }));
+
+  return {
+    results: batch.map((j) => ({
+      id: j.id,
+      passed: true,
+      reason: "Gemini analysis skipped due to API failure",
+    })),
+    modelIndex: startIndex, // Reset or keep current for next batch
+  };
 }
 
 async function callGemini(batch: Job[], modelName: string): Promise<GeminiFilterResult[]> {

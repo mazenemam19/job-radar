@@ -126,12 +126,20 @@ export async function runAllSources(): Promise<CronLog> {
   const rejectedSet = new Set(rejectedIds);
 
   // Track Gemini rejections in sourceDetails
+  // We use a case-insensitive lookup to be safe
+  const detailKeys = Object.keys(sourceDetails);
+
   newCandidates.forEach((j) => {
     if (rejectedSet.has(j.id)) {
-      const sourceKey = j.company; // j.company matches the key in sourceDetails
-      if (sourceDetails[sourceKey]) {
-        sourceDetails[sourceKey].geminiFiltered =
-          (sourceDetails[sourceKey].geminiFiltered || 0) + 1;
+      const sourceKey = j.sourceName || j.company;
+      // Find the key that matches (case-insensitive)
+      const actualKey = detailKeys.find(
+        (k) => k.toLowerCase().trim() === sourceKey.toLowerCase().trim(),
+      );
+
+      if (actualKey && sourceDetails[actualKey]) {
+        sourceDetails[actualKey].geminiFiltered =
+          (sourceDetails[actualKey].geminiFiltered || 0) + 1;
       }
     }
   });

@@ -11,7 +11,6 @@ import {
   resetWorkableUsed,
 } from "./ats-utils";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
-import { getNextBatch } from "../state";
 import { ALL_COMPANIES } from "./companies";
 
 const MODE = "visa";
@@ -29,10 +28,8 @@ export async function fetchVisaJobs(): Promise<{
   const workables = companies.filter((c) => c.ats === "workable");
   const others = companies.filter((c) => c.ats !== "workable");
 
-  const batchWorkable = await getNextBatch(workables, 12, "visa-workable");
-  const toScan = [...others, ...batchWorkable];
-
-  const skippedWorkables = workables.filter((c) => !batchWorkable.some((b) => b.name === c.name));
+  // Scan ALL companies (no more batching/rotation)
+  const toScan = [...others, ...workables];
 
   // ── Parallelize everything ─────────────────────────────────────────
   const allFetchers = [
@@ -59,23 +56,20 @@ export async function fetchVisaJobs(): Promise<{
       })();
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-    fetchWPStartupJobs("https://londonstartupjobs.co.uk", "London", "UK", "🇬🇧", MODE).then(
-      (res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" }),
-    ),
+    fetchWPStartupJobs(
+      "https://londonstartupjobs.co.uk",
+      "London",
+      "UK",
+      "🇬🇧",
+      MODE,
+      "London Startup Jobs",
+    ).then((res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" })),
   ];
 
   const results = await Promise.allSettled(allFetchers);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
-
-  for (const skipped of skippedWorkables) {
-    health[skipped.name] = {
-      count: 0,
-      ats: skipped.ats,
-      status: "skipped",
-    };
-  }
 
   for (const r of results) {
     if (r.status === "fulfilled") {
