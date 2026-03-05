@@ -285,14 +285,6 @@ const COMPANIES: ATSConfig[] = [
     countryFlag: FLAG,
     city: "Cairo",
   },
-  {
-    ats: "jazzhr",
-    name: "Koinz",
-    slug: "koinz",
-    country: COUNTRY,
-    countryFlag: FLAG,
-    city: "Cairo",
-  },
 
   // ── BambooHR ──────────────────────────────────────────────────────────
   {

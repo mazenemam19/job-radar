@@ -25,7 +25,6 @@ async function main() {
     "Robosta",
     "Robusta",
     "Brimore",
-    "Koinz",
     "Trella",
     "ExpandCart",
     "Rabbit",

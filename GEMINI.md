@@ -74,7 +74,6 @@
 ## 💡 Integration Insights
 
 - **Public vs. Private Boards**: Many high-growth startups (Paymob, Lucky) restrict their Greenhouse/Workable APIs. If a browser URL works but the `boards-api` or `widget` URL returns 404, it is a "No-Go" for automated fetching without a private API key.
-- **SSL Trust Issues**: Some ATS platforms (like JazzHR for Koinz) have configuration issues that trigger `FetchError` or `Network/Timeout` due to SSL/TLS trust relationship failures in Node.js.
 - **Custom Portals**: Large entities (Fawry) use homegrown or enterprise HRIS systems (Oracle/SAP) that lack public JSON endpoints.
 - **Unsupported ATS**: Freshteam (Breadfast), Recruitee (elmenus), and ZenATS (Vezeeta) are common in Egypt but currently unsupported by our fetcher suite.
 - **Volume Expansion**: To increase job count without lowering restrictions, prioritize "Hub Boards" (e.g., Berlin/London Startup Jobs). These often use WordPress REST APIs. Use the generic `fetchWPStartupJobs` fetcher for these.
@@ -106,7 +105,7 @@ This section documents detailed findings and decisions regarding specific compan
 - **Zenjob**: Greenhouse `zenjob` (API works, but currently 0 jobs).
 - **Backbase**: Greenhouse `backbase` (API works, but currently 0 jobs).
 - **MoneyHash**: Ashby `moneyhash` (API works, but currently 0 jobs).
-- **Koinz**: JazzHR `koinz` (API fails due to SSL/TLS issues, removed from active local-companies for now).
+- **Koinz**: Rejected — Uses an unsupported ats.
 
 ## 🤖 Gemini Model Intelligence (March 2026)
 
@@ -141,7 +140,7 @@ To maintain high availability and accuracy, the project uses a cascading fallbac
 - **Breadfast**: Rejected — Uses Freshteam, which lacks a standard public JSON API.
 - **Rabbit / ExpandCart**: Rejected — Workable slugs (`rabbit-mart`, `expandcart`) returned consistent 404s for the widget API.
 - **elmenus**: Rejected — Uses Recruitee, which is not currently supported.
-- **Koinz**: Rejected — Uses JazzHR but the API connection fails due to persistent SSL/TLS trust issues.
+- **Koinz**: Rejected — Uses an unsupported ats.
 - **Siemens EDA / Orange Business / Speer**: Rejected — Local Egyptian branches use restricted global boards or returned 404s for local slugs.
 - **Careerjet**: Rejected — API access requires an API key, but integration attempts were marred by persistent module resolution issues with `ts-node` in the project's development environment.
 - **NaukriGulf.com**: Rejected — No public, direct JSON API.
