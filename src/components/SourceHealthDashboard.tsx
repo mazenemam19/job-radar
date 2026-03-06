@@ -104,6 +104,7 @@ export default function SourceHealthDashboard({
       active: summaries.reduce((sum, s) => sum + (s.totalSurvivors || 0), 0),
       empty: summaries.filter((s) => s.status === "warning").length,
       filtered: summaries.filter((s) => s.status === "nomatch").length,
+      totalRaw: summaries.reduce((sum, s) => sum + (s.lastRawCount || 0), 0),
     };
   }, [summaries]);
 
@@ -287,6 +288,10 @@ export default function SourceHealthDashboard({
             <div className="legend-item border-emerald-500/20 bg-emerald-500/5">
               <span className="legend-count text-emerald-400">{stats.active}</span>
               <span className="legend-label">Total Jobs in Store</span>
+            </div>
+            <div className="legend-item border-purple-500/20 bg-purple-500/5">
+              <span className="legend-count text-purple-400">{stats.totalRaw}</span>
+              <span className="legend-label">Total Raw Fetched</span>
             </div>
             <div className="legend-item border-amber-500/20 bg-amber-500/5">
               <span className="legend-count text-amber-400">{stats.empty}</span>
