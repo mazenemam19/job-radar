@@ -40,7 +40,7 @@ Each job is scored 0–100 based on:
 
 ## 🛠️ Architecture
 
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Style-JSX.
+- **Frontend**: Next.js 14 , Tailwind CSS, Style-JSX.
 - **Backend**: Supabase PostgreSQL (JSONB) for persistent storage of jobs, state, and reliability logs.
 - **AI**: Google Gemini Pro/Flash fallback queue with 429-optimization.
 - **Deployment**: Vercel with scheduled GitHub Actions triggers every 6 hours.
