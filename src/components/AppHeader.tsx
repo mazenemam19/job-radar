@@ -25,9 +25,28 @@ export default function AppHeader({ lastUpdated, onRefresh, cronSecret }: AppHea
     if (running) return;
     setRunning(true);
     setRunStatus("idle");
+
+    let secretToUse = cronSecret;
+
+    // In production, prompt for CRON_SECRET
+    if (process.env.NODE_ENV === 'production' && !cronSecret) {
+      const enteredSecret = window.prompt("Enter CRON_SECRET:");
+      if (!enteredSecret) {
+        setRunning(false);
+        setRunStatus("err");
+        setTimeout(() => setRunStatus("idle"), 4000);
+        alert("CRON_SECRET is required to run scan in production.");
+        return;
+      }
+      secretToUse = enteredSecret;
+    } else if (process.env.NODE_ENV === 'development' && !cronSecret) {
+      // In development, if cronSecret is still missing, warn but allow to proceed (might be a mocked API or local setup)
+      console.warn("CRON_SECRET is missing in development. Scan might fail if API requires it.");
+    }
+    
     try {
       const headers: Record<string, string> = {};
-      if (cronSecret) headers["x-cron-secret"] = cronSecret;
+      if (secretToUse) headers["x-cron-secret"] = secretToUse;
 
       const res = await fetch("/api/cron", { method: "POST", headers });
       setRunStatus(res.ok ? "ok" : "err");
