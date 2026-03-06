@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import type { AppHeaderProps } from "@/lib/types";
+import type { AppHeaderProps } from "@/types";
 
 function relativeTime(iso: string): string {
   const s = Math.floor((Date.now() - Date.parse(iso)) / 1000);
