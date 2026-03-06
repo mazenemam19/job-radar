@@ -7,7 +7,7 @@
 - **Tech Gate**: ALL jobs must be **React**, **Next.js**, or **React Native**. Generic frontend roles are strictly filtered out in the scrapers/fetchers.
 - **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. Lead/Managerial roles are also excluded unless they are "Senior" individual contributor roles.
 - **Age Limit**: Strict **7-day auto-expiry**. Jobs older than 1 week are pruned from storage and skipped during scans.
-- **Scanning Strategy**: 100% of defined companies are scanned in every run. Rotation/Batching was removed in v3.5.
+- **Scanning Strategy**: 100% of defined companies are scanned in every run. Rotation/Batching was removed.
 - **Rate Limiting**: Workable fetchers use a sequential queue with a **1.5s - 3s delay**. `pLimit` caps global concurrency at **3-5 concurrent fetchers** to prevent network timeouts (`AbortError`).
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development. ALWAYS create a standalone test script. Run the full cron job ONLY ONCE as a final validation.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. No HTML scraping.
