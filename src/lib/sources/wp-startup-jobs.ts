@@ -1,7 +1,6 @@
 // src/lib/sources/wp-startup-jobs.ts
 import { JobMode, FetcherResult, BaseCompany, WordPressPost } from "../types";
 import { safeFetch, stripHtml, processJobs } from "./ats-utils";
-import { trackApiCall } from "../health-store";
 
 /**
  * Fetches jobs from WordPress-based startup job boards (Berlin, London).
@@ -19,15 +18,13 @@ export async function fetchWPStartupJobs(
   const url = `${baseUrl}/wp-json/wp/v2/posts?search=react&per_page=30`;
   const res = await safeFetch(url);
 
-  const healthStat = await trackApiCall(sourceName, res?.ok ?? false);
-
   if (!res)
     return {
       jobs: [],
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -35,7 +32,7 @@ export async function fetchWPStartupJobs(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
 
   try {
@@ -57,15 +54,14 @@ export async function fetchWPStartupJobs(
       true, // These boards are highly likely to support visa/relocation
     );
 
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
-    const healthStat = await trackApiCall(sourceName, false);
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }

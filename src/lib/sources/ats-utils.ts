@@ -1,5 +1,4 @@
 // src/lib/sources/ats-utils.ts
-import { trackApiCall, getHealthStat } from "../health-store";
 import type {
   Job,
   JobMode,
@@ -387,7 +386,6 @@ export async function fetchGreenhouse(
   const t0 = Date.now();
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -395,7 +393,7 @@ export async function fetchGreenhouse(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -403,7 +401,7 @@ export async function fetchGreenhouse(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const { jobs } = (await res.json()) as { jobs: GreenhouseJob[] };
@@ -421,14 +419,14 @@ export async function fetchGreenhouse(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -443,7 +441,6 @@ export async function fetchLever(
   const t0 = Date.now();
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -451,7 +448,7 @@ export async function fetchLever(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -459,7 +456,7 @@ export async function fetchLever(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const jobs = (await res.json()) as LeverJob[];
@@ -477,14 +474,14 @@ export async function fetchLever(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -499,7 +496,6 @@ export async function fetchAshby(
   const t0 = Date.now();
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}`;
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -507,7 +503,7 @@ export async function fetchAshby(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -515,7 +511,7 @@ export async function fetchAshby(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const data = (await res.json()) as { jobs?: AshbyJob[]; jobPostings?: AshbyJob[] };
@@ -534,14 +530,14 @@ export async function fetchAshby(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -567,7 +563,7 @@ function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
   return result;
 }
 
-async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Promise<T[]> {
+export async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Promise<T[]> {
   const results: T[] = [];
   for (let i = 0; i < fns.length; i += concurrency) {
     const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map((f) => f()));
@@ -584,16 +580,34 @@ export async function fetchWorkable(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   if (isWorkableBlocked(c.slug))
-    return { jobs: [], rawCount: 0, error: "Blocked (Cooldown)", durationMs: Date.now() - t0 };
+    return {
+      jobs: [],
+      rawCount: 0,
+      error: "Blocked (Cooldown)",
+      durationMs: Date.now() - t0,
+      ok: false,
+    };
   const cooldownUntil = getWorkableCooldownUntil(c.slug);
   if (cooldownUntil && cooldownUntil.getTime() > Date.now())
-    return { jobs: [], rawCount: 0, error: "Workable Cooldown", durationMs: Date.now() - t0 };
+    return {
+      jobs: [],
+      rawCount: 0,
+      error: "Workable Cooldown",
+      durationMs: Date.now() - t0,
+      ok: false,
+    };
 
   const budget = workableBudget;
   const limit = budget[mode as JobMode];
   const used = workableUsedByMode[mode];
   if (used >= limit)
-    return { jobs: [], rawCount: 0, error: "Budget Exceeded", durationMs: Date.now() - t0 };
+    return {
+      jobs: [],
+      rawCount: 0,
+      error: "Budget Exceeded",
+      durationMs: Date.now() - t0,
+      ok: false,
+    };
   workableUsedByMode[mode] += 1;
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
@@ -610,7 +624,6 @@ export async function fetchWorkable(
   };
 
   const res = await queueWorkable(doFetch, mode);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -618,7 +631,7 @@ export async function fetchWorkable(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -626,7 +639,7 @@ export async function fetchWorkable(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const data = (await res.json()) as { jobs?: WorkableJob[] };
@@ -665,14 +678,14 @@ export async function fetchWorkable(
       `[workable] ${c.name.padEnd(20)} | Raw: ${String(rawCount).padStart(3)} | Matched: ${String(processed.length).padStart(2)}`,
     );
 
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -690,7 +703,6 @@ export async function fetchTeamtailor(
     headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
     signal: AbortSignal.timeout(30_000),
   }).catch(() => null);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -698,7 +710,7 @@ export async function fetchTeamtailor(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -706,7 +718,7 @@ export async function fetchTeamtailor(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const { data } = (await res.json()) as { data: TeamtailorJob[] };
@@ -724,14 +736,14 @@ export async function fetchTeamtailor(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -749,7 +761,6 @@ export async function fetchBreezy(
     headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
     signal: AbortSignal.timeout(30_000),
   }).catch(() => null);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -757,7 +768,7 @@ export async function fetchBreezy(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -765,7 +776,7 @@ export async function fetchBreezy(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const jobs = (await res.json()) as BreezyJob[];
@@ -783,14 +794,14 @@ export async function fetchBreezy(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -805,7 +816,6 @@ export async function fetchSmartRecruiters(
   const t0 = Date.now();
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -813,7 +823,7 @@ export async function fetchSmartRecruiters(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -821,7 +831,7 @@ export async function fetchSmartRecruiters(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const { content } = (await res.json()) as { content: SRJob[] };
@@ -851,14 +861,14 @@ export async function fetchSmartRecruiters(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -873,7 +883,6 @@ export async function fetchBambooHR(
   const t0 = Date.now();
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -881,7 +890,7 @@ export async function fetchBambooHR(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -889,7 +898,7 @@ export async function fetchBambooHR(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const data = (await res.json()) as { result?: BambooJob[] };
@@ -908,14 +917,14 @@ export async function fetchBambooHR(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -930,7 +939,6 @@ export async function fetchJazzHR(
   const t0 = Date.now();
   const url = `https://api.resumator.com/v1/jobs/board/public/account/${c.slug}`;
   const res = await safeFetch(url, 60_000); // Increased timeout to 60s
-  const healthStat = await trackApiCall(c.name, res?.ok ?? false);
 
   if (!res)
     return {
@@ -938,7 +946,7 @@ export async function fetchJazzHR(
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -946,7 +954,7 @@ export async function fetchJazzHR(
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const jobs = (await res.json()) as JazzJob[];
@@ -964,14 +972,14 @@ export async function fetchJazzHR(
       mode,
       visaSponsorship,
     );
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -986,6 +994,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
   const seenIds = new Set<string>();
   const now = new Date().toISOString();
   let rawCount = 0;
+  let ok = true;
   try {
     const queryResults = await Promise.all(
       queries.map(async (q) => {
@@ -1008,10 +1017,9 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         });
 
         if (!sRes.ok) {
-          await trackApiCall("Wuzzuf", false);
+          ok = false;
           return [];
         }
-        await trackApiCall("Wuzzuf", true);
         const sData = (await sRes.json()) as WuzzufSearchResponse;
         const ids = (sData?.data || []).map((j) => j.id).filter((id) => !seenIds.has(id));
         if (ids.length === 0) return [];
@@ -1022,7 +1030,10 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
 
         const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
         const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-        if (!dRes.ok) return [];
+        if (!dRes.ok) {
+          ok = false;
+          return [];
+        }
         const dData = (await dRes.json()) as WuzzufDetailResponse;
         return dData?.data || [];
       }),
@@ -1030,9 +1041,6 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
 
     const jobs = queryResults.flat();
     seenIds.clear(); // Reset for the actual title/dedupe check
-
-    // Aggregate health stats without incrementing
-    const { success, total } = await getHealthStat("Wuzzuf");
 
     for (const entry of jobs) {
       const attr = entry.attributes || {};
@@ -1068,16 +1076,14 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         fetchedAt: now,
       });
     }
-    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0, success, total };
+    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0, ok };
   } catch (e) {
-    const { success, total } = await trackApiCall("Wuzzuf", false);
     return {
       jobs: [],
       rawCount: 0,
       error: `Error: ${e}`,
       durationMs: Date.now() - t0,
-      success,
-      total,
+      ok: false,
     };
   }
 }
@@ -1088,7 +1094,6 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = "https://remoteok.com/api";
   const res = await safeFetch(url);
-  const healthStat = await trackApiCall("RemoteOK", res?.ok ?? false);
 
   if (!res)
     return {
@@ -1096,7 +1101,7 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
       rawCount: 0,
       error: "Network/Timeout",
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   if (!res.ok)
     return {
@@ -1104,7 +1109,7 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
       rawCount: 0,
       error: `HTTP ${res.status}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   try {
     const data = (await res.json()) as RemoteOKJob[];
@@ -1136,14 +1141,14 @@ export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
         fetchedAt: new Date().toISOString(),
       });
     }
-    return { jobs: out, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: out, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],
       rawCount: 0,
       error: `Parse Error: ${e}`,
       durationMs: Date.now() - t0,
-      ...healthStat,
+      ok: false,
     };
   }
 }
@@ -1169,14 +1174,13 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    const healthStat = await trackApiCall(company.name, res?.ok ?? false);
     if (!res.ok)
       return {
         jobs: [],
         rawCount: 0,
         error: `HTTP ${res.status}`,
         durationMs: Date.now() - t0,
-        ...healthStat,
+        ok: false,
       };
     const data = (await res.json()) as {
       data: {
@@ -1204,10 +1208,9 @@ export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
       false,
     );
     // processJobs already sets sourceName to company.name ("Bright Skies")
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Unknown Error";
-    const healthStat = await trackApiCall("Bright Skies", false);
-    return { jobs: [], rawCount: 0, error, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: [], rawCount: 0, error, durationMs: Date.now() - t0, ok: false };
   }
 }

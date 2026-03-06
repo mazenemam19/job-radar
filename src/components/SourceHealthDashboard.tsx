@@ -34,12 +34,11 @@ export default function SourceHealthDashboard({
       const lastRawCount = lastDetail?.rawCount;
       const lastGeminiFiltered = lastDetail?.geminiFiltered ?? 0;
       const lastError = lastDetail?.error;
-      const lastStatus = lastDetail?.status;
 
-      // Final matched signal is what's left after Gemini
+      // Final matched signal is what's left after Gemini in the LAST run
       const lastCount = Math.max(0, lastRegexFiltered - lastGeminiFiltered);
 
-      // Lifetime stats from the latest log that has them
+      // Lifetime stats
       const success = lastDetail?.success ?? 0;
       const total = lastDetail?.total ?? 0;
 
@@ -58,29 +57,26 @@ export default function SourceHealthDashboard({
 
       let status: "healthy" | "nomatch" | "warning" | "error" | "skipped" = "healthy";
 
-      if (lastStatus === "skipped") {
-        status = "skipped";
-      } else if (lastError) {
+      if (lastError) {
         status = "error";
       } else if (lastCount > 0) {
         status = "healthy";
       } else if (lastRegexFiltered > 0 && lastCount === 0) {
-        // If all matched jobs were filtered by Gemini, status is filtered
-        status = "nomatch";
+        status = "nomatch"; // Filtered by AI
       } else if ((lastRawCount ?? 0) === 0) {
-        status = "warning";
+        status = "warning"; // Empty source
       } else {
-        status = "nomatch";
+        status = "nomatch"; // Filtered by Regex
       }
 
       return {
         name,
         totalRuns: total,
         successRate: total > 0 ? (success / total) * 100 : 0,
-        lastCount, // Final matched
+        lastCount, // Final matched in last run
         lastRawCount,
         lastGeminiFiltered,
-        lastRegexFiltered, // Technical matches (Regex tier)
+        lastRegexFiltered,
         lastError,
         avgDuration: durationCount > 0 ? totalDuration / durationCount : undefined,
         status,
@@ -192,11 +188,6 @@ export default function SourceHealthDashboard({
           border-color: rgba(255, 255, 255, 0.1);
           color: #fff;
         }
-        .status-pill.skipped {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: rgba(59, 130, 246, 0.2);
-          color: #93c5fd;
-        }
 
         .dot {
           width: 4px;
@@ -217,9 +208,6 @@ export default function SourceHealthDashboard({
         }
         .dot.nomatch {
           background: #fff;
-        }
-        .dot.skipped {
-          background: #93c5fd;
         }
 
         @keyframes pulse {
@@ -268,12 +256,12 @@ export default function SourceHealthDashboard({
       <header className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
         <div>
           <h2 className="text-xl font-display font-bold text-white tracking-tight">
-            {alwaysOpen ? "Source Health v3.3" : "Engine Diagnostics"}
+            {alwaysOpen ? "Engine Diagnostics" : "Last Scan Health"}
           </h2>
           <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/20 mt-1">
             {alwaysOpen
-              ? "Real-time monitoring of engine source health and pipeline volume"
-              : "Fetcher Lifecycle Diagnostics"}
+              ? "Real-time monitoring of fetcher success and pipeline volume"
+              : "Detailed results from the most recent scan"}
           </p>
         </div>
         {!alwaysOpen && (
@@ -281,34 +269,29 @@ export default function SourceHealthDashboard({
             onClick={() => setIsOpen(!isOpen)}
             className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2 rounded-lg text-[11px] font-mono uppercase tracking-widest text-white/60 transition-all shadow-xl hover:text-white"
           >
-            {isOpen ? "[ System Offline ]" : "[ Run Diagnostics ]"}
+            {isOpen ? "[ Hide Engine Stats ]" : "[ View Engine Stats ]"}
           </button>
         )}
       </header>
 
       {isOpen && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-500">
-          {/* LEGEND SUMMARY */}
           <div className="flex flex-wrap gap-4 mb-8">
             <div className="legend-item border-rose-500/20 bg-rose-500/5">
               <span className="legend-count text-rose-400">{stats.failed}</span>
-              <span className="legend-label">Failed Fetch</span>
+              <span className="legend-label">Errors</span>
             </div>
             <div className="legend-item border-emerald-500/20 bg-emerald-500/5">
               <span className="legend-count text-emerald-400">{stats.active}</span>
-              <span className="legend-label">Active Matches</span>
+              <span className="legend-label">Found Jobs</span>
             </div>
             <div className="legend-item border-amber-500/20 bg-amber-500/5">
               <span className="legend-count text-amber-400">{stats.empty}</span>
-              <span className="legend-label">Empty (Source)</span>
+              <span className="legend-label">Empty Boards</span>
             </div>
             <div className="legend-item border-white/10 bg-white/5">
               <span className="legend-count text-white">{stats.filtered}</span>
-              <span className="legend-label">Filtered Out</span>
-            </div>
-            <div className="legend-item border-blue-400/20 bg-blue-400/5">
-              <span className="legend-count text-blue-300">{stats.skipped}</span>
-              <span className="legend-label">Skipped</span>
+              <span className="legend-label">Filtered</span>
             </div>
           </div>
 
@@ -317,12 +300,12 @@ export default function SourceHealthDashboard({
               <thead>
                 <tr>
                   <th style={{ textAlign: "left" }}>Engine Source</th>
-                  <th style={{ textAlign: "center" }}>Operation State</th>
+                  <th style={{ textAlign: "center" }}>Last Run Status</th>
                   <th style={{ textAlign: "center" }}>Reliability</th>
-                  <th style={{ textAlign: "center" }}>Raw Signal</th>
-                  <th style={{ textAlign: "center" }}>Regex Filtered</th>
-                  <th style={{ textAlign: "center" }}>Gemini Filtered</th>
-                  <th style={{ textAlign: "center" }}>Matched Signal</th>
+                  <th style={{ textAlign: "center" }}>Raw</th>
+                  <th style={{ textAlign: "center" }}>Regex Pass</th>
+                  <th style={{ textAlign: "center" }}>Gemini Reject</th>
+                  <th style={{ textAlign: "center" }}>Final Matched</th>
                   <th style={{ textAlign: "right" }}>Latency</th>
                   <th style={{ textAlign: "left" }}>System Logs</th>
                 </tr>
@@ -338,33 +321,25 @@ export default function SourceHealthDashboard({
                           {s.status === "error"
                             ? "Failed"
                             : s.status === "healthy"
-                              ? "Active"
+                              ? "Found"
                               : s.status === "warning"
                                 ? "Empty"
-                                : s.status === "skipped"
-                                  ? "Skipped"
-                                  : "Filtered"}
+                                : "Filtered"}
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <span className="val-bright">{s.success ?? 0}</span>
                         <span className="val-mute"> / {s.total ?? 0}</span>
                       </td>
-                      <td
-                        style={{ textAlign: "center" }}
-                        className={s.status === "warning" ? "" : "val-mute"}
-                      >
+                      <td style={{ textAlign: "center" }} className="val-mute">
                         {s.lastRawCount ?? 0}
                       </td>
-                      {/* Regex Filtered */}
                       <td style={{ textAlign: "center" }} className="val-mute">
                         {s.lastRegexFiltered ?? 0}
                       </td>
-                      {/* Gemini Filtered (Rejections) */}
                       <td style={{ textAlign: "center" }} className="val-mute">
                         {s.lastGeminiFiltered ?? 0}
                       </td>
-                      {/* Matched Signal (Final Active) */}
                       <td
                         style={{ textAlign: "center" }}
                         className={s.status === "healthy" ? "val-bright" : "val-mute"}
@@ -379,10 +354,8 @@ export default function SourceHealthDashboard({
                           (s.status === "warning"
                             ? "No data found on board"
                             : s.status === "nomatch"
-                              ? `Filtered by tech-gate or AI`
-                              : s.status === "skipped"
-                                ? "Skipped in current batch rotation"
-                                : "Optimal matching confirmed")}
+                              ? `Filtered by gate or AI`
+                              : "Optimal matching confirmed")}
                       </td>
                     </tr>
                   );
@@ -390,6 +363,10 @@ export default function SourceHealthDashboard({
               </tbody>
             </table>
           </div>
+          <p className="mt-4 text-[10px] text-white/20 italic text-center">
+            * Note: &quot;Final Matched&quot; shows jobs found in the LAST scan. Existing jobs from
+            previous scans remain in the dashboard until they expire (7 days).
+          </p>
         </div>
       )}
     </div>

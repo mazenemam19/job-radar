@@ -13,6 +13,7 @@ import {
   fetchSmartRecruiters,
   fetchRemoteOK,
   resetWorkableUsed,
+  pLimit,
 } from "./ats-utils";
 import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
@@ -37,9 +38,9 @@ export async function fetchRemoteJobs(): Promise<{
   // Scan ALL companies (no more batching/rotation)
   const toScan = [...others, ...workables];
 
-  // ── Parallelize everything ─────────────────────────────────────────
-  const allFetchers = [
-    ...toScan.map((c) => {
+  // ── Limit concurrency to prevent AbortErrors/Timeouts ──────────────────
+  const fetcherFns = [
+    ...toScan.map((c) => async () => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -62,33 +63,36 @@ export async function fetchRemoteJobs(): Promise<{
       })();
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-    fetchRemoteOK(MODE).then((res) => ({ ...res, sourceName: "RemoteOK", ats: "custom" })),
-    fetchHimalayas(MODE).then((res) => ({ ...res, sourceName: "Himalayas", ats: "custom" })),
-    fetchRemotive(MODE).then((res) => ({ ...res, sourceName: "Remotive", ats: "custom" })),
-    fetchWPStartupJobs(
-      "https://berlinstartupjobs.com",
-      "Berlin",
-      "Germany",
-      "🇩🇪",
-      MODE,
-      "Berlin Startup Jobs (Global)",
-    ).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" })),
+    async () =>
+      fetchRemoteOK(MODE).then((res) => ({ ...res, sourceName: "RemoteOK", ats: "custom" })),
+    async () =>
+      fetchHimalayas(MODE).then((res) => ({ ...res, sourceName: "Himalayas", ats: "custom" })),
+    async () =>
+      fetchRemotive(MODE).then((res) => ({ ...res, sourceName: "Remotive", ats: "custom" })),
+    async () =>
+      fetchWPStartupJobs(
+        "https://berlinstartupjobs.com",
+        "Berlin",
+        "Germany",
+        "🇩🇪",
+        MODE,
+        "Berlin Startup Jobs (Global)",
+      ).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" })),
   ];
 
-  const results = await Promise.allSettled(allFetchers);
+  // Limit to 5 concurrent fetchers to ensure network stability
+  const results = await pLimit(fetcherFns, 5);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
 
   for (const r of results) {
-    if (r.status === "fulfilled") {
+    if (r) {
       const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
-        r.value as FetcherResult & {
+        r as FetcherResult & {
           sourceName: string;
           ats: string;
-          success?: number;
-          total?: number;
         };
       health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
       for (const j of jobs) {
@@ -97,8 +101,6 @@ export async function fetchRemoteJobs(): Promise<{
           all.push(j);
         }
       }
-    } else {
-      console.error("[global] Unhandled rejection:", r.reason);
     }
   }
 

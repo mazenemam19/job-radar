@@ -9,6 +9,7 @@ import {
   fetchBreezy,
   fetchSmartRecruiters,
   resetWorkableUsed,
+  pLimit,
 } from "./ats-utils";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { ALL_COMPANIES } from "./companies";
@@ -31,9 +32,9 @@ export async function fetchVisaJobs(): Promise<{
   // Scan ALL companies (no more batching/rotation)
   const toScan = [...others, ...workables];
 
-  // ── Parallelize everything ─────────────────────────────────────────
-  const allFetchers = [
-    ...toScan.map((c) => {
+  // ── Limit concurrency to prevent AbortErrors/Timeouts ──────────────────
+  const fetcherFns = [
+    ...toScan.map((c) => async () => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -56,34 +57,32 @@ export async function fetchVisaJobs(): Promise<{
       })();
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-    fetchWPStartupJobs(
-      "https://londonstartupjobs.co.uk",
-      "London",
-      "UK",
-      "🇬🇧",
-      MODE,
-      "London Startup Jobs",
-    ).then((res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" })),
+    async () =>
+      fetchWPStartupJobs(
+        "https://londonstartupjobs.co.uk",
+        "London",
+        "UK",
+        "🇬🇧",
+        MODE,
+        "London Startup Jobs",
+      ).then((res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" })),
   ];
 
-  const results = await Promise.allSettled(allFetchers);
+  // Limit to 5 concurrent fetchers to ensure network stability
+  const results = await pLimit(fetcherFns, 5);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
 
   for (const r of results) {
-    if (r.status === "fulfilled") {
+    if (r) {
       const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
-        r.value as FetcherResult & {
+        r as FetcherResult & {
           sourceName: string;
           ats: string;
-          success?: number;
-          total?: number;
         };
       all.push(...jobs);
       health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
-    } else {
-      console.error("[visa] Unhandled rejection:", r.reason);
     }
   }
 

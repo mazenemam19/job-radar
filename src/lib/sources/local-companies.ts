@@ -13,6 +13,7 @@ import {
   fetchBrightSkies,
   fetchWuzzuf,
   resetWorkableUsed,
+  pLimit,
 } from "./ats-utils";
 import { ALL_COMPANIES } from "./companies";
 
@@ -34,9 +35,9 @@ export async function fetchLocalJobs(): Promise<{
   // Scan ALL companies (no more batching/rotation)
   const toScan = [...others, ...workables];
 
-  // ── Parallelize everything ─────────────────────────────────────────
-  const allFetchers = [
-    ...toScan.map((c) => {
+  // ── Limit concurrency to prevent AbortErrors/Timeouts ──────────────────
+  const fetcherFns = [
+    ...toScan.map((c) => async () => {
       const p = (() => {
         switch (c.ats) {
           case "greenhouse":
@@ -63,24 +64,24 @@ export async function fetchLocalJobs(): Promise<{
       })();
       return p.then((res) => ({ ...res, sourceName: c.name, ats: c.ats }));
     }),
-    fetchWuzzuf(MODE).then((res) => ({ ...res, sourceName: "Wuzzuf", ats: "custom" })),
-    fetchBrightSkies(MODE).then((res) => ({ ...res, sourceName: "Bright Skies", ats: "custom" })),
+    async () => fetchWuzzuf(MODE).then((res) => ({ ...res, sourceName: "Wuzzuf", ats: "custom" })),
+    async () =>
+      fetchBrightSkies(MODE).then((res) => ({ ...res, sourceName: "Bright Skies", ats: "custom" })),
   ];
 
-  const results = await Promise.allSettled(allFetchers);
+  // Limit to 5 concurrent fetchers to ensure network stability
+  const results = await pLimit(fetcherFns, 5);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
   const seen = new Set<string>();
 
   for (const r of results) {
-    if (r.status === "fulfilled") {
+    if (r) {
       const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
-        r.value as FetcherResult & {
+        r as FetcherResult & {
           sourceName: string;
           ats: string;
-          success?: number;
-          total?: number;
         };
       health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
       for (const j of jobs) {
@@ -89,8 +90,6 @@ export async function fetchLocalJobs(): Promise<{
           all.push(j);
         }
       }
-    } else {
-      console.error("[local] Unhandled rejection:", r.reason);
     }
   }
 

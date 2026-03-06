@@ -46,6 +46,7 @@ export interface SourceHealth {
   durationMs?: number;
   ats?: string;
   status?: "ok" | "error" | "zero" | "skipped";
+  ok?: boolean; // Result of the CURRENT run
   // Lifetime stats
   success?: number;
   total?: number;
@@ -107,8 +108,9 @@ export interface FetcherResult {
   rawCount?: number;
   error?: string;
   durationMs?: number;
-  success?: number;
-  total?: number;
+  ok?: boolean; // CURRENT run success
+  success?: number; // Lifetime success count
+  total?: number; // Lifetime total count
 }
 
 // ── ATS Specific Response Types ───────────────────────────────────────────

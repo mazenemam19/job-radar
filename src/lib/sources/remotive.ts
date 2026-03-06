@@ -2,7 +2,6 @@
 import { Job, JobMode, FetcherResult, RemotiveJob } from "../types";
 import { safeFetch, stripHtml } from "./ats-utils";
 import { scoreJob } from "../scoring";
-import { trackApiCall } from "../health-store";
 
 /**
  * Fetches jobs from Remotive.com API.
@@ -13,25 +12,21 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
   const url = "https://remotive.com/api/remote-jobs?category=software-dev";
   const res = await safeFetch(url);
 
-  const healthStat = await trackApiCall("Remotive", res?.ok ?? false);
-
-  if (!res)
-    return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0, ...healthStat };
+  if (!res) return { jobs: [], error: "Network/Timeout", durationMs: Date.now() - t0, ok: false };
   if (!res.ok)
-    return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: [], error: `HTTP ${res.status}`, durationMs: Date.now() - t0, ok: false };
 
   try {
     const data = (await res.json()) as { jobs: RemotiveJob[] };
     const rawJobs = data.jobs || [];
     const rawCount = rawJobs.length;
     const out: Job[] = [];
-    const now = new Date().toISOString();
 
     for (const r of rawJobs) {
       const title = r.title || "";
-      const description = stripHtml(r.description || "");
+      if (!/react|next|native/i.test(title)) continue;
 
-      // Tech Gate + Level Gate via scoreJob
+      const description = stripHtml(r.description || "");
       const scored = scoreJob({
         title,
         description,
@@ -52,26 +47,19 @@ export async function fetchRemotive(mode: JobMode): Promise<FetcherResult> {
         country: "Global",
         countryFlag: "🌍",
         url: r.url,
-        description: description.slice(0, 1000),
+        description: description.slice(0, 500),
         isRemote: true,
         postedAt: r.publication_date,
         dateUnknown: false,
         visaSponsorship: false,
         ...scored,
-        fetchedAt: now,
+        fetchedAt: new Date().toISOString(),
       });
     }
 
     console.log(`[global] Remotive: collected ${out.length} matches`);
-    return { jobs: out, rawCount, durationMs: Date.now() - t0, ...healthStat };
+    return { jobs: out, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
-    const healthStat = await trackApiCall("Remotive", false);
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `Parse Error: ${e}`,
-      durationMs: Date.now() - t0,
-      ...healthStat,
-    };
+    return { jobs: [], error: `Parse Error: ${e}`, durationMs: Date.now() - t0, ok: false };
   }
 }

@@ -1,11 +1,4 @@
-import {
-  readStore,
-  writeStore,
-  mergeJobs,
-  appendCronLog,
-  readRawStore,
-  writeRawStore,
-} from "./storage";
+import { readStore, writeStore, mergeJobs, appendCronLog } from "./storage";
 import { fetchVisaJobs } from "./sources/visa-companies";
 import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchRemoteJobs } from "./sources/remote-companies";
@@ -23,6 +16,7 @@ import {
   markWorkableSlugsBlocked24h,
 } from "./sources/ats-utils";
 import { finalizeBatchState } from "./state";
+import { trackMultipleApiCalls } from "./health-store";
 import type { Job, CronLog, SourceHealth } from "./types";
 
 export async function runAllSources(): Promise<CronLog> {
@@ -44,6 +38,7 @@ export async function runAllSources(): Promise<CronLog> {
 
   const errors: string[] = [];
   const sourceDetails: Record<string, SourceHealth> = {};
+  const healthResults: Record<string, boolean> = {};
 
   let visaJobs: Job[] = [];
   let localJobs: Job[] = [];
@@ -59,12 +54,9 @@ export async function runAllSources(): Promise<CronLog> {
   if (localResult.status === "fulfilled") {
     localJobs = localResult.value.jobs;
     for (const key in localResult.value.health) {
-      if (localResult.value.health.hasOwnProperty(key)) {
-        sourceDetails[key] = {
-          ...sourceDetails[key],
-          ...localResult.value.health[key],
-        };
-      }
+      const h = localResult.value.health[key];
+      sourceDetails[key] = { ...sourceDetails[key], ...h };
+      if (h.ok !== undefined) healthResults[key] = h.ok;
     }
   } else {
     errors.push(`local pipeline: ${localResult.reason}`);
@@ -74,12 +66,9 @@ export async function runAllSources(): Promise<CronLog> {
   if (visaResult.status === "fulfilled") {
     visaJobs = visaResult.value.jobs;
     for (const key in visaResult.value.health) {
-      if (visaResult.value.health.hasOwnProperty(key)) {
-        sourceDetails[key] = {
-          ...sourceDetails[key],
-          ...visaResult.value.health[key],
-        };
-      }
+      const h = visaResult.value.health[key];
+      sourceDetails[key] = { ...sourceDetails[key], ...h };
+      if (h.ok !== undefined) healthResults[key] = h.ok;
     }
   } else {
     errors.push(`visa pipeline: ${visaResult.reason}`);
@@ -89,12 +78,9 @@ export async function runAllSources(): Promise<CronLog> {
   if (remoteResult.status === "fulfilled") {
     globalJobs = remoteResult.value.jobs;
     for (const key in remoteResult.value.health) {
-      if (remoteResult.value.health.hasOwnProperty(key)) {
-        sourceDetails[key] = {
-          ...sourceDetails[key],
-          ...remoteResult.value.health[key],
-        };
-      }
+      const h = remoteResult.value.health[key];
+      sourceDetails[key] = { ...sourceDetails[key], ...h };
+      if (h.ok !== undefined) healthResults[key] = h.ok;
     }
   } else {
     errors.push(`remote pipeline: ${remoteResult.reason}`);
@@ -114,23 +100,11 @@ export async function runAllSources(): Promise<CronLog> {
 
   const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
 
-  // ── Persist Raw Market Data ───────────────────────────────────────────
-  // We save ALL fetched jobs before any personal filtering for market analysis.
-  try {
-    const existingRaw = await readRawStore();
-    const rawMap = new Map(existingRaw.map((j) => [j.id, j]));
-    rawFetched.forEach((j) => rawMap.set(j.id, j));
-    await writeRawStore(Array.from(rawMap.values()));
-  } catch (e) {
-    console.error("[runner] Failed to persist raw market data:", e);
-  }
-
   // ── Gemini Filtration Layer ──
-  // Identify TRULY new jobs that passed regex but haven't been Gemini-checked yet.
   const seenCandidateIds = new Set<string>();
   const newCandidates = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return false;
-    if (seenCandidateIds.has(j.id)) return false; // Prevent duplicate Gemini calls in same run
+    if (seenCandidateIds.has(j.id)) return false;
     if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title)) return false;
     if (isGenericTitleButBackendRole(j.title, j.description)) return false;
     if (requiresCitizenshipOrClearance(j.title + " " + j.description)) return false;
@@ -147,25 +121,19 @@ export async function runAllSources(): Promise<CronLog> {
   const fetched = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return true;
     if (rejectedSet.has(j.id)) return false;
-    // If it was a candidate, check if it passed
     return passedNewJobs.some((pj) => pj.id === j.id);
   });
 
   const { store: updated, added } = mergeJobs(store, fetched);
 
   // ── Final Health Refinement ──
-  // We overwrite the 'count' and 'geminiFiltered' with the real numbers
-  // derived from current unique survivors and current run unique rejections.
   const detailKeys = Object.keys(sourceDetails);
-
   for (const key in sourceDetails) {
-    sourceDetails[key].count = 0; // Technical matches (Regex tier)
-    sourceDetails[key].geminiFiltered = 0; // AI Rejections
+    sourceDetails[key].count = 0;
+    sourceDetails[key].geminiFiltered = 0;
   }
 
-  // 1. Count technical survivors (Unique jobs from this run that passed Regex)
-  const uniqueRawFetched = Array.from(new Map(rawFetched.map((j) => [j.id, j])).values());
-  uniqueRawFetched.forEach((j) => {
+  rawFetched.forEach((j) => {
     const sName = (j.sourceName || j.company).toLowerCase().trim();
     const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
     if (key && sourceDetails[key]) {
@@ -173,9 +141,7 @@ export async function runAllSources(): Promise<CronLog> {
     }
   });
 
-  // 2. Count Gemini rejections (Unique jobs from this run rejected by AI)
-  const uniqueNewCandidates = Array.from(new Map(newCandidates.map((j) => [j.id, j])).values());
-  uniqueNewCandidates.forEach((j) => {
+  newCandidates.forEach((j) => {
     if (rejectedSet.has(j.id)) {
       const sName = (j.sourceName || j.company).toLowerCase().trim();
       const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
@@ -184,6 +150,20 @@ export async function runAllSources(): Promise<CronLog> {
       }
     }
   });
+
+  // ── Bulk update health store once ──
+  try {
+    const finalHealth = await trackMultipleApiCalls(healthResults);
+    // Sync the final stats back into sourceDetails for the log
+    for (const key in sourceDetails) {
+      if (finalHealth[key]) {
+        sourceDetails[key].success = finalHealth[key].success;
+        sourceDetails[key].total = finalHealth[key].total;
+      }
+    }
+  } catch (e) {
+    console.error("[runner] Failed to update health store:", e);
+  }
 
   // Email alert only for brand-new visa-mode jobs
   const brandNewVisa = added.filter((j) => !existingIds.has(j.id) && j.mode === "visa");
