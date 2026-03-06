@@ -57,7 +57,7 @@ export default function Dashboard({ cronSecret }: { cronSecret?: string }) {
     loadJobs();
   }, [loadJobs]);
 
-  const allJobs = store?.jobs ?? [];
+  const allJobs = useMemo(() => store?.jobs ?? [], [store]);
 
   // Jobs filtered by current mode
   const modeJobs = useMemo(

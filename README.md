@@ -1,163 +1,93 @@
-# 🎯 Job Radar
+# 🎯 Job Radar v3.5
 
-A personal job-hunting dashboard that automatically scrapes frontend engineering jobs across three pipelines and scores them against your React/TypeScript skillset. Runs daily at **6pm Cairo time** via Vercel Cron.
-
----
-
-## Pipelines
-
-| Pipeline             | What it finds                                | Companies                                                  |
-| -------------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| 🌍 **Visa Sponsors** | EU companies that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more          |
-| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs      | Instabug, Bosta, Thndr, Nawy, Dubizzle, Paymob, +more      |
-| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2 | GitLab, Automattic, Netlify, Vercel, Linear, Zapier, +more |
+A personalized job-hunting intelligence engine tailored for a **Senior React/Next.js Engineer based in Egypt**. It automatically scrapes frontend engineering jobs across global tech hubs, local startups, and worldwide remote boards, scoring them against a specific technical profile.
 
 ---
 
-## Scoring
+## 🚀 Key Features
+
+- **Multi-Tier Filtering**:
+  1. **Regex Gate**: Fast local filtering for tech stack (React/Next.js required), seniority, and location-aware patterns (e.g., US-only, Hybrid).
+  2. **Gemini LLM Tier**: Nuanced check for location alignment, BDS policy (Israel-related), and detailed tech skew. Includes exact supporting quotes for all rejections.
+- **Market Intelligence**: A dedicated dashboard analyzing raw signals to identify skill demand, co-occurrence trends, and market gaps.
+- **Source Health Diagnostics**: Real-time reliability tracking (Success/Total API calls) and granular filtering stats (Raw → Regex Pass → Gemini Reject → Total Active).
+- **Unified Company Management**: A single source of truth in `companies.ts` drives all pipelines.
+- **Comprehensive Scans**: Scans 100% of defined sources in every run (no rotation).
+
+---
+
+## 🛤️ Pipelines
+
+| Pipeline             | What it finds                                           | Key Sources                                          |
+| -------------------- | ------------------------------------------------------- | ---------------------------------------------------- |
+| ✈️ **Visa Sponsors** | Companies in EU/UK hubs that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, Moonfare    |
+| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs                 | Instabug, Bosta, Thndr, Nawy, Blink22, ArpuPlus      |
+| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2            | Vercel, Linear, GitLab, Netlify, RemoteOK, Himalayas |
+
+---
+
+## 📊 Scoring & Selection
 
 Each job is scored 0–100 based on:
 
-- **Skill match (60%)** — how many of your expert/proficient skills appear in the JD
-- **Recency (30%)** — freshness (max 7 days old, after that dropped)
-- **Relocation bonus (10%)** — explicit relocation support mentioned
+- **Skill match (60%)** — Core skills: `React`, `TypeScript`, `Next.js`, `Tailwind`, `Vite`, etc.
+- **Recency (30%)** — Strict **7-day auto-expiry**. Jobs older than 1 week are dropped.
+- **Relocation bonus (10%)** — Explicit relocation support mentioned.
 
-Your core skills checked: `React`, `TypeScript`, `JavaScript`, `HTML`, `CSS`, `Redux`, `React Query`, `Next.js`, `Tailwind`, `Vite`, `Material UI`, and more.
-
-Jobs with 0 skill match score are **never shown**. Jobs older than **7 days** are auto-dropped.
+**Note**: Jobs with 0 skill match score or those failing the strict title filters (Backend, DevOps, Intern, etc.) are **never shown**.
 
 ---
 
----
+## 🛠️ Architecture
 
-## Gemini LLM Filtration Layer
-
-The Job Radar project employs a **two-tier filtering system** to ensure job quality and relevance:
-
-1.  **Regex Tier**: A fast, initial check for tech stack (React, Next.js, etc.), seniority level, and obvious location restrictions (e.g., US-only).
-2.  **Gemini LLM Tier**: A secondary, more nuanced check for:
-    - **Location Alignment**: Ensures roles are friendly to Egypt/EMEA timezones and don't have restrictive US/UK/Canada-only requirements.
-    - **Israel-Related Companies**: Rejects companies based in Israel or known for supporting Israel.
-    - **Tech & Seniority**: Further refines tech stack matches and excludes Lead/Managerial roles.
-    - **Resilience**: Utilizes a cascading fallback queue of models (`gemini-3.1-pro-preview` down to `gemini-2.5-flash-lite`) to handle API load and errors.
-    - **Quota Optimization**: Gemini is only invoked for _new_ jobs that pass the Regex Tier, preserving API quota.
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Style-JSX.
+- **Backend**: Supabase PostgreSQL (JSONB) for persistent storage of jobs, state, and reliability logs.
+- **AI**: Google Gemini Pro/Flash fallback queue with 429-optimization.
+- **Deployment**: Vercel with scheduled GitHub Actions triggers every 6 hours.
 
 ---
 
-## Pipelines
+## 💾 Setup
 
-| Pipeline             | What it finds                                           | Companies                                                  |
-| -------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
-| ✈️ **Visa Sponsors** | Companies in EU/UK hubs that sponsor visas + relocation | Doctolib, Wallapop, Stripe, SumUp, Wolt, +60 more          |
-| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs                 | Instabug, Bosta, Thndr, Nawy, Blink22, ArpuPlus, +more     |
-| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2            | GitLab, Automattic, Netlify, Vercel, Linear, Zapier, +more |
-
----
-
-## Gemini LLM Filtration Layer
-
-The Job Radar project employs a **two-tier filtering system** to ensure job quality and relevance:
-
-1.  **Regex Tier**: A fast, initial check for tech stack (React, Next.js, etc.), seniority level, and obvious location restrictions (e.g., US-only).
-2.  **Gemini LLM Tier**: A secondary, more nuanced check for:
-    - **Location Alignment**: Ensures roles are friendly to Egypt/EMEA timezones and don't have restrictive US/UK/Canada-only requirements.
-    - **Israel-Related Companies**: Rejects companies based in Israel or known for supporting Israel.
-    - **Tech & Seniority**: Further refines tech stack matches and excludes Lead/Managerial roles.
-    - **Resilience**: Utilizes a cascading fallback queue of models (`gemini-3.1-pro-preview` down to `gemini-2.5-flash-lite`) to handle API load and errors.
-    - **Quota Optimization**: Gemini is only invoked for _new_ jobs that pass the Regex Tier, preserving API quota.
-
----
-
-## Filters Applied
-
-1. **Title filter** — rejects backend, DevOps, Android, MLOps, compliance, hardware, marketing ops, intern roles, etc.
-2. **Backend description guard** — generic "Software Engineer" titles get description-scanned for infra signals (Kafka, Kubernetes, Terraform…)
-3. **Clearance filter** — rejects "must be US citizen / right to work in UK" etc.
-4. **Timezone filter** (global only) — rejects US-timezone-only roles
-
----
-
-## Setup
-
-### 1. Clone & install
-
-```bash
-git clone <your-repo>
-cd job-radar
-npm install
-```
-
-### 2. Environment variables
+### 1. Environment Variables
 
 Create `.env.local`:
 
 ```env
-CRON_SECRET=your-random-secret-here
-EMAIL_USER=youremail@gmail.com
-EMAIL_PASS=your-gmail-app-password
-EMAIL_TO=youremail@gmail.com
-GEMINI_API_KEY=your_gemini_api_key_here
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+GEMINI_API_KEY=...
+CRON_SECRET=...
+EMAIL_USER=...
+EMAIL_PASS=...
+EMAIL_TO=...
 ```
 
-### 3. Run locally
+### 2. Supabase Table
+
+Create a `storage` table:
+
+```sql
+CREATE TABLE storage (
+  key TEXT PRIMARY KEY,
+  data JSONB
+);
+```
+
+### 3. Run Locally
 
 ```bash
-npm run dev
-# Dashboard at http://localhost:3000
-```
-
-### 4. Deploy to Vercel
-
-```bash
-vercel deploy
-```
-
-- Add the same env vars in Vercel dashboard → Settings → Environment Variables
-- The `vercel.json` already configures the daily cron at **4pm UTC (6pm Cairo)** ✅
-- Set `CRON_SECRET` in Vercel env — Vercel sends it automatically as `Authorization: Bearer <secret>`
-
----
-
-## File Structure
-
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── cron/route.ts       ← Daily runner (GET=Vercel cron, POST=dashboard button)
-│   │   └── jobs/[id]/route.ts  ← Single job API for detail page
-│   ├── job/[id]/page.tsx       ← Job detail page
-│   └── page.tsx                ← Dashboard (3 tabs: Visa / Local / Global)
-├── components/
-│   └── JobCard.tsx             ← Job card with score ring, skill chips, detail nav
-└── lib/
-    ├── runner.ts               ← Orchestrates all 3 pipelines
-    ├── scoring.ts              ← Skill matching, title filters, score calculation
-    ├── storage.ts              ← jobs.json read/write, 7-day cleanup
-    ├── email.ts                ← Gmail alert for new visa jobs
-    ├── gemini.ts               ← Gemini LLM filtration logic
-    └── sources/
-        ├── visa-companies.ts   ← Companies offering visa sponsorship (formerly companies.ts)
-        ├── local-companies.ts  ← Egyptian company list
-        ├── remote-companies.ts ← Global remote company list (formerly global-companies.ts)
-        └── ats-utils.ts        ← Fetchers for Greenhouse, Lever, Ashby, Workable, BambooHR, SmartRecruiters
-vercel.json                     ← Cron: daily at 4pm UTC (6pm Cairo)
+pnpm install
+pnpm dev
+# Run a manual scan
+pnpm cron:now
 ```
 
 ---
 
-## Adding Companies
+## 📜 Principles & Mandates
 
-Edit the relevant source file and add a line:
-
-```ts
-{ ats: "greenhouse", name: "Acme Corp", slug: "acmecorp", country: "Germany", countryFlag: "🇩🇪" }
-```
-
-Supported ATS platforms: `greenhouse`, `lever`, `ashby`, `workable`, `bamboohr`, `smartrecruiters`, `teamtailor`, `breezy`
-
----
-
-## Notes on Local Pipeline Empty Results
-
-If local shows 0 jobs, it means Egyptian companies genuinely have no fresh React openings that week — not a bug. The pipeline scrapes live ATSs, applies the same title/skill filters, and only keeps jobs ≤7 days old.
+- **Strict Profile Alignment**: Only jobs matching the Senior React / Egypt-based profile are accepted.
+- **Zero Duplication**: Centralized fetching ensures each company is hit only once per run.
+- **Transparency**: Every AI rejection must be accompanied by an exact quote from the job description.
+- **Rate Limiting**: `queueWorkable` and `pLimit` maintain safety to prevent IP blacklisting.
