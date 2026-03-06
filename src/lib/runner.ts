@@ -33,7 +33,8 @@ export async function runAllSources(): Promise<CronLog> {
   }
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
-  const [store, state] = await Promise.all([readStore(), readState()]);
+  const store = await readStore();
+  await readState(); // Initialize process state for lastUpdated timestamp
   const existingIds = new Set(store.jobs.map((j) => j.id));
 
   const errors: string[] = [];
@@ -51,13 +52,30 @@ export async function runAllSources(): Promise<CronLog> {
     fetchRemoteJobs(),
   ]);
 
-  if (localResult.status === "fulfilled") {
-    localJobs = localResult.value.jobs;
-    for (const key in localResult.value.health) {
-      const h = localResult.value.health[key];
-      sourceDetails[key] = { ...sourceDetails[key], ...h };
+  const aggregateHealth = (health: Record<string, SourceHealth>) => {
+    for (const key in health) {
+      const h = health[key];
+      if (!sourceDetails[key]) {
+        sourceDetails[key] = { ...h };
+      } else {
+        // Additive fields
+        sourceDetails[key].count = (sourceDetails[key].count || 0) + (h.count || 0);
+        sourceDetails[key].rawCount = (sourceDetails[key].rawCount || 0) + (h.rawCount || 0);
+        sourceDetails[key].geminiFiltered =
+          (sourceDetails[key].geminiFiltered || 0) + (h.geminiFiltered || 0);
+        // Overwrite or preserve descriptive fields
+        if (h.error) sourceDetails[key].error = h.error;
+        if (h.durationMs)
+          sourceDetails[key].durationMs = (sourceDetails[key].durationMs || 0) + h.durationMs;
+        if (h.ok !== undefined) sourceDetails[key].ok = sourceDetails[key].ok && h.ok;
+      }
       if (h.ok !== undefined) healthResults[key] = h.ok;
     }
+  };
+
+  if (localResult.status === "fulfilled") {
+    localJobs = localResult.value.jobs;
+    aggregateHealth(localResult.value.health);
   } else {
     errors.push(`local pipeline: ${localResult.reason}`);
     console.error("[runner] local pipeline failed:", localResult.reason);
@@ -65,11 +83,7 @@ export async function runAllSources(): Promise<CronLog> {
 
   if (visaResult.status === "fulfilled") {
     visaJobs = visaResult.value.jobs;
-    for (const key in visaResult.value.health) {
-      const h = visaResult.value.health[key];
-      sourceDetails[key] = { ...sourceDetails[key], ...h };
-      if (h.ok !== undefined) healthResults[key] = h.ok;
-    }
+    aggregateHealth(visaResult.value.health);
   } else {
     errors.push(`visa pipeline: ${visaResult.reason}`);
     console.error("[runner] visa pipeline failed:", visaResult.reason);
@@ -77,11 +91,7 @@ export async function runAllSources(): Promise<CronLog> {
 
   if (remoteResult.status === "fulfilled") {
     globalJobs = remoteResult.value.jobs;
-    for (const key in remoteResult.value.health) {
-      const h = remoteResult.value.health[key];
-      sourceDetails[key] = { ...sourceDetails[key], ...h };
-      if (h.ok !== undefined) healthResults[key] = h.ok;
-    }
+    aggregateHealth(remoteResult.value.health);
   } else {
     errors.push(`remote pipeline: ${remoteResult.reason}`);
     console.error("[runner] remote pipeline failed:", remoteResult.reason);
@@ -101,7 +111,6 @@ export async function runAllSources(): Promise<CronLog> {
   const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
 
   // ── Raw Market Persistence ──
-  // Save ALL fetched jobs before filtering for market dashboard
   await writeRawStore(rawFetched);
 
   // ── Gemini Filtration Layer ──
@@ -121,7 +130,6 @@ export async function runAllSources(): Promise<CronLog> {
   const { passed: passedNewJobs, rejectedIds } = await filterJobsWithGemini(newCandidates);
   const rejectedSet = new Set(rejectedIds);
 
-  // Filter rawFetched: keep existing, OR keep new IF it passed Gemini
   const fetched = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return true;
     if (rejectedSet.has(j.id)) return false;
@@ -132,6 +140,7 @@ export async function runAllSources(): Promise<CronLog> {
 
   // ── Final Health Refinement ──
   const detailKeys = Object.keys(sourceDetails);
+
   for (const key in sourceDetails) {
     sourceDetails[key].count = 0;
     sourceDetails[key].geminiFiltered = 0;
@@ -155,10 +164,8 @@ export async function runAllSources(): Promise<CronLog> {
     }
   });
 
-  // ── Bulk update health store once ──
   try {
     const finalHealth = await trackMultipleApiCalls(healthResults);
-    // Sync the final stats back into sourceDetails for the log
     for (const key in sourceDetails) {
       if (finalHealth[key]) {
         sourceDetails[key].success = finalHealth[key].success;

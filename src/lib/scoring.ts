@@ -147,7 +147,7 @@ export function isTooSeniorOrTooJunior(title: string): boolean {
 
 export function isGeographicallyBlacklisted(text: string): boolean {
   const t = text.toLowerCase();
-  
+
   const blacklist = [
     /\bisrael\b/,
     /\btel\s+aviv\b/,
@@ -176,6 +176,10 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /hybrid\s+role/i,
     /in-person\s+participation\s+is\s+required/i,
     /office\s+presence\s+is\s+required/i,
+    /office\s+culture/i,
+    /collaboration\s+of\s+being\s+together/i,
+    /work-life\s+harmony/i,
+    /value\s+in\s+our\s+office\s+culture/i,
     /\b(portugal|spain|france|germany|italy|poland|switzerland|india|nyc|san\s+francisco|bay\s+area|lisbon|madrid|barcelona|aveiro)\b/i,
   ];
 
@@ -190,9 +194,9 @@ export function isGeographicallyBlacklisted(text: string): boolean {
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
   const desc = description.toLowerCase();
-  
+
   const isSpecificallyFE = /\b(frontend|front-end|react|ui)\b/i.test(t);
-  
+
   if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(desc)) return true;
   if (!REACT_REQUIRED.test(desc)) return true;
 
@@ -219,7 +223,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bsystems\s+programming\b/,
     /\bjava\b.*\bscala\b/i, // Specific Java/Scala signal found in recent rejection
   ];
-  
+
   const feSignals = [
     /\breact\b/,
     /\bnext\.?js\b/,
@@ -229,15 +233,15 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bcss\b/,
     /\bhtml\b/,
   ];
-  
+
   const bCount = backendSignals.filter((re) => re.test(desc)).length;
   const fCount = feSignals.filter((re) => re.test(desc)).length;
-  
+
   // If title is generic and backend signals are strong, reject
   if (!isSpecificallyFE && bCount >= 3 && bCount > fCount) return true;
   // Even if title is FE, if it's overwhelming backend, reject
   if (isSpecificallyFE && bCount >= 6 && bCount > fCount * 2) return true;
-  
+
   return false;
 }
 
