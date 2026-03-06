@@ -13,12 +13,19 @@ function daysAgo(iso: string): string {
 }
 
 export default function JobDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const id = params?.id;
+
   useEffect(() => {
+    if (!id) {
+      setLoading(false); // No id, so not loading anymore
+      return; // Exit if no id
+    }
+
     fetch(`/api/jobs/${encodeURIComponent(id)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
