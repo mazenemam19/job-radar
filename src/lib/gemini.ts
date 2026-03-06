@@ -25,6 +25,7 @@ const genAI = GEMINI_API_KEY
 interface GeminiFilterResult {
   passed: boolean;
   reason: string;
+  quote?: string; // Supporting quote from the description for rejections
   id: string;
 }
 
@@ -62,7 +63,8 @@ export async function filterJobsWithGemini(
           results.push({ ...job, geminiPassed: true, geminiReason: res.reason });
         } else {
           rejectedIds.push(job.id);
-          console.log(`[gemini] Rejected ${job.id} (${job.company}): ${res.reason}`);
+          const quoteText = res.quote ? ` | Quote: "${res.quote}"` : "";
+          console.log(`[gemini] Rejected ${job.id} (${job.company}): ${res.reason}${quoteText}`);
         }
       }
     }
@@ -121,7 +123,7 @@ async function callGemini(batch: Job[], modelName: string): Promise<GeminiFilter
     title: j.title,
     company: j.company,
     location: j.location,
-    description: j.description.substring(0, 2500), // Increased to catch footer restrictions
+    description: j.description.substring(0, 3000), // Increased to catch footer restrictions
   }));
 
   const prompt = `
@@ -135,6 +137,7 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
    - REJECT if it mentions "US Hubs", "US Citizenship", "Green Card", or "Security Clearance" (unless for Egypt).
    - REJECT if the role is remote but restricted to a specific country/region that is NOT Global or EMEA.
    - REJECT if the timezone is PST, EST, CST, MST, or "North America" without mentioning "Global" or "EMEA" flexibility.
+   - REJECT if it mentions "office presence", "hybrid", "onsite in X city" (unless it is Cairo/Giza).
    - BE AGGRESSIVE: If it says "Remote in the US", it is a REJECT.
 
 2. ISRAEL-RELATED (BDS ALIGNMENT):
@@ -151,7 +154,8 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
    - REJECT Intern, Junior, Trainee, Graduate, or Associate roles. We only want Mid-level to Senior individual contributors.
 
 OUTPUT FORMAT:
-Return ONLY a valid JSON array of objects: [{"id": "string", "passed": boolean, "reason": "concise explanation"}]
+Return ONLY a valid JSON array of objects: [{"id": "string", "passed": boolean, "reason": "concise explanation", "quote": "exact quote from description that caused rejection"}]
+If "passed" is true, the "quote" field can be an empty string.
 
 JOBS TO EVALUATE:
 ${JSON.stringify(jobData, null, 2)}

@@ -1,4 +1,4 @@
-import { readStore, writeStore, mergeJobs, appendCronLog } from "./storage";
+import { readStore, writeStore, mergeJobs, appendCronLog, writeRawStore } from "./storage";
 import { fetchVisaJobs } from "./sources/visa-companies";
 import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchRemoteJobs } from "./sources/remote-companies";
@@ -15,7 +15,7 @@ import {
   getWorkable429SlugsThisRun,
   markWorkableSlugsBlocked24h,
 } from "./sources/ats-utils";
-import { finalizeBatchState } from "./state";
+import { finalizeBatchState, readState } from "./state";
 import { trackMultipleApiCalls } from "./health-store";
 import type { Job, CronLog, SourceHealth } from "./types";
 
@@ -33,7 +33,7 @@ export async function runAllSources(): Promise<CronLog> {
   }
   console.log("[runner] ── Scan start ───────────────────────────────────────");
   const t0 = Date.now();
-  const store = await readStore();
+  const [store, state] = await Promise.all([readStore(), readState()]);
   const existingIds = new Set(store.jobs.map((j) => j.id));
 
   const errors: string[] = [];
@@ -99,6 +99,10 @@ export async function runAllSources(): Promise<CronLog> {
   }
 
   const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
+
+  // ── Raw Market Persistence ──
+  // Save ALL fetched jobs before filtering for market dashboard
+  await writeRawStore(rawFetched);
 
   // ── Gemini Filtration Layer ──
   const seenCandidateIds = new Set<string>();

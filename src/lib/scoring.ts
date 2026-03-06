@@ -145,11 +145,53 @@ export function isTooSeniorOrTooJunior(title: string): boolean {
   return seniorRejections.some((re) => re.test(t)) || juniorRejections.some((re) => re.test(t));
 }
 
+export function isGeographicallyBlacklisted(text: string): boolean {
+  const t = text.toLowerCase();
+  
+  // Rejection lists based on recent Gemini patterns
+  const blacklist = [
+    /\bisrael\b/,
+    /\btel\s+aviv\b/,
+    /\btel-aviv\b/,
+    /\bhaifa\b/,
+    /\bherzliya\b/,
+    /\bjerusalem\b/,
+    /\bra'anana\b/,
+    /\bgush\s+dan\b/,
+    /\bcentral\s+district\b/,
+    // Country restrictions that exclude Egypt
+    /\b(us|usa|united\s+states|u\.?s\.?a\.?)\s+only\b/i,
+    /\b(uk|u\.?k\.?|united\s+kingdom)\s+only\b/i,
+    /\bcanada\s+only\b/i,
+    /\beurope\s+only\b/i,
+    /\bamericas\s+only\b/i,
+    /\blatam\s+only\b/i,
+    /\bapac\s+only\b/i,
+    /\bau\s+only\b/i,
+    /\baustralia\s+only\b/i,
+    /\bnew\s+zealand\s+only\b/i,
+    // Cities/States mentioned as physical requirement without Egypt/EMEA flexibility
+    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|bengaluru|bangalore|san\s+francisco|bay\s+area|new\s+york|nyc|london|berlin|paris|lisbon|madrid|barcelona|aveiro)\b/i,
+  ];
+
+  // If it mentions global/emea/egypt, we allow it to pass to Gemini for nuanced check
+  if (/\b(global|emea|egypt|cairo|giza|anywhere|worldwide)\b/i.test(t)) {
+    // Exception: Israel is always a hard reject regardless of other keywords
+    if (/\bisrael|tel\s+aviv|haifa|herzliya/i.test(t)) return true;
+    return false;
+  }
+
+  return blacklist.some((re) => re.test(t));
+}
+
 export function isGenericTitleButBackendRole(title: string, description: string): boolean {
   const t = title.toLowerCase();
   const desc = description.toLowerCase();
+  
+  // If the title is specifically frontend, we are more lenient
+  const isSpecificallyFE = /\b(frontend|front-end|react|ui)\b/i.test(t);
+  
   if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(desc)) return true;
-  if (/\b(frontend|front-end|react)\b/i.test(t)) return false;
   if (!REACT_REQUIRED.test(desc)) return true;
 
   const backendSignals = [
@@ -168,7 +210,13 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\belasticsearch\b/,
     /\bbackend\s+api\b/,
     /\brest\s+api\b/,
+    /\bgolang\b|\bgo\s+backend\b/,
+    /\bpython\s+(fastapi|django|flask)\b/,
+    /\brust\b/,
+    /\bc\+\+|\bcpp\b/,
+    /\bsystems\s+programming\b/,
   ];
+  
   const feSignals = [
     /\breact\b/,
     /\bnext\.?js\b/,
@@ -178,9 +226,16 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bcss\b/,
     /\bhtml\b/,
   ];
+  
   const bCount = backendSignals.filter((re) => re.test(desc)).length;
   const fCount = feSignals.filter((re) => re.test(desc)).length;
-  return bCount >= 4 && bCount > fCount;
+  
+  // If title is generic and backend signals are strong, reject
+  if (!isSpecificallyFE && bCount >= 3 && bCount > fCount) return true;
+  // Even if title is FE, if it's overwhelming backend, reject
+  if (isSpecificallyFE && bCount >= 6 && bCount > fCount * 2) return true;
+  
+  return false;
 }
 
 export function requiresCitizenshipOrClearance(text: string): boolean {
@@ -201,6 +256,9 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /\bu\.?s\.?\s+hubs?\b/,
     /\bu\.?s\.?-only\b/,
     /only\s+open\s+to\s+(residents|citizens|candidates)\s+of\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
+    // Add Hybrid/Onsite rejections for non-Egypt locations
+    /\bhybrid\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
+    /\b(onsite|on-site|in-office|office-based)\b/i,
   ].some((re) => re.test(t));
 }
 
@@ -241,6 +299,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
   }
 
   if (
+    isGeographicallyBlacklisted(text) ||
     isGenericTitleButBackendRole(input.title, input.description) ||
     requiresCitizenshipOrClearance(text)
   ) {
