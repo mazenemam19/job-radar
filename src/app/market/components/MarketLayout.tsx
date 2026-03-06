@@ -20,7 +20,9 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
         <div className="title-block">
           <h1 className="main-title">Market Intelligence</h1>
           <div className="meta-strip">
-            <span className="timestamp">Updated: {new Date(data.meta.generatedAt).toLocaleString()}</span>
+            <span className="timestamp">
+              Updated: {new Date(data.meta.generatedAt).toLocaleString()}
+            </span>
             <span className="divider">|</span>
             <span className="source-count">Analyzing {data.meta.totalJobs} raw job listings</span>
           </div>
@@ -39,27 +41,27 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
       <div className="market-grid">
         {/* Row 1: High Level Stats */}
         <div className="stats-row">
-          <StatCard 
-            label="Qualified Match Rate" 
-            value={`${100 - data.meta.filterRate}%`} 
+          <StatCard
+            label="Qualified Match Rate"
+            value={`${100 - data.meta.filterRate}%`}
             subtitle={`${data.meta.jobsPassingFilter} jobs passed all filters`}
             color="#4ade80"
           />
-          <StatCard 
-            label="Tech Ecosystem Breadth" 
-            value={data.meta.uniqueSkillsFound} 
+          <StatCard
+            label="Tech Ecosystem Breadth"
+            value={data.meta.uniqueSkillsFound}
             subtitle="Distinct technologies identified"
             color="#6366f1"
           />
-          <StatCard 
-            label="Seniority Distribution" 
-            value={data.seniorityBreakdown.find(s => s.level === 'Senior')?.count || 0} 
+          <StatCard
+            label="Seniority Distribution"
+            value={data.seniorityBreakdown.find((s) => s.level === "Senior")?.count || 0}
             subtitle="Senior-level roles found"
             color="#f59e0b"
           />
-          <StatCard 
-            label="Remote Density" 
-            value={`${Math.round((data.remoteSignals.remote / data.meta.totalJobs) * 100)}%`} 
+          <StatCard
+            label="Remote Density"
+            value={`${Math.round((data.remoteSignals.remote / data.meta.totalJobs) * 100)}%`}
             subtitle="Explicitly remote-friendly"
             color="#0ea5e9"
           />
@@ -74,13 +76,16 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
 
           <div className="secondary-column">
             <InsightsPanel insights={data.insights} />
-            
+
             <div className="market-card category-legend">
               <h3 className="legend-title">Category Map</h3>
               <div className="legend-grid">
-                {categories.map(cat => (
+                {categories.map((cat) => (
                   <div key={cat} className="legend-item">
-                    <span className="color-dot" style={{ background: CATEGORY_COLORS[cat] || '#64748b' }} />
+                    <span
+                      className="color-dot"
+                      style={{ background: CATEGORY_COLORS[cat] || "#64748b" }}
+                    />
                     <span className="cat-name">{cat}</span>
                   </div>
                 ))}
@@ -88,11 +93,23 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
             </div>
 
             <SkillGaps data={data.marketSkillGaps} />
-            
+
             <div className="pipeline-section">
-              <PipelineStat label="Visa Hubs" total={data.pipelineBreakdown.visa.total} skills={data.pipelineBreakdown.visa.topSkills} />
-              <PipelineStat label="Local (Egypt)" total={data.pipelineBreakdown.local.total} skills={data.pipelineBreakdown.local.topSkills} />
-              <PipelineStat label="Global Remote" total={data.pipelineBreakdown.global.total} skills={data.pipelineBreakdown.global.topSkills} />
+              <PipelineStat
+                label="Visa Hubs"
+                total={data.pipelineBreakdown.visa.total}
+                skills={data.pipelineBreakdown.visa.topSkills}
+              />
+              <PipelineStat
+                label="Local (Egypt)"
+                total={data.pipelineBreakdown.local.total}
+                skills={data.pipelineBreakdown.local.topSkills}
+              />
+              <PipelineStat
+                label="Global Remote"
+                total={data.pipelineBreakdown.global.total}
+                skills={data.pipelineBreakdown.global.topSkills}
+              />
             </div>
           </div>
         </div>
@@ -111,7 +128,7 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
           justify-content: space-between;
           align-items: flex-end;
           margin-bottom: 48px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           padding-bottom: 24px;
         }
         .main-title {
@@ -131,8 +148,10 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
           text-transform: uppercase;
           letter-spacing: 0.1em;
         }
-        .divider { opacity: 0.2; }
-        
+        .divider {
+          opacity: 0.2;
+        }
+
         .filter-stat {
           text-align: right;
           min-width: 200px;
@@ -160,7 +179,7 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
         .mini-track {
           width: 80px;
           height: 4px;
-          background: rgba(255,255,255,0.05);
+          background: rgba(255, 255, 255, 0.05);
           border-radius: 2px;
           overflow: hidden;
         }
@@ -198,7 +217,7 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
 
         .market-card {
           background: #0f0f1c;
-          border: 1px solid rgba(255,255,255,0.08);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           padding: 24px;
         }

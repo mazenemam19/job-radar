@@ -18,7 +18,9 @@ export async function readState(): Promise<ScanState> {
         currentProcessState = JSON.parse(fs.readFileSync(LOCAL_STATE_PATH, "utf-8"));
         return currentProcessState!;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   try {
@@ -32,7 +34,9 @@ export async function readState(): Promise<ScanState> {
       currentProcessState = data.data as ScanState;
       return currentProcessState;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   currentProcessState = { workableOffsets: {} };
   return currentProcessState;

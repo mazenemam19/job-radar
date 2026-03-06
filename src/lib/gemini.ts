@@ -22,7 +22,6 @@ const genAI = GEMINI_API_KEY
     })
   : null;
 
-
 /**
  * Filter jobs using Gemini LLM with a fallback queue for high availability.
  * Batches jobs to save on tokens and requests.

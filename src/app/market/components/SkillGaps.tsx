@@ -13,7 +13,10 @@ export default function SkillGaps({ data }: { data: SkillGap[] }) {
         {data.slice(0, 15).map((gap) => (
           <div key={gap.skill} className="gap-item">
             <div className="gap-info">
-              <span className="skill-dot" style={{ background: CATEGORY_COLORS[gap.category] || '#64748b' }} />
+              <span
+                className="skill-dot"
+                style={{ background: CATEGORY_COLORS[gap.category] || "#64748b" }}
+              />
               <span className="skill-name">{gap.skill}</span>
               {gap.trending && <span className="trend-tag">Trending</span>}
             </div>
@@ -48,7 +51,7 @@ export default function SkillGaps({ data }: { data: SkillGap[] }) {
           justify-content: space-between;
           align-items: center;
           padding: 8px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.03);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
         }
         .gap-info {
           display: flex;

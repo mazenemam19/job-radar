@@ -11,7 +11,7 @@ export default function CoOccurrenceGrid({ data }: { data: CoOccur[] }) {
         <span className="icon">🔗</span>
         Top Skill Co-Occurrence
       </h2>
-      
+
       <div className="occur-grid">
         {data.slice(0, 24).map((pair, idx) => (
           <div key={idx} className="occur-item">
@@ -52,7 +52,7 @@ export default function CoOccurrenceGrid({ data }: { data: CoOccur[] }) {
           gap: 12px;
         }
         .occur-item {
-          background: rgba(255,255,255,0.02);
+          background: rgba(255, 255, 255, 0.02);
           border: 1px solid var(--border);
           border-radius: 8px;
           padding: 12px 16px;
@@ -68,8 +68,13 @@ export default function CoOccurrenceGrid({ data }: { data: CoOccur[] }) {
           gap: 6px;
           align-items: center;
         }
-        .skill-a, .skill-b { color: #fff; }
-        .plus { opacity: 0.3; }
+        .skill-a,
+        .skill-b {
+          color: #fff;
+        }
+        .plus {
+          opacity: 0.3;
+        }
         .pair-count {
           font-family: var(--font-mono);
           font-size: 12px;

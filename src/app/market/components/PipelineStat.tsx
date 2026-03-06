@@ -11,9 +11,9 @@ export default function PipelineStat({ label, total, skills }: PipelineData) {
         <span className="pipeline-label">{label}</span>
         <span className="pipeline-count">{total} jobs</span>
       </div>
-      
+
       <div className="pipeline-skills">
-        {skills.map(s => (
+        {skills.map((s) => (
           <div key={s.skill} className="p-skill-item">
             <span className="p-skill-name">{s.skill}</span>
             <span className="p-skill-val">{s.count}</span>
@@ -23,7 +23,7 @@ export default function PipelineStat({ label, total, skills }: PipelineData) {
 
       <style jsx>{`
         .pipeline-card {
-          background: rgba(255,255,255,0.02);
+          background: rgba(255, 255, 255, 0.02);
           border: 1px solid var(--border);
           border-radius: 12px;
           padding: 16px 20px;

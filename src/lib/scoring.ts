@@ -170,7 +170,13 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\bjava\b.*\bscala\b/i,
   ];
 
-  const feSignals = [/\breact\b/, /\bnext\.?js\b/, /\btypescript\b/, /\bjavascript\b/, /\btailwind\b/];
+  const feSignals = [
+    /\breact\b/,
+    /\bnext\.?js\b/,
+    /\btypescript\b/,
+    /\bjavascript\b/,
+    /\btailwind\b/,
+  ];
 
   const bCount = backendSignals.filter((re) => re.test(desc)).length;
   const fCount = feSignals.filter((re) => re.test(desc)).length;
