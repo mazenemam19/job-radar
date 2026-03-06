@@ -54,25 +54,25 @@ export default function JobDetailPage() {
       {/* ── Header ── */}
       <header className="detail-header">
         <div className="detail-company-row">
-          <span className="detail-flag">{job.countryFlag}</span>
+          <span className="detail-flag">{job!.countryFlag}</span>
           <div>
-            <span className="detail-company">{job.company}</span>
-            <span className="detail-country">{job.country}</span>
+            <span className="detail-company">{job!.company}</span>
+            <span className="detail-country">{job!.country}</span>
           </div>
           <div className="detail-score" style={{ color: scoreColor }}>
-            {Math.round(job.totalScore)}
+            {Math.round(job!.totalScore)}
           </div>
         </div>
 
-        <h1 className="detail-title">{job.title}</h1>
+        <h1 className="detail-title">{job!.title}</h1>
 
         <div className="detail-meta">
-          <span>📍 {job.location}</span>
-          {job.isRemote && <span className="remote-badge">🏠 Remote</span>}
-          <span className="meta-date">🕐 {daysAgo(job.postedAt)}</span>
-          {job.mode === "visa" ? (
+          <span>📍 {job!.location}</span>
+          {job!.isRemote && <span className="remote-badge">🏠 Remote</span>}
+          <span className="meta-date">🕐 {daysAgo(job!.postedAt)}</span>
+          {job!.mode === "visa" ? (
             <span className="visa-badge">✈ Visa ✓</span>
-          ) : job.mode === "local" ? (
+          ) : job!.mode === "local" ? (
             <span className="local-badge">🇪🇬 Local</span>
           ) : (
             <span className="remote-badge">🌐 Global</span>
@@ -81,12 +81,12 @@ export default function JobDetailPage() {
 
         {/* ── Skill chips ── */}
         <div className="detail-skills">
-          {job.matchedSkills.map((s) => (
+          {job!.matchedSkills.map((s) => (
             <span key={s} className="skill-chip matched">
               {s}
             </span>
           ))}
-          {job.missingSkills.map((s) => (
+          {job!.missingSkills.map((s) => (
             <span key={s} className="skill-chip missing">
               {s}
             </span>
@@ -100,11 +100,11 @@ export default function JobDetailPage() {
             <div className="sbar-track" style={{ flex: 1 }}>
               <div
                 className="sbar-fill"
-                style={{ width: `${job.skillMatchScore}%`, background: scoreColor }}
+                style={{ width: `${job!.skillMatchScore}%`, background: scoreColor }}
               />
             </div>
             <span className="detail-score-val" style={{ color: scoreColor }}>
-              {job.skillMatchScore}
+              {job!.skillMatchScore}
             </span>
           </div>
           <div className="detail-score-item">
@@ -113,33 +113,33 @@ export default function JobDetailPage() {
               <div
                 className="sbar-fill"
                 style={{
-                  width: `${job.recencyScore}%`,
+                  width: `${job!.recencyScore}%`,
                   background:
-                    job.recencyScore >= 80
+                    job!.recencyScore >= 80
                       ? "var(--green)"
-                      : job.recencyScore >= 60
+                      : job!.recencyScore >= 60
                         ? "var(--amber)"
                         : "var(--slate)",
                 }}
               />
             </div>
-            <span className="detail-score-val">{job.recencyScore}</span>
+            <span className="detail-score-val">{job!.recencyScore}</span>
           </div>
         </div>
 
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className="detail-apply-btn">
+        <a href={job!.url} target="_blank" rel="noopener noreferrer" className="detail-apply-btn">
           Apply Now ↗
         </a>
       </header>
 
       {/* ── Description ── */}
-      {job.description && (
-        <section className="detail-body" dangerouslySetInnerHTML={{ __html: job.description }} />
+      {job!.description && (
+        <section className="detail-body" dangerouslySetInnerHTML={{ __html: job!.description }} />
       )}
 
       {/* ── Bottom CTA ── */}
       <div className="detail-footer">
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className="detail-apply-btn">
+        <a href={job!.url} target="_blank" rel="noopener noreferrer" className="detail-apply-btn">
           Apply Now ↗
         </a>
         <button className="btn-details" onClick={() => router.back()}>
