@@ -2,30 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
-interface SkillFrequency {
-  skill: string;
-  category: string;
-  count: number;
-  percentage: number;
-  inYourSkillSet: boolean;
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  frontend: "#6366f1",
-  language: "#3b82f6",
-  mobile: "#a855f7",
-  styling: "#ec4899",
-  state: "#8b5cf6",
-  testing: "#f97316",
-  tooling: "#64748b",
-  backend: "#10b981",
-  cloud: "#0ea5e9",
-  database: "#f43f5e",
-  concept: "#14b8a6",
-  design: "#eab308",
-  process: "#84cc16",
-};
+import { CATEGORY_COLORS } from "@/lib/constants";
+import { SkillFrequency } from "@/types";
 
 export default function SkillBars({ data }: { data: SkillFrequency[] }) {
   const [mounted, setMounted] = useState(false);

@@ -2,6 +2,7 @@
 "use client";
 
 import { CronLog, SourceSummary } from "@/lib/types";
+import { STATUS_LABELS } from "@/lib/constants";
 import { useState, useMemo } from "react";
 
 export default function SourceHealthDashboard({
@@ -254,7 +255,7 @@ export default function SourceHealthDashboard({
                       <td style={{ textAlign: "center" }}>
                         <div className={`status-pill ${s.status}`}>
                           <div className={`dot ${s.status}`} />
-                          {s.status === "error" ? "Failed" : (s.totalSurvivors || 0) > 0 ? "Active" : s.status === "warning" ? "Empty" : "Filtered"}
+                          {STATUS_LABELS[s.status]}
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }}>

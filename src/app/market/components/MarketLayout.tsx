@@ -5,577 +5,261 @@ import React from "react";
 import StatCard from "./StatCard";
 import SkillBars from "./SkillBars";
 import SkillGaps from "./SkillGaps";
-import PipelineStat from "./PipelineStat";
-import CoOccurrenceGrid from "./CoOccurrenceGrid";
 import InsightsPanel from "./InsightsPanel";
-import { MarketAnalysis } from "@/lib/market";
+import CoOccurrenceGrid from "./CoOccurrenceGrid";
+import PipelineStat from "./PipelineStat";
+import { MarketAnalysis } from "@/types";
+import { CATEGORY_COLORS } from "@/lib/constants";
 
 export default function MarketLayout({ data }: { data: MarketAnalysis }) {
-  const allSkills = data.skillFrequency.map((s) => s.skill);
+  const categories = Array.from(new Set(Object.values(data.skillFrequency).map((s) => s.category)));
 
   return (
     <div className="market-container">
-      {/* Header Section */}
       <header className="market-header">
-        <h1 className="page-title">Market Intelligence</h1>
-        <div className="meta-strip">
-          <span className="meta-item">Analyzing {data.meta.totalJobs} Raw Signals</span>
-          <span className="divider" />
-          <span className="meta-item">
-            Generated {new Date(data.meta.generatedAt).toLocaleDateString()}
-          </span>
+        <div className="title-block">
+          <h1 className="main-title">Market Intelligence</h1>
+          <div className="meta-strip">
+            <span className="timestamp">Updated: {new Date(data.meta.generatedAt).toLocaleString()}</span>
+            <span className="divider">|</span>
+            <span className="source-count">Analyzing {data.meta.totalJobs} raw job listings</span>
+          </div>
+        </div>
+        <div className="filter-stat">
+          <div className="stat-label">Tech Gate Strength</div>
+          <div className="stat-value-wrap">
+            <span className="stat-value">{data.meta.filterRate}%</span>
+            <div className="mini-track">
+              <div className="mini-fill" style={{ width: `${data.meta.filterRate}%` }} />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Hero stats */}
-      <section className="hero-grid">
-        <StatCard label="Database" value={data.meta.totalJobs} subtitle="Raw Signals" />
-        <StatCard
-          label="Fit Rate"
-          value={data.meta.jobsPassingFilter}
-          subtitle="Personal Match"
-          color="var(--green)"
-        />
-        <StatCard
-          label="Noise Rate"
-          value={`${data.meta.filterRate}%`}
-          subtitle="Filtered Out"
-          color="var(--amber)"
-        />
-        <StatCard
-          label="Tech Stack"
-          value={data.meta.uniqueSkillsFound}
-          subtitle="Unique Tools"
-          color="var(--accent-h)"
-        />
-      </section>
-
-      {/* Demand vs Gaps */}
-      <section className="split-grid">
-        <div className="demand-card market-card">
-          <div className="card-header">
-            <h2 className="card-title">Your Skills Market Demand</h2>
-            <span className="card-badge">Profile Strengths</span>
-          </div>
-          <div className="demand-grid">
-            {data.yourSkillsMarketDemand.slice(0, 10).map((skill) => (
-              <div key={skill.skill} className="skill-box">
-                <div className="box-top">
-                  <span className="skill-label">{skill.skill}</span>
-                  <span className={`strength-pill ${skill.marketStrength}`}>
-                    {skill.marketStrength}
-                  </span>
-                </div>
-                <div className="box-bottom">
-                  <span className="skill-pct">{skill.percentage}%</span>
-                  <span className="box-lbl">Demand</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <SkillGaps data={data.marketSkillGaps} />
-      </section>
-
-      {/* Frequencies */}
-      <section className="full-width">
-        <SkillBars data={data.skillFrequency} />
-      </section>
-
-      {/* Co-occurrence */}
-      <section className="full-width">
-        <CoOccurrenceGrid data={data.coOccurrence} allSkills={allSkills} />
-      </section>
-
-      {/* Pipelines */}
-      <section className="pipeline-grid">
-        <PipelineStat pipeline="visa" data={data.pipelineBreakdown.visa} />
-        <PipelineStat pipeline="local" data={data.pipelineBreakdown.local} />
-        <PipelineStat pipeline="global" data={data.pipelineBreakdown.global} />
-      </section>
-
-      {/* Seniority & Score */}
-      <section className="split-grid">
-        <div className="market-card">
-          <h2 className="card-title mb-32">Seniority Distribution</h2>
-          <div className="seniority-list">
-            {data.seniorityBreakdown.map((level) => (
-              <div key={level.level} className="senior-item">
-                <div className="senior-meta">
-                  <span className="senior-label">{level.level}</span>
-                  <span className="senior-count">{level.count} JOBS</span>
-                </div>
-                <div className="senior-track">
-                  <div
-                    className="senior-fill"
-                    style={{ width: `${(level.count / data.meta.totalJobs) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="market-grid">
+        {/* Row 1: High Level Stats */}
+        <div className="stats-row">
+          <StatCard 
+            label="Qualified Match Rate" 
+            value={`${100 - data.meta.filterRate}%`} 
+            subtitle={`${data.meta.jobsPassingFilter} jobs passed all filters`}
+            color="#4ade80"
+          />
+          <StatCard 
+            label="Tech Ecosystem Breadth" 
+            value={data.meta.uniqueSkillsFound} 
+            subtitle="Distinct technologies identified"
+            color="#6366f1"
+          />
+          <StatCard 
+            label="Seniority Distribution" 
+            value={data.seniorityBreakdown.find(s => s.level === 'Senior')?.count || 0} 
+            subtitle="Senior-level roles found"
+            color="#f59e0b"
+          />
+          <StatCard 
+            label="Remote Density" 
+            value={`${Math.round((data.remoteSignals.remote / data.meta.totalJobs) * 100)}%`} 
+            subtitle="Explicitly remote-friendly"
+            color="#0ea5e9"
+          />
         </div>
 
-        <div className="market-card">
-          <h2 className="card-title mb-32">Match Score Distribution</h2>
-          <div className="score-chart">
-            {data.scoreDistribution.map((bucket) => {
-              const maxCount = Math.max(...data.scoreDistribution.map((b) => b.count));
-              const height = maxCount > 0 ? (bucket.count / maxCount) * 100 : 0;
-              return (
-                <div key={bucket.bucket} className="chart-col">
-                  <div className="col-bar-wrapper">
-                    <div className="col-bar" style={{ height: `${height}%` }} />
-                    <span className="col-val">{bucket.count}</span>
+        {/* Row 2: Deep Analysis */}
+        <div className="analysis-grid">
+          <div className="primary-column">
+            <SkillBars data={data.skillFrequency} />
+            <CoOccurrenceGrid data={data.coOccurrence} />
+          </div>
+
+          <div className="secondary-column">
+            <InsightsPanel insights={data.insights} />
+            
+            <div className="market-card category-legend">
+              <h3 className="legend-title">Category Map</h3>
+              <div className="legend-grid">
+                {categories.map(cat => (
+                  <div key={cat} className="legend-item">
+                    <span className="color-dot" style={{ background: CATEGORY_COLORS[cat] || '#64748b' }} />
+                    <span className="cat-name">{cat}</span>
                   </div>
-                  <span className="col-lbl">{bucket.bucket}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Companies & Workplace */}
-      <section className="split-grid-70-30">
-        <div className="market-card">
-          <h2 className="card-title mb-32">Hiring Powerhouses</h2>
-          <div className="cos-grid">
-            {data.topCompanies.map((company, i) => (
-              <div key={i} className="co-row">
-                <div className="co-identity">
-                  <span className="co-rank">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="co-name">{company.company}</span>
-                </div>
-                <div className="co-meta">
-                  <span className="co-pipeline">{company.pipeline}</span>
-                  <span className="co-count">{company.count}</span>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <SkillGaps data={data.marketSkillGaps} />
+            
+            <div className="pipeline-section">
+              <PipelineStat label="Visa Hubs" total={data.pipelineBreakdown.visa.total} skills={data.pipelineBreakdown.visa.topSkills} />
+              <PipelineStat label="Local (Egypt)" total={data.pipelineBreakdown.local.total} skills={data.pipelineBreakdown.local.topSkills} />
+              <PipelineStat label="Global Remote" total={data.pipelineBreakdown.global.total} skills={data.pipelineBreakdown.global.topSkills} />
+            </div>
           </div>
         </div>
-
-        <div className="market-card flex-col">
-          <h2 className="card-title mb-32">Workplace Trends</h2>
-          <div className="workplace-list">
-            {[
-              { label: "Remote", count: data.remoteSignals.remote, color: "var(--green)" },
-              { label: "Hybrid", count: data.remoteSignals.hybrid, color: "#3b82f6" },
-              { label: "On-Site", count: data.remoteSignals.onSite, color: "#f43f5e" },
-              { label: "Relocation", count: data.remoteSignals.relocation, color: "#a855f7" },
-            ].map((sig) => (
-              <div key={sig.label} className="work-item">
-                <div
-                  className="work-dot"
-                  style={{ background: sig.color, boxShadow: `0 0 10px ${sig.color}` }}
-                />
-                <div className="work-content">
-                  <div className="work-meta">
-                    <span>{sig.label}</span>
-                    <span className="work-val">{sig.count}</span>
-                  </div>
-                  <div className="work-track">
-                    <div
-                      className="work-fill"
-                      style={{
-                        width: `${(sig.count / data.meta.totalJobs) * 100}%`,
-                        background: sig.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Insights */}
-      <InsightsPanel insights={data.insights} />
+      </div>
 
       <style jsx>{`
         .market-container {
-          padding-top: 40px;
+          min-height: 100vh;
+          background: #08080f;
+          color: #dde1f0;
+          padding: 40px;
+          font-family: var(--font-body);
         }
         .market-header {
-          padding: 40px 0;
-          border-bottom: 1px solid var(--border);
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
           margin-bottom: 48px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          padding-bottom: 24px;
         }
-        .page-title {
+        .main-title {
           font-family: var(--font-display);
           font-size: 42px;
           font-weight: 800;
+          letter-spacing: -0.03em;
           color: #fff;
-          letter-spacing: -0.02em;
-          text-transform: uppercase;
-          line-height: 1;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         .meta-strip {
           display: flex;
-          align-items: center;
-          gap: 16px;
+          gap: 12px;
           font-family: var(--font-mono);
           font-size: 11px;
-          color: var(--text-muted);
+          color: #a1a1c2;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+        }
+        .divider { opacity: 0.2; }
+        
+        .filter-stat {
+          text-align: right;
+          min-width: 200px;
+        }
+        .stat-label {
+          font-size: 10px;
           text-transform: uppercase;
           letter-spacing: 0.2em;
+          color: #7171a3;
+          margin-bottom: 8px;
           font-weight: 700;
         }
-        .divider {
-          width: 4px;
-          height: 4px;
-          background: var(--text-dim);
-          border-radius: 50%;
-        }
-        .hero-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-          margin-bottom: 48px;
-        }
-        .split-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-          margin-bottom: 48px;
-        }
-        .split-grid-70-30 {
-          display: grid;
-          grid-template-columns: 2fr 1fr;
-          gap: 24px;
-          margin-bottom: 48px;
-        }
-        .full-width {
-          margin-bottom: 48px;
-        }
-        .pipeline-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-          margin-bottom: 48px;
-        }
-        .market-card {
-          background: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: 32px;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-        }
-        .card-header {
+        .stat-value-wrap {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          margin-bottom: 32px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid var(--border);
+          gap: 12px;
+          justify-content: flex-end;
         }
-        .card-title {
-          font-family: var(--font-display);
-          font-size: 18px;
-          font-weight: 800;
-          color: #fff;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .mb-32 {
-          margin-bottom: 32px;
-        }
-        .card-badge {
-          font-family: var(--font-mono);
-          font-size: 9px;
-          color: var(--accent-h);
-          background: rgba(99, 102, 241, 0.05);
-          padding: 4px 10px;
-          border-radius: 4px;
-          border: 1px solid rgba(99, 102, 241, 0.2);
-          font-weight: 900;
-          text-transform: uppercase;
-        }
-        .demand-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-        .skill-box {
-          background: var(--bg-2);
-          border: 1px solid var(--border);
-          padding: 20px;
-          border-radius: 12px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          height: 110px;
-          transition: border-color 0.3s;
-        }
-        .skill-box:hover {
-          border-color: rgba(74, 222, 128, 0.2);
-        }
-        .box-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-        }
-        .skill-label {
-          font-weight: 800;
-          color: #fff;
-          font-size: 13px;
-          text-transform: uppercase;
-        }
-        .strength-pill {
-          font-size: 8px;
-          font-weight: 900;
-          text-transform: uppercase;
-          padding: 2px 6px;
-          border-radius: 4px;
-        }
-        .strength-pill.strong {
-          color: var(--green);
-          background: rgba(74, 222, 128, 0.1);
-        }
-        .strength-pill.moderate {
-          color: #3b82f6;
-          background: rgba(59, 130, 246, 0.1);
-        }
-        .strength-pill.weak {
-          color: var(--text-dim);
-          background: rgba(255, 255, 255, 0.02);
-        }
-        .box-bottom {
-          display: flex;
-          align-items: baseline;
-          gap: 8px;
-        }
-        .skill-pct {
+        .stat-value {
           font-family: var(--font-mono);
           font-size: 24px;
-          font-weight: 800;
+          font-weight: 700;
           color: #fff;
         }
-        .box-lbl {
-          font-family: var(--font-mono);
-          font-size: 9px;
-          color: var(--text-dim);
-          font-weight: 700;
-          text-transform: uppercase;
+        .mini-track {
+          width: 80px;
+          height: 4px;
+          background: rgba(255,255,255,0.05);
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .mini-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #6366f1, #a855f7);
         }
 
-        .seniority-list {
+        .market-grid {
           display: flex;
           flex-direction: column;
           gap: 32px;
         }
-        .senior-item {
+        .stats-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 24px;
+        }
+        .analysis-grid {
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          gap: 32px;
+          align-items: start;
+        }
+        .primary-column {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 32px;
         }
-        .senior-meta {
+        .secondary-column {
           display: flex;
-          justify-content: space-between;
-          font-family: var(--font-mono);
-          font-size: 10px;
+          flex-direction: column;
+          gap: 32px;
+        }
+
+        .market-card {
+          background: #0f0f1c;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 24px;
+        }
+        .legend-title {
+          font-family: var(--font-display);
+          font-size: 12px;
           font-weight: 800;
-        }
-        .senior-label {
-          color: var(--text-muted);
-        }
-        .senior-count {
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          margin-bottom: 20px;
           color: #fff;
         }
-        .senior-track {
-          height: 2px;
-          background: var(--bg-2);
-          border-radius: 2px;
-        }
-        .senior-fill {
-          height: 100%;
-          background: var(--accent);
-          border-radius: 2px;
-          box-shadow: 0 0 10px var(--accent);
-          transition: width 1s;
-        }
-
-        .score-chart {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 8px;
-          height: 180px;
-          padding-bottom: 20px;
-          border-bottom: 1px solid var(--border);
-        }
-        .chart-col {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 12px;
-          height: 100%;
-        }
-        .col-bar-wrapper {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
-          align-items: center;
-          position: relative;
-        }
-        .col-bar {
-          width: 100%;
-          background: var(--accent);
-          opacity: 0.3;
-          border-radius: 2px 2px 0 0;
-          transition: all 0.5s;
-          cursor: pointer;
-        }
-        .chart-col:hover .col-bar {
-          opacity: 0.6;
-          transform: scaleX(1.05);
-        }
-        .col-val {
-          position: absolute;
-          top: -24px;
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 800;
-          color: var(--accent-h);
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-        .chart-col:hover .col-val {
-          opacity: 1;
-        }
-        .col-lbl {
-          font-family: var(--font-mono);
-          font-size: 9px;
-          color: var(--text-dim);
-          font-weight: 900;
-          transform: rotate(-45deg);
-          white-space: nowrap;
-          margin-top: 8px;
-        }
-
-        .cos-grid {
+        .legend-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 16px 48px;
-        }
-        .co-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 0;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-        }
-        .co-identity {
-          display: flex;
-          align-items: center;
           gap: 12px;
-          overflow: hidden;
         }
-        .co-rank {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          color: var(--text-dim);
-          font-weight: 900;
-        }
-        .co-name {
-          color: var(--text);
-          font-weight: 700;
-          font-size: 13px;
-          text-transform: uppercase;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .co-meta {
+        .legend-item {
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 8px;
         }
-        .co-pipeline {
-          font-family: var(--font-mono);
-          font-size: 8px;
-          color: var(--text-muted);
-          font-weight: 900;
-          text-transform: uppercase;
-          padding: 2px 6px;
-          border: 1px solid var(--border);
-          border-radius: 4px;
-        }
-        .co-count {
-          font-family: var(--font-mono);
-          font-size: 13px;
-          color: var(--accent-h);
-          font-weight: 800;
-          width: 24px;
-          text-align: right;
-        }
-
-        .workplace-list {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-        .work-item {
-          display: flex;
-          gap: 16px;
-          align-items: center;
-        }
-        .work-dot {
+        .color-dot {
           width: 8px;
           height: 8px;
-          border-radius: 50%;
-          flex-shrink: 0;
+          border-radius: 2px;
         }
-        .work-content {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .work-meta {
-          display: flex;
-          justify-content: space-between;
-          font-family: var(--font-mono);
+        .cat-name {
           font-size: 10px;
-          font-weight: 900;
           text-transform: uppercase;
-          color: var(--text-muted);
-        }
-        .work-val {
-          color: #fff;
-        }
-        .work-track {
-          height: 2px;
-          background: var(--bg-2);
-          border-radius: 2px;
-        }
-        .work-fill {
-          height: 100%;
-          border-radius: 2px;
-          opacity: 0.6;
-          transition: width 1s;
+          font-family: var(--font-mono);
+          color: #a1a1c2;
         }
 
-        @media (max-width: 1024px) {
-          .hero-grid {
+        .pipeline-section {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        @media (max-width: 1200px) {
+          .analysis-grid {
+            grid-template-columns: 1fr;
+          }
+          .secondary-column {
+            order: -1;
+          }
+        }
+        @media (max-width: 900px) {
+          .stats-row {
             grid-template-columns: 1fr 1fr;
           }
-          .split-grid,
-          .split-grid-70-30 {
+        }
+        @media (max-width: 600px) {
+          .stats-row {
             grid-template-columns: 1fr;
           }
-          .pipeline-grid {
-            grid-template-columns: 1fr;
-          }
-          .cos-grid {
-            grid-template-columns: 1fr;
+          .market-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 24px;
           }
         }
       `}</style>

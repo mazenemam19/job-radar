@@ -2,132 +2,72 @@
 "use client";
 
 import React from "react";
+import { PipelineData } from "@/types";
 
-interface PipelineData {
-  total: number;
-  topSkills: Array<{ skill: string; count: number }>;
-}
-
-const EMOJIS: Record<string, string> = {
-  visa: "✈️",
-  local: "🇪🇬",
-  global: "🌍",
-};
-
-const NAMES: Record<string, string> = {
-  visa: "Visa Hubs",
-  local: "Egypt Market",
-  global: "Global Remote",
-};
-
-export default function PipelineStat({ pipeline, data }: { pipeline: string; data: PipelineData }) {
-  const maxCount = data.topSkills[0]?.count || 1;
-
+export default function PipelineStat({ label, total, skills }: PipelineData) {
   return (
-    <div className="market-card pipeline-card">
-      <div className="pipeline-header">
-        <div className="pipeline-identity">
-          <span className="emoji">{EMOJIS[pipeline]}</span>
-          <h3 className="pipeline-name">{NAMES[pipeline]}</h3>
-        </div>
-        <div className="pipeline-total">{data.total}</div>
+    <div className="pipeline-card">
+      <div className="pipeline-main">
+        <span className="pipeline-label">{label}</span>
+        <span className="pipeline-count">{total} jobs</span>
       </div>
-
+      
       <div className="pipeline-skills">
-        {data.topSkills.map((s) => (
-          <div key={s.skill} className="skill-row">
-            <div className="skill-meta">
-              <span className="skill-label">{s.skill}</span>
-              <span className="skill-count">{s.count}</span>
-            </div>
-            <div className="skill-track">
-              <div className="skill-fill" style={{ width: `${(s.count / maxCount) * 100}%` }} />
-            </div>
+        {skills.map(s => (
+          <div key={s.skill} className="p-skill-item">
+            <span className="p-skill-name">{s.skill}</span>
+            <span className="p-skill-val">{s.count}</span>
           </div>
         ))}
       </div>
 
       <style jsx>{`
-        .market-card {
-          background: var(--surface);
+        .pipeline-card {
+          background: rgba(255,255,255,0.02);
           border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: 24px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-          transition: border-color 0.3s;
+          border-radius: 12px;
+          padding: 16px 20px;
         }
-        .market-card:hover {
-          border-color: var(--border-hi);
-        }
-        .pipeline-header {
+        .pipeline-main {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          margin-bottom: 24px;
+          align-items: baseline;
+          margin-bottom: 12px;
         }
-        .pipeline-identity {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .emoji {
-          font-size: 20px;
-          filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.1));
-        }
-        .pipeline-name {
+        .pipeline-label {
           font-family: var(--font-display);
+          font-size: 13px;
           font-weight: 800;
           color: #fff;
-          font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
-        .pipeline-total {
-          background: var(--bg-2);
-          color: #fff;
+        .pipeline-count {
           font-family: var(--font-mono);
-          font-weight: 700;
           font-size: 11px;
-          padding: 4px 10px;
-          border-radius: 4px;
-          border: 1px solid var(--border);
+          color: var(--accent);
+          font-weight: 700;
         }
         .pipeline-skills {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
         }
-        .skill-row {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .skill-meta {
+        .p-skill-item {
           display: flex;
           justify-content: space-between;
+          font-size: 10px;
           font-family: var(--font-mono);
-          font-size: 9px;
-          text-transform: uppercase;
-          font-weight: 700;
-          letter-spacing: 0.1em;
-        }
-        .skill-label {
-          color: var(--text-muted);
-        }
-        .skill-count {
           color: var(--text-dim);
         }
-        .skill-track {
-          height: 2px;
-          background: var(--bg-3);
-          border-radius: 2px;
+        .p-skill-name {
+          white-space: nowrap;
           overflow: hidden;
+          text-overflow: ellipsis;
         }
-        .skill-fill {
-          height: 100%;
-          background: var(--accent);
-          opacity: 0.4;
-          border-radius: 2px;
+        .p-skill-val {
+          color: var(--text-muted);
+          font-weight: 600;
         }
       `}</style>
     </div>
