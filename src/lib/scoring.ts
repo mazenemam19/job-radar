@@ -148,7 +148,6 @@ export function isTooSeniorOrTooJunior(title: string): boolean {
 export function isGeographicallyBlacklisted(text: string): boolean {
   const t = text.toLowerCase();
   
-  // Rejection lists based on recent Gemini patterns
   const blacklist = [
     /\bisrael\b/,
     /\btel\s+aviv\b/,
@@ -159,7 +158,7 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /\bra'anana\b/,
     /\bgush\s+dan\b/,
     /\bcentral\s+district\b/,
-    // Country restrictions that exclude Egypt
+    // Country restrictions
     /\b(us|usa|united\s+states|u\.?s\.?a\.?)\s+only\b/i,
     /\b(uk|u\.?k\.?|united\s+kingdom)\s+only\b/i,
     /\bcanada\s+only\b/i,
@@ -167,16 +166,20 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /\bamericas\s+only\b/i,
     /\blatam\s+only\b/i,
     /\bapac\s+only\b/i,
-    /\bau\s+only\b/i,
-    /\baustralia\s+only\b/i,
-    /\bnew\s+zealand\s+only\b/i,
-    // Cities/States mentioned as physical requirement without Egypt/EMEA flexibility
-    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|bengaluru|bangalore|san\s+francisco|bay\s+area|new\s+york|nyc|london|berlin|paris|lisbon|madrid|barcelona|aveiro)\b/i,
+    // Patterns found in recent quotes
+    /remote\s*-\s*(united\s+states|usa|us)/i,
+    /based\s+in\s+the\s+americas\s+or\s+europe/i,
+    /restricted\s+to\s+candidates\s+in\s+(the\s+)?(us|usa|united\s+states)/i,
+    /available\s+locations:\s*(bengaluru|india|bangalore)/i,
+    // Hybrid/Office requirements
+    /hybrid\s+workplace/i,
+    /hybrid\s+role/i,
+    /in-person\s+participation\s+is\s+required/i,
+    /office\s+presence\s+is\s+required/i,
+    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|nyc|san\s+francisco|bay\s+area|lisbon|madrid|barcelona|aveiro)\b/i,
   ];
 
-  // If it mentions global/emea/egypt, we allow it to pass to Gemini for nuanced check
   if (/\b(global|emea|egypt|cairo|giza|anywhere|worldwide)\b/i.test(t)) {
-    // Exception: Israel is always a hard reject regardless of other keywords
     if (/\bisrael|tel\s+aviv|haifa|herzliya/i.test(t)) return true;
     return false;
   }
@@ -188,7 +191,6 @@ export function isGenericTitleButBackendRole(title: string, description: string)
   const t = title.toLowerCase();
   const desc = description.toLowerCase();
   
-  // If the title is specifically frontend, we are more lenient
   const isSpecificallyFE = /\b(frontend|front-end|react|ui)\b/i.test(t);
   
   if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(desc)) return true;
@@ -215,6 +217,7 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\brust\b/,
     /\bc\+\+|\bcpp\b/,
     /\bsystems\s+programming\b/,
+    /\bjava\b.*\bscala\b/i, // Specific Java/Scala signal found in recent rejection
   ];
   
   const feSignals = [

@@ -47,7 +47,10 @@ export async function finalizeBatchState() {
   if (!currentProcessState) return;
 
   try {
-    const content = currentProcessState;
+    const content = {
+      ...currentProcessState,
+      lastUpdated: new Date().toISOString(),
+    };
 
     if (!process.env.VERCEL) {
       const dir = path.dirname(LOCAL_STATE_PATH);
