@@ -144,8 +144,10 @@ export async function runAllSources(): Promise<CronLog> {
   for (const key in sourceDetails) {
     sourceDetails[key].count = 0;
     sourceDetails[key].geminiFiltered = 0;
+    sourceDetails[key].totalSurvivors = 0;
   }
 
+  // 1. Count technical matches from this run (Passed Regex)
   rawFetched.forEach((j) => {
     const sName = (j.sourceName || j.company).toLowerCase().trim();
     const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
@@ -154,6 +156,7 @@ export async function runAllSources(): Promise<CronLog> {
     }
   });
 
+  // 2. Count Gemini rejections from this run
   newCandidates.forEach((j) => {
     if (rejectedSet.has(j.id)) {
       const sName = (j.sourceName || j.company).toLowerCase().trim();
@@ -161,6 +164,15 @@ export async function runAllSources(): Promise<CronLog> {
       if (key && sourceDetails[key]) {
         sourceDetails[key].geminiFiltered! += 1;
       }
+    }
+  });
+
+  // 3. Count TOTAL survivors currently in the store (Cumulative 7-day)
+  updated.jobs.forEach((j) => {
+    const sName = (j.sourceName || j.company).toLowerCase().trim();
+    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
+    if (key && sourceDetails[key]) {
+      sourceDetails[key].totalSurvivors! += 1;
     }
   });
 

@@ -42,6 +42,7 @@ export interface SourceHealth {
   count: number;
   rawCount?: number;
   geminiFiltered?: number;
+  totalSurvivors?: number;
   error?: string;
   durationMs?: number;
   ats?: string;
@@ -313,6 +314,7 @@ export interface SourceSummary {
   lastRawCount?: number;
   lastRegexFiltered?: number;
   lastGeminiFiltered?: number;
+  totalSurvivors?: number;
   lastError?: string;
   avgDuration?: number;
   status: "healthy" | "nomatch" | "warning" | "error" | "skipped";

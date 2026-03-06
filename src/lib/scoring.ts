@@ -263,9 +263,9 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /\bu\.?s\.?\s+hubs?\b/,
     /\bu\.?s\.?-only\b/,
     /only\s+open\s+to\s+(residents|citizens|candidates)\s+of\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
-    // Add Hybrid/Onsite rejections for non-Egypt locations
+    // Only reject hybrid/onsite if it's explicitly tied to a non-Egypt location
     /\bhybrid\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
-    /\b(onsite|on-site|in-office|office-based)\b/i,
+    /\b(onsite|on-site|in-office|office-based)\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
   ].some((re) => re.test(t));
 }
 

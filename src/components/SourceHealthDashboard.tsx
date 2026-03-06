@@ -36,10 +36,10 @@ export default function SourceHealthDashboard({
       const lastRegexFiltered = lastDetail?.count ?? 0;
       const lastRawCount = lastDetail?.rawCount;
       const lastGeminiFiltered = lastDetail?.geminiFiltered ?? 0;
+      const lastTotalSurvivors = lastDetail?.totalSurvivors ?? 0;
       const lastError = lastDetail?.error;
-      const lastStatus = lastDetail?.status;
 
-      // Final matched signal is what's left after Gemini in the LAST run that included this source
+      // Current scan signal
       const lastCount = Math.max(0, lastRegexFiltered - lastGeminiFiltered);
 
       // Lifetime stats
@@ -63,8 +63,8 @@ export default function SourceHealthDashboard({
 
       if (lastError) {
         status = "error";
-      } else if (lastCount > 0) {
-        status = "healthy";
+      } else if (lastTotalSurvivors > 0) {
+        status = "healthy"; // Source is healthy if it has ANY survivors in store
       } else if (lastRegexFiltered > 0 && lastCount === 0) {
         status = "nomatch"; // Filtered by AI
       } else if ((lastRawCount ?? 0) === 0) {
@@ -77,10 +77,11 @@ export default function SourceHealthDashboard({
         name,
         totalRuns: total,
         successRate: total > 0 ? (success / total) * 100 : 0,
-        lastCount, // Final matched in its last run
+        lastCount, // Found in last scan
         lastRawCount,
         lastGeminiFiltered,
-        lastRegexFiltered, // Technical matches (Regex tier)
+        lastRegexFiltered,
+        totalSurvivors: lastTotalSurvivors, // Cumulative 7-day
         lastError,
         avgDuration: durationCount > 0 ? totalDuration / durationCount : undefined,
         status,
@@ -99,10 +100,9 @@ export default function SourceHealthDashboard({
   const stats = useMemo(() => {
     return {
       failed: summaries.filter((s) => s.status === "error").length,
-      active: summaries.filter((s) => s.status === "healthy").length,
+      active: summaries.reduce((sum, s) => sum + (s.totalSurvivors || 0), 0),
       empty: summaries.filter((s) => s.status === "warning").length,
       filtered: summaries.filter((s) => s.status === "nomatch").length,
-      skipped: summaries.filter((s) => s.status === "skipped").length,
     };
   }, [summaries]);
 
@@ -143,7 +143,6 @@ export default function SourceHealthDashboard({
         .row-healthy { background: rgba(74, 222, 128, 0.03); color: #4ade80; }
         .row-warning { background: rgba(251, 191, 36, 0.04); color: #fbbf24; }
         .row-nomatch { background: transparent; color: #fff; }
-        .row-skipped { background: rgba(59, 130, 246, 0.05); color: #93c5fd; }
 
         .status-pill {
           display: inline-flex;
@@ -214,12 +213,12 @@ export default function SourceHealthDashboard({
         <div className="animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="flex flex-wrap gap-4 mb-8">
             <div className="legend-item border-rose-500/20 bg-rose-500/5">
-              <span className="legend-count text-rose-400">{stats.failed}</span>
+              <span className="legend-count text-rose-400">{summaries.filter(s => s.status === 'error').length}</span>
               <span className="legend-label">Errors</span>
             </div>
             <div className="legend-item border-emerald-500/20 bg-emerald-500/5">
               <span className="legend-count text-emerald-400">{stats.active}</span>
-              <span className="legend-label">Found Jobs</span>
+              <span className="legend-label">Total Jobs in Store</span>
             </div>
             <div className="legend-item border-amber-500/20 bg-amber-500/5">
               <span className="legend-count text-amber-400">{stats.empty}</span>
@@ -241,7 +240,8 @@ export default function SourceHealthDashboard({
                   <th style={{ textAlign: "center" }}>Raw</th>
                   <th style={{ textAlign: "center" }}>Regex Pass</th>
                   <th style={{ textAlign: "center" }}>Gemini Reject</th>
-                  <th style={{ textAlign: "center" }}>Final Matched</th>
+                  <th style={{ textAlign: "center" }}>Scan Match</th>
+                  <th style={{ textAlign: "center" }}>Total Active</th>
                   <th style={{ textAlign: "right" }}>Latency</th>
                   <th style={{ textAlign: "left" }}>System Logs</th>
                 </tr>
@@ -254,7 +254,7 @@ export default function SourceHealthDashboard({
                       <td style={{ textAlign: "center" }}>
                         <div className={`status-pill ${s.status}`}>
                           <div className={`dot ${s.status}`} />
-                          {s.status === "error" ? "Failed" : s.status === "healthy" ? "Found" : s.status === "warning" ? "Empty" : "Filtered"}
+                          {s.status === "error" ? "Failed" : (s.totalSurvivors || 0) > 0 ? "Active" : s.status === "warning" ? "Empty" : "Filtered"}
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }}>
@@ -264,8 +264,11 @@ export default function SourceHealthDashboard({
                       <td style={{ textAlign: "center" }} className="val-mute">{s.lastRawCount ?? 0}</td>
                       <td style={{ textAlign: "center" }} className="val-mute">{s.lastRegexFiltered ?? 0}</td>
                       <td style={{ textAlign: "center" }} className="val-mute">{s.lastGeminiFiltered ?? 0}</td>
-                      <td style={{ textAlign: "center" }} className={s.status === "healthy" ? "val-bright" : "val-mute"}>
+                      <td style={{ textAlign: "center" }} className="val-mute">
                         {s.lastCount}
+                      </td>
+                      <td style={{ textAlign: "center" }} className={s.status === "healthy" ? "val-bright" : "val-mute"}>
+                        {s.totalSurvivors ?? 0}
                       </td>
                       <td style={{ textAlign: "right" }} className="val-mute">
                         {s.avgDuration ? `${(s.avgDuration / 1000).toFixed(2)}s` : "--"}
@@ -280,7 +283,7 @@ export default function SourceHealthDashboard({
             </table>
           </div>
           <p className="mt-4 text-[10px] text-white/20 italic text-center">
-            * Note: &quot;Final Matched&quot; shows jobs found in the LAST scan that included this source. Existing jobs from previous scans remain in the dashboard until they expire (7 days).
+            * &quot;Scan Match&quot; is found in last run. &quot;Total Active&quot; is the full 7-day store content.
           </p>
         </div>
       )}

@@ -5,6 +5,7 @@ import {
   isClearlyNonFrontend,
   isTooSeniorOrTooJunior,
   isGenericTitleButBackendRole,
+  isGeographicallyBlacklisted,
   requiresCitizenshipOrClearance,
 } from "./scoring";
 
@@ -90,6 +91,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
       !isClearlyNonFrontend(j.title) &&
       !isTooSeniorOrTooJunior(j.title) &&
       !isGenericTitleButBackendRole(j.title, j.description) &&
+      !isGeographicallyBlacklisted(text) &&
       !requiresCitizenshipOrClearance(text)
     );
   });
@@ -108,6 +110,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
         !isClearlyNonFrontend(j.title) &&
         !isTooSeniorOrTooJunior(j.title) &&
         !isGenericTitleButBackendRole(j.title, j.description) &&
+        !isGeographicallyBlacklisted(text) &&
         !requiresCitizenshipOrClearance(text)
       );
     })
