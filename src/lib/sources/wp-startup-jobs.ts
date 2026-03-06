@@ -1,5 +1,5 @@
 // src/lib/sources/wp-startup-jobs.ts
-import { JobMode, FetcherResult, BaseCompany, WordPressPost } from "../types";
+import { JobMode, FetcherResult, BaseCompany, WordPressPost } from "@/types";
 import { safeFetch, stripHtml, processJobs } from "./ats-utils";
 
 /**

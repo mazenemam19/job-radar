@@ -2,7 +2,7 @@
 // "Global Remote" pipeline — worldwide remote companies that accept Egypt/GMT+2 applicants.
 // Filter: rejects US-timezone-only, must-be-authorized-in-country, EU-resident-only.
 
-import type { Job, SourceHealth, FetcherResult } from "../types";
+import type { Job, SourceHealth, FetcherResult } from "@/types";
 import {
   fetchGreenhouse,
   fetchLever,

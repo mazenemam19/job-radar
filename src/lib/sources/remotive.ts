@@ -1,5 +1,5 @@
 // src/lib/sources/remotive.ts
-import { Job, JobMode, FetcherResult, RemotiveJob } from "../types";
+import { Job, JobMode, FetcherResult, RemotiveJob } from "@/types";
 import { safeFetch, stripHtml } from "./ats-utils";
 import { scoreJob } from "../scoring";
 

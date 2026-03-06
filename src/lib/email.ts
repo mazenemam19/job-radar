@@ -1,6 +1,6 @@
 // src/lib/email.ts
 import nodemailer from "nodemailer";
-import type { Job } from "./types";
+import type { Job } from "@/types";
 
 function scoreColor(s: number) {
   return s >= 80 ? "#4ade80" : s >= 60 ? "#fbbf24" : "#94a3b8";

@@ -1,5 +1,5 @@
 // src/lib/sources/companies.ts
-import { ATSConfig, JobMode } from "../types";
+import { ATSConfig, JobMode } from "@/types";
 
 export interface CompanyConfig extends ATSConfig {
   pipelines: JobMode[];
