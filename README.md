@@ -35,7 +35,7 @@ A personalized job-hunting dashboard tailored for a **Senior React/Next.js Engin
 
 ## 🛠️ Architecture & Setup
 
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS.
+- **Frontend**: Next.js 14, Tailwind CSS.
 - **Backend**: Supabase PostgreSQL (JSONB) for storage.
 - **AI**: Google Gemini fallback queue.
 - **Database**: Create a `storage` table with `key` (text) and `data` (jsonb).
