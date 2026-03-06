@@ -1,5 +1,5 @@
 // src/lib/sources/himalayas.ts
-import { JobMode, FetcherResult, HimalayasJob } from "../types";
+import { JobMode, FetcherResult, HimalayasJob } from "@/types";
 import { safeFetch, stripHtml, processJobs } from "./ats-utils";
 
 const MAX_PAGES = 10; // Cap to prevent infinite loops

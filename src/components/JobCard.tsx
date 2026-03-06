@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { Job } from "@/lib/types";
+import type { Job } from "@/types";
 
 function ScoreRing({ score }: { score: number }) {
   const [animated, setAnimated] = useState(0);

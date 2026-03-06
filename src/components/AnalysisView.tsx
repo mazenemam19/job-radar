@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { JobStore } from "@/lib/types";
+import type { JobStore } from "@/types";
 import AppHeader from "./AppHeader";
 import SourceHealthDashboard from "./SourceHealthDashboard";
 

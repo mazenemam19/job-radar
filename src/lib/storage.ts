@@ -1,6 +1,6 @@
 // src/lib/storage.ts
 import { supabase } from "./supabase";
-import { Job, JobStore, CronLog } from "./types";
+import { Job, JobStore, CronLog } from "@/types";
 import {
   isClearlyNonFrontend,
   isTooSeniorOrTooJunior,

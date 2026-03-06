@@ -20,49 +20,16 @@ import type {
   WuzzufSearchResponse,
   WuzzufDetailResponse,
   RemoteOKJob,
-} from "../types";
+  DomainCounts,
+  WorkableCooldownEntry,
+  WorkableBudgetConfig,
+} from "@/types";
 import { isClearlyNonFrontend, isTooSeniorOrTooJunior, scoreJob } from "../scoring";
+import { COUNTRY_MAP } from "../constants";
 import fs from "fs";
 import path from "path";
 
-// ── Shared Constants ────────────────────────────────────────────────────────
-
-const COUNTRY_MAP: Record<string, { name: string; flag: string }> = {
-  ireland: { name: "Ireland", flag: "🇮🇪" },
-  germany: { name: "Germany", flag: "🇩🇪" },
-  netherlands: { name: "Netherlands", flag: "🇳🇱" },
-  "united kingdom": { name: "UK", flag: "🇬🇧" },
-  uk: { name: "UK", flag: "🇬🇧" },
-  london: { name: "UK", flag: "🇬🇧" },
-  berlin: { name: "Germany", flag: "🇩🇪" },
-  amsterdam: { name: "Netherlands", flag: "🇳🇱" },
-  dublin: { name: "Ireland", flag: "🇮🇪" },
-  spain: { name: "Spain", flag: "🇪🇸" },
-  barcelona: { name: "Spain", flag: "🇪🇸" },
-  madrid: { name: "Spain", flag: "🇪🇸" },
-  portugal: { name: "Portugal", flag: "🇵🇹" },
-  lisbon: { name: "Portugal", flag: "🇵🇹" },
-  france: { name: "France", flag: "🇫🇷" },
-  paris: { name: "France", flag: "🇫🇷" },
-  sweden: { name: "Sweden", flag: "🇸🇪" },
-  stockholm: { name: "Sweden", flag: "🇸🇪" },
-  denmark: { name: "Denmark", flag: "🇩🇰" },
-  copenhagen: { name: "Denmark", flag: "🇩🇰" },
-  finland: { name: "Finland", flag: "🇫🇮" },
-  helsinki: { name: "Finland", flag: "🇫🇮" },
-  poland: { name: "Poland", flag: "🇵🇱" },
-  warsaw: { name: "Poland", flag: "🇵🇱" },
-  usa: { name: "USA", flag: "🇺🇸" },
-  "united states": { name: "USA", flag: "🇺🇸" },
-  egypt: { name: "Egypt", flag: "🇪🇬" },
-  cairo: { name: "Egypt", flag: "🇪🇬" },
-  "saudi arabia": { name: "Saudi Arabia", flag: "🇸🇦" },
-  "united arab emirates": { name: "UAE", flag: "🇦🇪" },
-  uae: { name: "UAE", flag: "🇦🇪" },
-  dubai: { name: "UAE", flag: "🇦🇪" },
-  riyadh: { name: "Saudi Arabia", flag: "🇸🇦" },
-  remote: { name: "Remote", flag: "🌍" },
-};
+// ── Shared Helper Functions ──────────────────────────────────────────────────
 
 function detectCountry(
   location: string,
@@ -74,23 +41,6 @@ function detectCountry(
     if (re.test(loc)) return val;
   }
   return fallback;
-}
-
-// ── Strict Filters ──────────────────────────────────────────────────────────
-
-export function isGeographicallyBlacklisted(text: string): boolean {
-  const t = text.toLowerCase();
-  return [
-    /\bisrael\b/,
-    /\btel\s+aviv\b/,
-    /\btel-aviv\b/,
-    /\bhaifa\b/,
-    /\bherzliya\b/,
-    /\bjerusalem\b/,
-    /\bra'anana\b/,
-    /\bgush\s+dan\b/,
-    /\bcentral\s+district\b/,
-  ].some((re) => re.test(t));
 }
 
 export function isTimezoneIncompatible(text: string): boolean {
@@ -106,23 +56,6 @@ export function isTimezoneIncompatible(text: string): boolean {
   return usOnly || usTimezones || usRemote;
 }
 
-export function isTooBackendForFrontend(description: string): boolean {
-  const d = description.toLowerCase();
-  const backendSignals = [
-    /\bkubernetes\b/,
-    /\bterraform\b/,
-    /\baws\s+lambda\b/,
-    /\bpostgresql\b/,
-    /\bmicroservices\b/,
-    /\bdistributed\s+systems\b/,
-    /\bjava\s+spring\b/,
-    /\bpython\s+django\b/,
-    /\bgo\s+backend\b/,
-  ];
-  const bCount = backendSignals.filter((re) => re.test(d)).length;
-  return bCount >= 4;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const TMP_DIR = "/tmp";
@@ -130,16 +63,9 @@ const REQ_COUNTS_PATH = path.resolve(TMP_DIR, "req-counts.json");
 const WORKABLE_COOLDOWN_PATH = path.resolve(TMP_DIR, "workable-cooldown.json");
 const WORKABLE_BLOCKED_PATH = path.resolve(TMP_DIR, "workable-blocked.json");
 
-type DomainCounts = Record<string, number>;
-interface WorkableCooldownEntry {
-  slug: string;
-  until: string;
-}
-
 let domainCountsCache: DomainCounts | null = null;
 let workableCooldownCache: WorkableCooldownEntry[] | null = null;
 
-type WorkableBudgetConfig = { visa: number; global: number; local: number };
 const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 999, global: 999, local: 999 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
 const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
@@ -263,7 +189,8 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
-export async function safeFetch(url: string, timeout = 30_000): Promise<Response | null> {
+/** Increased timeout to 45s to avoid AbortErrors under load */
+export async function safeFetch(url: string, timeout = 45_000): Promise<Response | null> {
   trackDomainRequest(url);
   try {
     return await fetch(url, {
@@ -309,7 +236,6 @@ export function processJobs(
   for (const r of raw) {
     const title = r.title.trim();
     if (isClearlyNonFrontend(title) || isTooSeniorOrTooJunior(title)) continue;
-    if (isGeographicallyBlacklisted(title + r.location + r.description)) continue;
 
     // ── Global Mode Restrictions ──
     if (mode === "global") {
@@ -322,14 +248,9 @@ export function processJobs(
         );
         const hasEgypt = r.locationRestrictions.some((loc) => /egypt/i.test(loc));
 
-        // If it's a single country restriction (or multiple specific ones) and none is Egypt/Broad
-        if (!isBroad && !hasEgypt) {
-          continue;
-        }
+        if (!isBroad && !hasEgypt) continue;
       }
     }
-
-    if (isTooBackendForFrontend(r.description)) continue;
 
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;
@@ -374,6 +295,16 @@ export function processJobs(
     });
   }
   return out;
+}
+
+export async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < fns.length; i += concurrency) {
+    const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map((f) => f()));
+    for (const r of batch) results.push(r.status === "fulfilled" ? r.value : (null as T));
+    if (i + concurrency < fns.length) await new Promise((r) => setTimeout(r, 500));
+  }
+  return results;
 }
 
 // ── Greenhouse ─────────────────────────────────────────────────────────────
@@ -561,16 +492,6 @@ function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
     result.catch(() => {}),
   );
   return result;
-}
-
-export async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Promise<T[]> {
-  const results: T[] = [];
-  for (let i = 0; i < fns.length; i += concurrency) {
-    const batch = await Promise.allSettled(fns.slice(i, i + concurrency).map((f) => f()));
-    for (const r of batch) results.push(r.status === "fulfilled" ? r.value : (null as T));
-    if (i + concurrency < fns.length) await new Promise((r) => setTimeout(r, 500));
-  }
-  return results;
 }
 
 export async function fetchWorkable(

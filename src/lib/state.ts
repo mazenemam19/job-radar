@@ -2,7 +2,7 @@
 import { supabase } from "./supabase";
 import fs from "fs";
 import path from "path";
-import type { ScanState } from "./types";
+import type { ScanState } from "@/types";
 
 const DB_KEY = "scan-state.json";
 const LOCAL_STATE_PATH = path.resolve(process.cwd(), "data/scan-state.json");

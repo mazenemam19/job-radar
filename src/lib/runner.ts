@@ -17,7 +17,7 @@ import {
 } from "./sources/ats-utils";
 import { finalizeBatchState, readState } from "./state";
 import { trackMultipleApiCalls } from "./health-store";
-import type { Job, CronLog, SourceHealth } from "./types";
+import type { Job, CronLog, SourceHealth } from "@/types";
 
 export async function runAllSources(): Promise<CronLog> {
   const budgetArg = process.argv?.find(

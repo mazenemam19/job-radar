@@ -1,6 +1,6 @@
 // src/lib/gemini.ts
 import { GoogleGenAI } from "@google/genai";
-import type { Job } from "./types";
+import type { Job, GeminiFilterResult } from "@/types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -22,12 +22,6 @@ const genAI = GEMINI_API_KEY
     })
   : null;
 
-interface GeminiFilterResult {
-  passed: boolean;
-  reason: string;
-  quote?: string; // Supporting quote from the description for rejections
-  id: string;
-}
 
 /**
  * Filter jobs using Gemini LLM with a fallback queue for high availability.

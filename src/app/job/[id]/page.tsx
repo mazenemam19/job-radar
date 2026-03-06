@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import type { Job } from "@/lib/types";
+import type { Job } from "@/types";
 
 function daysAgo(iso: string): string {
   const d = Math.floor((Date.now() - Date.parse(iso)) / 864e5);

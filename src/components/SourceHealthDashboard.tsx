@@ -1,7 +1,8 @@
 // src/components/SourceHealthDashboard.tsx
 "use client";
 
-import { CronLog, SourceSummary } from "@/lib/types";
+import { CronLog, SourceSummary } from "@/types";
+import { STATUS_LABELS } from "@/lib/constants";
 import { useState, useMemo } from "react";
 
 export default function SourceHealthDashboard({
@@ -32,7 +33,7 @@ export default function SourceHealthDashboard({
       // Find the LATEST log that actually contains this source
       const lastLogWithSource = sortedLogs.find((log) => log.sourceDetails?.[name]);
       const lastDetail = lastLogWithSource?.sourceDetails?.[name];
-      
+
       const lastRegexFiltered = lastDetail?.count ?? 0;
       const lastRawCount = lastDetail?.rawCount;
       const lastGeminiFiltered = lastDetail?.geminiFiltered ?? 0;
@@ -139,10 +140,22 @@ export default function SourceHealthDashboard({
           border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
-        .row-error { background: rgba(244, 63, 94, 0.06); color: #fb7185; }
-        .row-healthy { background: rgba(74, 222, 128, 0.03); color: #4ade80; }
-        .row-warning { background: rgba(251, 191, 36, 0.04); color: #fbbf24; }
-        .row-nomatch { background: transparent; color: #fff; }
+        .row-error {
+          background: rgba(244, 63, 94, 0.06);
+          color: #fb7185;
+        }
+        .row-healthy {
+          background: rgba(74, 222, 128, 0.03);
+          color: #4ade80;
+        }
+        .row-warning {
+          background: rgba(251, 191, 36, 0.04);
+          color: #fbbf24;
+        }
+        .row-nomatch {
+          background: transparent;
+          color: #fff;
+        }
 
         .status-pill {
           display: inline-flex;
@@ -156,24 +169,68 @@ export default function SourceHealthDashboard({
           letter-spacing: 0.05em;
           border: 1px solid transparent;
         }
-        .status-pill.error { background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.3); color: #fb7185; }
-        .status-pill.healthy { background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.2); color: #4ade80; }
-        .status-pill.warning { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2); color: #fbbf24; }
-        .status-pill.nomatch { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #fff; }
+        .status-pill.error {
+          background: rgba(244, 63, 94, 0.15);
+          border-color: rgba(244, 63, 94, 0.3);
+          color: #fb7185;
+        }
+        .status-pill.healthy {
+          background: rgba(74, 222, 128, 0.1);
+          border-color: rgba(74, 222, 128, 0.2);
+          color: #4ade80;
+        }
+        .status-pill.warning {
+          background: rgba(251, 191, 36, 0.1);
+          border-color: rgba(251, 191, 36, 0.2);
+          color: #fbbf24;
+        }
+        .status-pill.nomatch {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(255, 255, 255, 0.1);
+          color: #fff;
+        }
 
-        .dot { width: 4px; height: 4px; border-radius: 50%; }
-        .dot.error { background: #fb7185; animation: pulse 1.5s infinite; box-shadow: 0 0 8px #f43f5e; }
-        .dot.healthy { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
-        .dot.warning { background: #fbbf24; }
-        .dot.nomatch { background: #fff; }
+        .dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+        }
+        .dot.error {
+          background: #fb7185;
+          animation: pulse 1.5s infinite;
+          box-shadow: 0 0 8px #f43f5e;
+        }
+        .dot.healthy {
+          background: #4ade80;
+          box-shadow: 0 0 6px #4ade80;
+        }
+        .dot.warning {
+          background: #fbbf24;
+        }
+        .dot.nomatch {
+          background: #fff;
+        }
 
         @keyframes pulse {
-          0% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.5); opacity: 0.5; }
-          100% { transform: scale(1); opacity: 1; }
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.5);
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
-        .val-mute { opacity: 0.3; }
-        .val-bright { font-weight: 800; }
+        .val-mute {
+          opacity: 0.3;
+        }
+        .val-bright {
+          font-weight: 800;
+        }
 
         .legend-item {
           display: flex;
@@ -184,8 +241,17 @@ export default function SourceHealthDashboard({
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .legend-count { font-family: var(--font-mono); font-size: 16px; font-weight: 700; }
-        .legend-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.4; }
+        .legend-count {
+          font-family: var(--font-mono);
+          font-size: 16px;
+          font-weight: 700;
+        }
+        .legend-label {
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          opacity: 0.4;
+        }
       `}</style>
 
       <header className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
@@ -213,7 +279,9 @@ export default function SourceHealthDashboard({
         <div className="animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="flex flex-wrap gap-4 mb-8">
             <div className="legend-item border-rose-500/20 bg-rose-500/5">
-              <span className="legend-count text-rose-400">{summaries.filter(s => s.status === 'error').length}</span>
+              <span className="legend-count text-rose-400">
+                {summaries.filter((s) => s.status === "error").length}
+              </span>
               <span className="legend-label">Errors</span>
             </div>
             <div className="legend-item border-emerald-500/20 bg-emerald-500/5">
@@ -254,27 +322,41 @@ export default function SourceHealthDashboard({
                       <td style={{ textAlign: "center" }}>
                         <div className={`status-pill ${s.status}`}>
                           <div className={`dot ${s.status}`} />
-                          {s.status === "error" ? "Failed" : (s.totalSurvivors || 0) > 0 ? "Active" : s.status === "warning" ? "Empty" : "Filtered"}
+                          {STATUS_LABELS[s.status]}
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <span className="val-bright">{s.success ?? 0}</span>
                         <span className="val-mute"> / {s.total ?? 0}</span>
                       </td>
-                      <td style={{ textAlign: "center" }} className="val-mute">{s.lastRawCount ?? 0}</td>
-                      <td style={{ textAlign: "center" }} className="val-mute">{s.lastRegexFiltered ?? 0}</td>
-                      <td style={{ textAlign: "center" }} className="val-mute">{s.lastGeminiFiltered ?? 0}</td>
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastRawCount ?? 0}
+                      </td>
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastRegexFiltered ?? 0}
+                      </td>
+                      <td style={{ textAlign: "center" }} className="val-mute">
+                        {s.lastGeminiFiltered ?? 0}
+                      </td>
                       <td style={{ textAlign: "center" }} className="val-mute">
                         {s.lastCount}
                       </td>
-                      <td style={{ textAlign: "center" }} className={s.status === "healthy" ? "val-bright" : "val-mute"}>
+                      <td
+                        style={{ textAlign: "center" }}
+                        className={s.status === "healthy" ? "val-bright" : "val-mute"}
+                      >
                         {s.totalSurvivors ?? 0}
                       </td>
                       <td style={{ textAlign: "right" }} className="val-mute">
                         {s.avgDuration ? `${(s.avgDuration / 1000).toFixed(2)}s` : "--"}
                       </td>
                       <td style={{ fontSize: "10px", opacity: 0.6, fontStyle: "italic" }}>
-                        {s.lastError || (s.status === "warning" ? "No data found on board" : s.status === "nomatch" ? `Filtered by gate or AI` : "Optimal matching confirmed")}
+                        {s.lastError ||
+                          (s.status === "warning"
+                            ? "No data found on board"
+                            : s.status === "nomatch"
+                              ? `Filtered by gate or AI`
+                              : "Optimal matching confirmed")}
                       </td>
                     </tr>
                   );
@@ -283,7 +365,8 @@ export default function SourceHealthDashboard({
             </table>
           </div>
           <p className="mt-4 text-[10px] text-white/20 italic text-center">
-            * &quot;Scan Match&quot; is found in last run. &quot;Total Active&quot; is the full 7-day store content.
+            * &quot;Scan Match&quot; is found in last run. &quot;Total Active&quot; is the full
+            7-day store content.
           </p>
         </div>
       )}

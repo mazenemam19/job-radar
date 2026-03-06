@@ -2,13 +2,7 @@
 "use client";
 
 import React from "react";
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  subtitle?: string;
-  color?: string;
-}
+import { StatCardProps } from "@/types";
 
 export default function StatCard({ label, value, subtitle, color = "#fff" }: StatCardProps) {
   return (

@@ -1,46 +1,13 @@
 // src/lib/scoring.ts
-import type { ScoreInput, ScoreResult } from "./types";
-
-// ── Skill Tiers ────────────────────────────────────────────────────────────
-const EXPERT_SKILLS = [
-  "React",
-  "TypeScript",
-  "JavaScript",
-  "HTML",
-  "CSS",
-  "Redux",
-  "React Query",
-  "Zustand",
-  "MobX",
-  "Tailwind",
-  "Material UI",
-  "SASS",
-  "Next.js",
-  "Vite",
-  "Webpack",
-];
-
-const SECONDARY_SKILLS = [
-  "Jest",
-  "Vitest",
-  "React Testing Library",
-  "React Native",
-  "GraphQL",
-  "WebSocket",
-  "Storybook",
-];
-
-export const BONUS_SKILLS = [
-  "Node.js",
-  "Express",
-  "MongoDB",
-  "PostgreSQL",
-  "AWS",
-  "Docker",
-  "Git",
-  "Redis",
-  "Kubernetes",
-];
+import type { ScoreInput, ScoreResult } from "@/types";
+import {
+  EXPERT_SKILLS,
+  SECONDARY_SKILLS,
+  BONUS_SKILLS,
+  SENIOR_KEYWORDS,
+  JUNIOR_KEYWORDS,
+  computeRecencyScore,
+} from "./constants";
 
 // ── Gate Logic ───────────────────────────────────────────────────────────
 
@@ -121,28 +88,7 @@ export function isClearlyNonFrontend(title: string): boolean {
 }
 
 export function isTooSeniorOrTooJunior(title: string): boolean {
-  const t = title.toLowerCase();
-  const seniorRejections = [
-    /\blead\b/,
-    /\bprincipal\b/,
-    /\bstaff\b/,
-    /\bmanager\b/,
-    /\bhead\s+of\b/,
-    /\bdirector\b/,
-    /\bvp\b/,
-    /\bvice\s+president\b/,
-    /\bchief\b/,
-    /\bcto\b/,
-    /\bcpo\b/,
-  ];
-  const juniorRejections = [
-    /\bjunior\b/,
-    /\bentry[\s-]?level\b/,
-    /\btrainee\b/,
-    /\bassociate\b/,
-    /\bintern\b/,
-  ];
-  return seniorRejections.some((re) => re.test(t)) || juniorRejections.some((re) => re.test(t));
+  return SENIOR_KEYWORDS.test(title) || JUNIOR_KEYWORDS.test(title);
 }
 
 export function isGeographicallyBlacklisted(text: string): boolean {
@@ -221,25 +167,15 @@ export function isGenericTitleButBackendRole(title: string, description: string)
     /\brust\b/,
     /\bc\+\+|\bcpp\b/,
     /\bsystems\s+programming\b/,
-    /\bjava\b.*\bscala\b/i, // Specific Java/Scala signal found in recent rejection
+    /\bjava\b.*\bscala\b/i,
   ];
 
-  const feSignals = [
-    /\breact\b/,
-    /\bnext\.?js\b/,
-    /\btypescript\b/,
-    /\bjavascript\b/,
-    /\btailwind\b/,
-    /\bcss\b/,
-    /\bhtml\b/,
-  ];
+  const feSignals = [/\breact\b/, /\bnext\.?js\b/, /\btypescript\b/, /\bjavascript\b/, /\btailwind\b/];
 
   const bCount = backendSignals.filter((re) => re.test(desc)).length;
   const fCount = feSignals.filter((re) => re.test(desc)).length;
 
-  // If title is generic and backend signals are strong, reject
   if (!isSpecificallyFE && bCount >= 3 && bCount > fCount) return true;
-  // Even if title is FE, if it's overwhelming backend, reject
   if (isSpecificallyFE && bCount >= 6 && bCount > fCount * 2) return true;
 
   return false;
@@ -263,7 +199,6 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
     /\bu\.?s\.?\s+hubs?\b/,
     /\bu\.?s\.?-only\b/,
     /only\s+open\s+to\s+(residents|citizens|candidates)\s+of\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
-    // Only reject hybrid/onsite if it's explicitly tied to a non-Egypt location
     /\bhybrid\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
     /\b(onsite|on-site|in-office|office-based)\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
   ].some((re) => re.test(t));
@@ -361,10 +296,4 @@ export function scoreJob(input: ScoreInput): ScoreResult {
     relocationBonus,
     totalScore,
   };
-}
-
-export function computeRecencyScore(postedAt: string): number {
-  const ms = Date.parse(postedAt);
-  if (isNaN(ms)) return 50;
-  return Math.max(0, Math.round(100 - ((Date.now() - ms) / 864e5 / 7) * 100));
 }

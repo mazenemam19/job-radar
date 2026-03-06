@@ -2,88 +2,27 @@
 "use client";
 
 import React from "react";
+import { CoOccur } from "@/types";
 
-interface CoOccur {
-  skillA: string;
-  skillB: string;
-  count: number;
-}
-
-export default function CoOccurrenceGrid({ data }: { data: CoOccur[]; allSkills: string[] }) {
-  const topSkillsSet = new Set<string>();
-  data.slice(0, 50).forEach((d) => {
-    if (topSkillsSet.size < 10) {
-      topSkillsSet.add(d.skillA);
-      topSkillsSet.add(d.skillB);
-    }
-  });
-  const topSkills = Array.from(topSkillsSet).sort().slice(0, 10);
-
-  const getCount = (sA: string, sB: string) => {
-    if (sA === sB) return "-";
-    const match = data.find(
-      (d) => (d.skillA === sA && d.skillB === sB) || (d.skillA === sB && d.skillB === sA),
-    );
-    return match ? match.count : 0;
-  };
-
-  const maxCount = Math.max(...data.map((d) => d.count), 1);
-
+export default function CoOccurrenceGrid({ data }: { data: CoOccur[] }) {
   return (
-    <div className="market-card grid-section">
+    <div className="market-card co-occur-section">
       <h2 className="section-title">
-        <span className="icon">🕸️</span>
-        Skill Co-occurrence Matrix
+        <span className="icon">🔗</span>
+        Top Skill Co-Occurrence
       </h2>
-
-      <div className="scroll-container">
-        <div className="matrix-wrapper">
-          <div className="matrix-grid">
-            {/* Header Spacer */}
-            <div className="cell spacer" />
-
-            {/* Column Headers */}
-            {topSkills.map((s) => (
-              <div key={s} className="cell header-col">
-                {s}
-              </div>
-            ))}
-
-            {/* Rows */}
-            {topSkills.map((sA) => (
-              <React.Fragment key={sA}>
-                <div className="cell header-row">{sA}</div>
-                {topSkills.map((sB) => {
-                  const count = getCount(sA, sB);
-                  const intensity = typeof count === "number" ? count / maxCount : 0;
-
-                  return (
-                    <div
-                      key={`${sA}-${sB}`}
-                      className="cell data-cell"
-                      style={{
-                        backgroundColor:
-                          count === "-"
-                            ? "rgba(255,255,255,0.02)"
-                            : `rgba(99, 102, 241, ${intensity * 0.8 + 0.05})`,
-                      }}
-                    >
-                      {typeof count === "number" && count > 0 && (
-                        <span className="count-val" style={{ opacity: intensity > 0.3 ? 1 : 0.4 }}>
-                          {count}
-                        </span>
-                      )}
-
-                      {typeof count === "number" && count > 0 && (
-                        <div className="tooltip">{count} SHARED JOBS</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+      
+      <div className="occur-grid">
+        {data.slice(0, 24).map((pair, idx) => (
+          <div key={idx} className="occur-item">
+            <div className="pair-names">
+              <span className="skill-a">{pair.skillA}</span>
+              <span className="plus">+</span>
+              <span className="skill-b">{pair.skillB}</span>
+            </div>
+            <div className="pair-count">{pair.count}</div>
           </div>
-        </div>
+        ))}
       </div>
 
       <style jsx>{`
@@ -92,7 +31,6 @@ export default function CoOccurrenceGrid({ data }: { data: CoOccur[]; allSkills:
           border: 1px solid var(--border);
           border-radius: var(--radius);
           padding: 32px;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
         }
         .section-title {
           font-family: var(--font-display);
@@ -108,96 +46,35 @@ export default function CoOccurrenceGrid({ data }: { data: CoOccur[]; allSkills:
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
-        .scroll-container {
-          overflow-x: auto;
-          margin: 0 -10px;
-          padding: 0 10px 20px;
-        }
-        .matrix-wrapper {
-          min-width: 640px;
-        }
-        .matrix-grid {
+        .occur-grid {
           display: grid;
-          grid-template-columns: 100px repeat(10, 1fr);
-          gap: 2px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
         }
-        .cell {
-          aspect-ratio: 1;
+        .occur-item {
+          background: rgba(255,255,255,0.02);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px 16px;
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          justify-content: center;
-          position: relative;
         }
-        .spacer {
-          aspect-ratio: auto;
-          height: 40px;
+        .pair-names {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-muted);
+          display: flex;
+          gap: 6px;
+          align-items: center;
         }
-        .header-col {
-          aspect-ratio: auto;
-          height: 40px;
-          font-size: 8px;
+        .skill-a, .skill-b { color: #fff; }
+        .plus { opacity: 0.3; }
+        .pair-count {
           font-family: var(--font-mono);
-          font-weight: 900;
-          color: var(--text-dim);
-          text-transform: uppercase;
-          text-align: center;
-          padding: 0 4px;
-          letter-spacing: -0.02em;
-        }
-        .header-row {
-          aspect-ratio: auto;
-          height: auto;
-          font-size: 8px;
-          font-family: var(--font-mono);
-          font-weight: 900;
-          color: var(--text-dim);
-          text-transform: uppercase;
-          justify-content: flex-end;
-          padding-right: 12px;
-          letter-spacing: -0.02em;
-        }
-        .data-cell {
-          border-radius: 2px;
-          border: 1px solid rgba(255, 255, 255, 0.02);
-          transition: all 0.2s;
-          cursor: crosshair;
-        }
-        .data-cell:hover {
-          transform: scale(1.1);
-          z-index: 10;
-          border-color: rgba(255, 255, 255, 0.2);
-          box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
-        }
-        .count-val {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 800;
-          color: #fff;
-        }
-        .tooltip {
-          position: absolute;
-          bottom: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          margin-bottom: 8px;
-          background: #000;
-          color: #fff;
-          font-family: var(--font-mono);
-          font-size: 9px;
-          font-weight: 900;
-          padding: 4px 8px;
-          border-radius: 3px;
-          border: 1px solid var(--border-hi);
-          white-space: nowrap;
-          pointer-events: none;
-          opacity: 0;
-          transition: opacity 0.2s;
-          z-index: 100;
-          letter-spacing: 0.05em;
-          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-        }
-        .data-cell:hover .tooltip {
-          opacity: 1;
+          font-size: 12px;
+          color: var(--accent);
+          font-weight: 700;
         }
       `}</style>
     </div>

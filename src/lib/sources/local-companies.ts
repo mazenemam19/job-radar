@@ -1,5 +1,5 @@
 // src/lib/sources/local-companies.ts
-import type { Job, SourceHealth, FetcherResult } from "../types";
+import type { Job, SourceHealth, FetcherResult } from "@/types";
 import {
   fetchGreenhouse,
   fetchLever,

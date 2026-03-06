@@ -1,6 +1,6 @@
 // src/lib/health-store.ts
 import { supabase } from "./supabase";
-import { HealthStore, HealthStat } from "./types";
+import { HealthStore, HealthStat } from "@/types";
 
 const DB_KEY = "health-store.json";
 

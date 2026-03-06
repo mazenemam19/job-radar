@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { JobStore, JobMode } from "@/lib/types";
+import type { JobStore, JobMode } from "@/types";
 import JobCard from "./JobCard";
 import AppHeader from "./AppHeader";
 
