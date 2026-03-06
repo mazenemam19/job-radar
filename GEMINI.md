@@ -20,7 +20,10 @@
 
 ## 💾 Storage & State
 
-- **Vercel Blob Storage**: Primary persistent store for all data (`jobs-store.json`, `scan-state.json`).
+- **Vercel Blob Storage**: Primary persistent store for all data.
+  - `jobs-store.json`: Approved survivors matching personal profile.
+  - `raw-market-store.json`: Comprehensive history of all fetched jobs (unfiltered) for market analysis.
+  - `scan-state.json`: Tracking offsets and rotation.
 - **`data/` Folder**: Locally ignored. Used only as a transient cache for scan states during development.
 - **Environment**: Requires `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `GEMINI_API_KEY` in `.env.local`.
 - **Cron Frequency**: Vercel Hobby tier limits cron jobs to **once per day**. Do not attempt to increase the frequency in `vercel.json` as it will be ignored or cause deployment errors. Use external triggers (like GitHub Actions) if higher frequency is needed.
@@ -53,6 +56,7 @@
   - Real dates get 0-100 score based on 7-day decay.
   - Unknown dates: Default to **4 days ago** (medium recency) to avoid crowding the top while ensuring natural expiry in 3 days.
 - **Cleanup**: Handled in `storage.ts` using `postedAt`. `mergeJobs` actively re-scans and purges any job (old or new) that fails the current filtering logic.
+- **Raw Data Persistence**: The scanner saves ALL fetched jobs to `raw-market-store.json` before any personal filtering occurs. This enables unbiased market intelligence while keeping the primary dashboard strictly curated.
 - **Filter Intelligence**:
   - **Geographical Rejection**: Blocks Israel-based companies (Wix, Fiverr, Monday.com, etc.) and those on BDS lists.
   - **Location & Hubs**: Aggressively rejects US/UK/Canada only roles, "US Hubs", and "Remote in the United States" using both regex and LLM.
@@ -136,6 +140,9 @@ To maintain high availability and accuracy, the project uses a cascading fallbac
 ## 🏛️ Architecture
 
 - **Source Health Page**: Dedicated route at `/analysis` using `AnalysisView.tsx`.
+- **Market Intelligence Dashboard**: Dedicated route at `/market` using a hybrid Server/Client architecture.
+  - **Server-side**: Data orchestration and regex-based skill extraction from `raw-market-store.json`.
+  - **Client-side**: High-fidelity visualizations using `<style jsx>` and project-native CSS variables.
 - **Component Modularity**:
   - `AppHeader.tsx`: Shared navigation and "Run Scan" logic.
   - `SourceHealthDashboard.tsx`: High-tech diagnostic view. Supports an `alwaysOpen` prop for the dedicated analysis page.

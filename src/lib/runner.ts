@@ -1,4 +1,11 @@
-import { readStore, writeStore, mergeJobs, appendCronLog } from "./storage";
+import {
+  readStore,
+  writeStore,
+  mergeJobs,
+  appendCronLog,
+  readRawStore,
+  writeRawStore,
+} from "./storage";
 import { fetchVisaJobs } from "./sources/visa-companies";
 import { fetchLocalJobs } from "./sources/local-companies";
 import { fetchRemoteJobs } from "./sources/remote-companies";
@@ -106,6 +113,17 @@ export async function runAllSources(): Promise<CronLog> {
   }
 
   const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
+
+  // ── Persist Raw Market Data ───────────────────────────────────────────
+  // We save ALL fetched jobs before any personal filtering for market analysis.
+  try {
+    const existingRaw = await readRawStore();
+    const rawMap = new Map(existingRaw.map((j) => [j.id, j]));
+    rawFetched.forEach((j) => rawMap.set(j.id, j));
+    await writeRawStore(Array.from(rawMap.values()));
+  } catch (e) {
+    console.error("[runner] Failed to persist raw market data:", e);
+  }
 
   // ── Gemini Filtration Layer ──
   // Identify TRULY new jobs that passed regex but haven't been Gemini-checked yet.

@@ -86,6 +86,10 @@ export default function AppHeader({ lastUpdated, onRefresh, cronSecret }: AppHea
           <span className="tab-icon">📈</span>
           Source Health
         </Link>
+        <Link href="/market" className={`view-tab ${pathname === "/market" ? "active" : ""}`}>
+          <span className="tab-icon">📊</span>
+          Market
+        </Link>
       </nav>
     </header>
   );

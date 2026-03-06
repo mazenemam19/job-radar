@@ -9,27 +9,29 @@ import {
 } from "./scoring";
 
 const BLOB_KEY = "jobs-store.json";
+const RAW_BLOB_KEY = "raw-market-store.json";
 const MAX_JOBS = 500;
 const MAX_JOB_AGE_DAYS = 7;
+const MAX_RAW_AGE_DAYS = 30;
 
 function emptyStore(): JobStore {
   return { jobs: [], lastUpdated: new Date().toISOString(), cronLogs: [] };
 }
 
-// Read from Vercel Blob
+// ── APPROVED STORE ( survivors of all filters ) ─────────────────────────────
+
 export async function readStore(): Promise<JobStore> {
   try {
     const { blobs } = await list();
     const entry = blobs.find((b) => b.pathname === BLOB_KEY);
     if (!entry) return emptyStore();
 
-    // Add cache-busting query param to ensure we get fresh data
     const res = await fetch(`${entry.url}?t=${Date.now()}`);
     if (!res.ok) return emptyStore();
 
     const store = (await res.json()) as JobStore;
 
-    // ── Auto-expire old jobs on every read ──────────────────────────────────
+    // Auto-expire old jobs
     const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
     store.jobs = store.jobs.filter((j) => {
       const ms = Date.parse(j.postedAt);
@@ -42,7 +44,6 @@ export async function readStore(): Promise<JobStore> {
   }
 }
 
-// Write to Vercel Blob
 export async function writeStore(store: JobStore): Promise<void> {
   await put(BLOB_KEY, JSON.stringify(store, null, 2), {
     access: "public",
@@ -51,17 +52,44 @@ export async function writeStore(store: JobStore): Promise<void> {
   });
 }
 
-/**
- * Merge new jobs into store.
- * - Deduplicates by id (existing job keeps its original postedAt — no date drift)
- * - Sorts by totalScore descending
- * - Caps at MAX_JOBS
- */
+// ── RAW MARKET STORE ( all fetched data before filtering ) ───────────────────
+
+export async function readRawStore(): Promise<Job[]> {
+  try {
+    const { blobs } = await list();
+    const entry = blobs.find((b) => b.pathname === RAW_BLOB_KEY);
+    if (!entry) return [];
+
+    const res = await fetch(`${entry.url}?t=${Date.now()}`);
+    if (!res.ok) return [];
+
+    const jobs = (await res.json()) as Job[];
+
+    // Auto-expire raw data older than 30 days
+    const cutoff = Date.now() - MAX_RAW_AGE_DAYS * 864e5;
+    return jobs.filter((j) => {
+      const ms = Date.parse(j.postedAt);
+      return !isNaN(ms) && ms >= cutoff;
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function writeRawStore(jobs: Job[]): Promise<void> {
+  await put(RAW_BLOB_KEY, JSON.stringify(jobs, null, 2), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  });
+}
+
+// ── MERGE LOGIC ─────────────────────────────────────────────────────────────
+
 export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; added: Job[] } {
   const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
   const existingIds = new Set(store.jobs.map((j) => j.id));
 
-  // Apply filters BEFORE calculating 'added' so we don't count rejected jobs as new
   const validIncoming = incoming.filter((j) => {
     const text = `${j.title} ${j.description}`;
     return (
@@ -79,8 +107,6 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
     return true;
   });
 
-  // ── Aggressive Re-filtering ──
-  // We re-scan the entire merged set to ensure old jobs also respect any NEW filtering logic.
   const merged = [...store.jobs, ...added]
     .filter((j) => {
       const text = `${j.title} ${j.description}`;
