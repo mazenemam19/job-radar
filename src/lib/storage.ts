@@ -1,5 +1,5 @@
 // src/lib/storage.ts
-import { put, list } from "@vercel/blob";
+import { supabase } from "./supabase";
 import { Job, JobStore, CronLog } from "./types";
 import {
   isClearlyNonFrontend,
@@ -8,8 +8,8 @@ import {
   requiresCitizenshipOrClearance,
 } from "./scoring";
 
-const BLOB_KEY = "jobs-store.json";
-const RAW_BLOB_KEY = "raw-market-store.json";
+const DB_KEY = "jobs-store.json";
+const DB_RAW_KEY = "raw-market-store.json";
 const MAX_JOBS = 500;
 const MAX_JOB_AGE_DAYS = 7;
 const MAX_RAW_AGE_DAYS = 30;
@@ -22,14 +22,15 @@ function emptyStore(): JobStore {
 
 export async function readStore(): Promise<JobStore> {
   try {
-    const { blobs } = await list();
-    const entry = blobs.find((b) => b.pathname === BLOB_KEY);
-    if (!entry) return emptyStore();
+    const { data, error } = await supabase
+      .from("storage")
+      .select("data")
+      .eq("key", DB_KEY)
+      .single();
 
-    const res = await fetch(`${entry.url}?t=${Date.now()}`);
-    if (!res.ok) return emptyStore();
+    if (error || !data) return emptyStore();
 
-    const store = (await res.json()) as JobStore;
+    const store = data.data as JobStore;
 
     // Auto-expire old jobs
     const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
@@ -45,25 +46,22 @@ export async function readStore(): Promise<JobStore> {
 }
 
 export async function writeStore(store: JobStore): Promise<void> {
-  await put(BLOB_KEY, JSON.stringify(store, null, 2), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await supabase.from("storage").upsert({ key: DB_KEY, data: store });
 }
 
 // ── RAW MARKET STORE ( all fetched data before filtering ) ───────────────────
 
 export async function readRawStore(): Promise<Job[]> {
   try {
-    const { blobs } = await list();
-    const entry = blobs.find((b) => b.pathname === RAW_BLOB_KEY);
-    if (!entry) return [];
+    const { data, error } = await supabase
+      .from("storage")
+      .select("data")
+      .eq("key", DB_RAW_KEY)
+      .single();
 
-    const res = await fetch(`${entry.url}?t=${Date.now()}`);
-    if (!res.ok) return [];
+    if (error || !data) return [];
 
-    const jobs = (await res.json()) as Job[];
+    const jobs = data.data as Job[];
 
     // Auto-expire raw data older than 30 days
     const cutoff = Date.now() - MAX_RAW_AGE_DAYS * 864e5;
@@ -77,11 +75,7 @@ export async function readRawStore(): Promise<Job[]> {
 }
 
 export async function writeRawStore(jobs: Job[]): Promise<void> {
-  await put(RAW_BLOB_KEY, JSON.stringify(jobs, null, 2), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await supabase.from("storage").upsert({ key: DB_RAW_KEY, data: jobs });
 }
 
 // ── MERGE LOGIC ─────────────────────────────────────────────────────────────

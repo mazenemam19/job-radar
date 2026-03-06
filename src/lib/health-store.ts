@@ -1,29 +1,27 @@
 // src/lib/health-store.ts
-import { put, list } from "@vercel/blob";
+import { supabase } from "./supabase";
 import { HealthStore, HealthStat } from "./types";
 
-const BLOB_KEY = "health-store.json";
+const DB_KEY = "health-store.json";
 
 let healthStoreCache: HealthStore | null = null;
 
-// Read from Vercel Blob
+// Read from Supabase
 export async function readHealthStore(): Promise<HealthStore> {
   if (healthStoreCache) return healthStoreCache;
   try {
-    const { blobs } = await list();
-    const entry = blobs.find((b) => b.pathname === BLOB_KEY);
-    if (!entry) {
+    const { data, error } = await supabase
+      .from("storage")
+      .select("data")
+      .eq("key", DB_KEY)
+      .single();
+
+    if (error || !data) {
       healthStoreCache = {};
       return {};
     }
 
-    const res = await fetch(`${entry.url}?t=${Date.now()}`);
-    if (!res.ok) {
-      healthStoreCache = {};
-      return {};
-    }
-
-    const store = (await res.json()) as HealthStore;
+    const store = data.data as HealthStore;
     healthStoreCache = store;
     return store;
   } catch {
@@ -32,14 +30,10 @@ export async function readHealthStore(): Promise<HealthStore> {
   }
 }
 
-// Write to Vercel Blob
+// Write to Supabase
 export async function writeHealthStore(store: HealthStore): Promise<void> {
   healthStoreCache = store; // Keep cache in sync
-  await put(BLOB_KEY, JSON.stringify(store, null, 2), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await supabase.from("storage").upsert({ key: DB_KEY, data: store });
 }
 
 /**

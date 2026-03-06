@@ -32,7 +32,7 @@ export async function fetchVisaJobs(): Promise<{
   // Scan ALL companies (no more batching/rotation)
   const toScan = [...others, ...workables];
 
-  // ── Limit concurrency to prevent AbortErrors/Timeouts ──────────────────
+  // ── Limit concurrency to 3 to prevent AbortErrors/Timeouts ──────────────────
   const fetcherFns = [
     ...toScan.map((c) => async () => {
       const p = (() => {
@@ -68,21 +68,30 @@ export async function fetchVisaJobs(): Promise<{
       ).then((res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" })),
   ];
 
-  // Limit to 5 concurrent fetchers to ensure network stability
-  const results = await pLimit(fetcherFns, 5);
+  // Limit to 3 concurrent fetchers to ensure network stability
+  const results = await pLimit(fetcherFns, 3);
 
   const all: Job[] = [];
   const health: Record<string, SourceHealth> = {};
 
   for (const r of results) {
     if (r) {
-      const { jobs, error, durationMs, sourceName, rawCount, ats, success, total } =
+      const { jobs, error, durationMs, sourceName, rawCount, ats, success, total, ok } =
         r as FetcherResult & {
           sourceName: string;
           ats: string;
         };
       all.push(...jobs);
-      health[sourceName] = { count: jobs.length, rawCount, error, durationMs, ats, success, total };
+      health[sourceName] = {
+        count: jobs.length,
+        rawCount,
+        error,
+        durationMs,
+        ats,
+        success,
+        total,
+        ok,
+      };
     }
   }
 

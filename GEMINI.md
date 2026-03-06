@@ -20,13 +20,14 @@
 
 ## 💾 Storage & State
 
-- **Vercel Blob Storage**: Primary persistent store for all data.
+- **Supabase Database**: Primary persistent store for all data (PostgreSQL + JSONB).
+  - Table: `storage` (Columns: `key` text PRIMARY KEY, `data` jsonb).
   - `jobs-store.json`: Approved survivors matching personal profile.
   - `raw-market-store.json`: Comprehensive history of all fetched jobs (unfiltered) for market analysis.
-  - `scan-state.json`: Tracking offsets and rotation.
+  - `scan-state.json`: Tracking state.
 - **`data/` Folder**: Locally ignored. Used only as a transient cache for scan states during development.
-- **Environment**: Requires `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `GEMINI_API_KEY` in `.env.local`.
-- **Cron Frequency**: Vercel Hobby tier limits cron jobs to **once per day**. Do not attempt to increase the frequency in `vercel.json` as it will be ignored or cause deployment errors. Use external triggers (like GitHub Actions) if higher frequency is needed.
+- **Environment**: Requires `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and `GEMINI_API_KEY` in `.env.local`.
+- **Cron Frequency**: GitHub Actions triggers the `/api/cron` endpoint every 6 hours to bypass Vercel's daily limit. Requires `CRON_SECRET` in GitHub Secrets.
 
 ## 🔌 Integrations
 
@@ -66,12 +67,12 @@
 
 ## ⚠️ Known Issues / Fixes
 
-- **Vercel Caching**: `fetch` calls to Blob storage use `?t=timestamp` to bypass edge caching.
+- **Supabase Migration**: Vercel Blob access was paused; all storage migrated to Supabase `storage` table for higher request limits and JSONB efficiency.
 - **Workable URL Typo**: Confirmed that the correct URL is `.../widget/accounts/...`.
-- **Serverless Persistence**: The `finalizeBatchState` function ensures rotation offsets are saved to the cloud only once at the end of a parallel scan to prevent race conditions.
+- **Serverless Persistence**: State is saved to Supabase at the end of each run to prevent race conditions.
 - **Read-Only Filesystem**: Vercel's serverless environment (`/var/task`) is read-only.
-  - **State Fix**: `src/lib/state.ts` is configured to skip local `data/` writes when `process.env.VERCEL` is detected, relying solely on Vercel Blob.
-  - **Transient Data**: Use `/tmp` (managed in `ats-utils.ts`) for any necessary runtime file operations (e.g., rate-limit tracking) that don't require persistence across separate lambda invocations.
+  - **State Fix**: Supabase provides cross-lambda persistence.
+  - **Transient Data**: Use `/tmp` (managed in `ats-utils.ts`) for runtime file operations.
 
 ## ✅ Potential New Sources
 
