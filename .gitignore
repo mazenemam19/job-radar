@@ -4,3 +4,4 @@ node_modules/
 dist-scripts/
 data/
 tsconfig.tsbuildinfo
+.playwright-mcp/

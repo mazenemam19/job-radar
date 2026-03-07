@@ -11,6 +11,7 @@ import {
   resetWorkableUsed,
   pLimit,
 } from "./ats-utils";
+import { fetchGoogleJobs } from "./google-search";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
 import { ALL_COMPANIES } from "./companies";
 
@@ -66,6 +67,18 @@ export async function fetchVisaJobs(): Promise<{
         MODE,
         "London Startup Jobs",
       ).then((res) => ({ ...res, sourceName: "London Startup Jobs", ats: "custom" })),
+    async () =>
+      fetchGoogleJobs(MODE, "Senior React", "Germany OR Netherlands OR UK OR Ireland").then(
+        (res) => {
+          const sourceName = "LinkedIn (Visa Hubs)";
+          return {
+            ...res,
+            sourceName,
+            ats: "custom",
+            jobs: res.jobs.map((j) => ({ ...j, sourceName })),
+          };
+        },
+      ),
   ];
 
   // Limit to 3 concurrent fetchers to ensure network stability
