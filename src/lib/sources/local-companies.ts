@@ -15,6 +15,7 @@ import {
   resetWorkableUsed,
   pLimit,
 } from "./ats-utils";
+import { fetchGoogleJobs } from "./google-search";
 import { ALL_COMPANIES } from "./companies";
 
 const MODE = "local";
@@ -67,6 +68,16 @@ export async function fetchLocalJobs(): Promise<{
     async () => fetchWuzzuf(MODE).then((res) => ({ ...res, sourceName: "Wuzzuf", ats: "custom" })),
     async () =>
       fetchBrightSkies(MODE).then((res) => ({ ...res, sourceName: "Bright Skies", ats: "custom" })),
+    async () =>
+      fetchGoogleJobs(MODE, "Senior React", "Egypt").then((res) => {
+        const sourceName = "LinkedIn (Local)";
+        return {
+          ...res,
+          sourceName,
+          ats: "custom",
+          jobs: res.jobs.map((j) => ({ ...j, sourceName })),
+        };
+      }),
   ];
 
   // Limit to 3 concurrent fetchers to ensure network stability

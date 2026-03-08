@@ -138,29 +138,54 @@ export async function runAllSources(): Promise<CronLog> {
 
   const { store: updated, added } = mergeJobs(store, fetched);
 
-  // ── Final Health Refinement ──
+  // ── ID MIGRATION & PURGE (Fixes Issue 1: Duplicates & 404s) ──
+  // Force removal of old Base64 Google IDs that were mangled or duplicated
+  const isHex = (s: string) => /^[0-9a-f]{16}$/i.test(s);
+  updated.jobs = updated.jobs.filter((j) => {
+    if (j.id.startsWith("google_")) {
+      const hashPart = j.id.replace("google_", "");
+      return isHex(hashPart); // Only keep clean Hex IDs
+    }
+    return true;
+  });
+
+  // ── Final Health Refinement (Fixes Issue 2: Dashboard Zeros) ──
   const detailKeys = Object.keys(sourceDetails);
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .trim();
 
   for (const key in sourceDetails) {
     sourceDetails[key].count = 0;
     sourceDetails[key].geminiFiltered = 0;
     sourceDetails[key].totalSurvivors = 0;
   }
-
-  // 1. Count technical matches from this run (Passed Regex)
+  // 1. Count technical matches (Survived Regex Gate)
+  // We count jobs that were technical enough to be considered "newCandidates"
+  // OR were already in the store (meaning they passed Regex previously)
   rawFetched.forEach((j) => {
-    const sName = (j.sourceName || j.company).toLowerCase().trim();
-    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
-    if (key && sourceDetails[key]) {
-      sourceDetails[key].count! += 1;
+    const isTechnicalMatch =
+      !isClearlyNonFrontend(j.title) &&
+      !isTooSeniorOrTooJunior(j.title) &&
+      !isGenericTitleButBackendRole(j.title, j.description) &&
+      !requiresCitizenshipOrClearance(j.title + " " + j.description);
+
+    if (isTechnicalMatch) {
+      const sName = normalize(j.sourceName || j.company);
+      const key = detailKeys.find((k) => normalize(k) === sName);
+      if (key && sourceDetails[key]) {
+        sourceDetails[key].count! += 1;
+      }
     }
   });
 
   // 2. Count Gemini rejections from this run
   newCandidates.forEach((j) => {
     if (rejectedSet.has(j.id)) {
-      const sName = (j.sourceName || j.company).toLowerCase().trim();
-      const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
+      const sName = normalize(j.sourceName || j.company);
+      const key = detailKeys.find((k) => normalize(k) === sName);
       if (key && sourceDetails[key]) {
         sourceDetails[key].geminiFiltered! += 1;
       }
@@ -169,8 +194,8 @@ export async function runAllSources(): Promise<CronLog> {
 
   // 3. Count TOTAL survivors currently in the store (Cumulative 7-day)
   updated.jobs.forEach((j) => {
-    const sName = (j.sourceName || j.company).toLowerCase().trim();
-    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
+    const sName = normalize(j.sourceName || j.company);
+    const key = detailKeys.find((k) => normalize(k) === sName);
     if (key && sourceDetails[key]) {
       sourceDetails[key].totalSurvivors! += 1;
     }

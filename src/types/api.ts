@@ -219,3 +219,67 @@ export interface WorkableCooldownEntry {
 }
 
 export type WorkableBudgetConfig = { visa: number; global: number; local: number };
+
+// ── LinkedIn Specific Response Types ─────────────────────────────────────
+
+export interface ActiveJobsDBJob {
+  id: string;
+  title: string;
+  organization: string;
+  url: string;
+  date_posted: string;
+  description_text?: string;
+  locations_derived?: string[];
+  remote_derived?: boolean;
+}
+
+export type ActiveJobsDBResponse = ActiveJobsDBJob[];
+
+export interface FreshCompanyInfo {
+  id: string;
+  name: string;
+  url: string;
+  logo?: { url: string }[];
+}
+
+export interface FreshSearchJob {
+  id: string;
+  title: string;
+  url: string;
+  listed_at: string;
+  location: string;
+  company: FreshCompanyInfo | string;
+}
+
+export interface FreshSearchResponse {
+  success: boolean;
+  data: FreshSearchJob[];
+}
+
+export interface FreshDetailJob extends FreshSearchJob {
+  description: string;
+  job_url: string;
+  company: FreshCompanyInfo;
+}
+
+export interface FreshDetailResponse {
+  success: boolean;
+  data: FreshDetailJob;
+}
+
+// ── Google Search (SerpApi) Response Types ────────────────────────────────
+
+export interface SerpResult {
+  title: string;
+  link: string;
+  snippet: string;
+  source?: string;
+  date?: string;
+}
+
+export interface SerpApiResponse {
+  organic_results?: SerpResult[];
+  search_metadata?: {
+    status: string;
+  };
+}

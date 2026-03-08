@@ -15,6 +15,7 @@ import {
   resetWorkableUsed,
   pLimit,
 } from "./ats-utils";
+import { fetchGoogleJobs } from "./google-search";
 import { fetchHimalayas } from "./himalayas";
 import { fetchRemotive } from "./remotive";
 import { fetchWPStartupJobs } from "./wp-startup-jobs";
@@ -78,6 +79,16 @@ export async function fetchRemoteJobs(): Promise<{
         MODE,
         "Berlin Startup Jobs (Global)",
       ).then((res) => ({ ...res, sourceName: "Berlin Startup Jobs (Global)", ats: "custom" })),
+    async () =>
+      fetchGoogleJobs(MODE, "Senior React", "Europe OR Middle East").then((res) => {
+        const sourceName = "LinkedIn (Remote EMEA)";
+        return {
+          ...res,
+          sourceName,
+          ats: "custom",
+          jobs: res.jobs.map((j) => ({ ...j, sourceName })),
+        };
+      }),
   ];
 
   // Limit to 3 concurrent fetchers to ensure network stability
