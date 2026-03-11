@@ -2,5 +2,5 @@
 import Dashboard from "@/components/Dashboard";
 
 export default function Home() {
-  return <Dashboard cronSecret={process.env.CRON_SECRET} />;
+  return <Dashboard />;
 }
