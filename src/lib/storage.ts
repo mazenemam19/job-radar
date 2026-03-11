@@ -103,17 +103,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
     return true;
   });
 
-  // Preserve original postedAt for existing jobs to ensure they eventually expire
-  const existingWithOriginalDates = store.jobs.map((oldJob) => {
-    const freshVersion = incoming.find((ij) => ij.id === oldJob.id);
-    if (freshVersion) {
-      // Keep the older date, but update technical scores if the fresh version is better
-      return { ...freshVersion, postedAt: oldJob.postedAt };
-    }
-    return oldJob;
-  });
-
-  const merged = [...existingWithOriginalDates, ...added]
+  const merged = [...store.jobs, ...added]
     .filter((j) => {
       const text = `${j.title} ${j.description}`;
       return (
