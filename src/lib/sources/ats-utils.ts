@@ -972,6 +972,9 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         attr.company_name ||
         attr.computedFields?.find((f) => f.name === "company_name")?.value?.[0] ||
         "Wuzzuf Job";
+
+      const fullDescription = `${attr.description || ""} ${attr.requirements || ""}`.trim();
+
       allWuzzufJobs.push({
         id: `local_wuzzuf_${entry.id}`,
         source: "local",
@@ -983,14 +986,14 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         country: attr.location?.country?.name || "MENA",
         countryFlag: "🌍",
         url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
-        description: stripHtml(attr.description || "").slice(0, 3000),
+        description: stripHtml(fullDescription).slice(0, 3000),
         isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
         postedAt: attr.postedAt,
         dateUnknown: false,
         visaSponsorship: false,
         ...scoreJob({
           title,
-          description: attr.description,
+          description: fullDescription,
           location: "MENA",
           postedAt: attr.postedAt,
         }),

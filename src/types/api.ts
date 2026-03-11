@@ -146,6 +146,7 @@ export interface WuzzufJob {
     title: string;
     slug?: string;
     description: string;
+    requirements?: string;
     workplaceArrangement?: string;
     postedAt: string;
     location?: {
