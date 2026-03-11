@@ -147,7 +147,9 @@ export interface WuzzufJob {
     slug?: string;
     description: string;
     requirements?: string;
-    workplaceArrangement?: string;
+    jobType?: string;
+    careerLevel?: { name: string };
+    workplaceArrangement?: string | { displayedName: string };
     postedAt: string;
     location?: {
       city?: { name: string };

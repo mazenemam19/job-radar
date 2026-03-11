@@ -973,7 +973,17 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         attr.computedFields?.find((f) => f.name === "company_name")?.value?.[0] ||
         "Wuzzuf Job";
 
-      const fullDescription = `${attr.description || ""} ${attr.requirements || ""}`.trim();
+      const fullDescription = `
+        ${attr.description || ""} 
+        ${attr.requirements || ""} 
+        Job Type: ${attr.jobType || ""}
+        Career Level: ${attr.careerLevel?.name || ""}
+      `.trim();
+
+      const workplaceArrangement =
+        typeof attr.workplaceArrangement === "string"
+          ? attr.workplaceArrangement
+          : attr.workplaceArrangement?.displayedName || "";
 
       allWuzzufJobs.push({
         id: `local_wuzzuf_${entry.id}`,
@@ -987,7 +997,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
         countryFlag: "🌍",
         url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
         description: stripHtml(fullDescription).slice(0, 3000),
-        isRemote: /remote/i.test(attr.workplaceArrangement || "") || /remote/i.test(title),
+        isRemote: /remote/i.test(workplaceArrangement) || /remote/i.test(title),
         postedAt: attr.postedAt,
         dateUnknown: false,
         visaSponsorship: false,
