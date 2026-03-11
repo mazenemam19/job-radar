@@ -5,6 +5,7 @@ import React from "react";
 import StatCard from "./StatCard";
 import SkillBars from "./SkillBars";
 import SkillGaps from "./SkillGaps";
+import MissingSkillsCard from "./MissingSkillsCard";
 import InsightsPanel from "./InsightsPanel";
 import CoOccurrenceGrid from "./CoOccurrenceGrid";
 import PipelineStat from "./PipelineStat";
@@ -70,6 +71,7 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
         {/* Row 2: Deep Analysis */}
         <div className="analysis-grid">
           <div className="primary-column">
+            <MissingSkillsCard data={data.filteredOutReactSkills} />
             <SkillBars data={data.skillFrequency} />
             <CoOccurrenceGrid data={data.coOccurrence} />
           </div>

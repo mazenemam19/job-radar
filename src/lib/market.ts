@@ -1,48 +1,7 @@
 // src/lib/market.ts
 import { readStore, readRawStore } from "@/lib/storage";
 import { SKILL_REGISTRY, PERSONAL_SKILLS, getSeniority } from "./constants";
-
-export interface MarketAnalysis {
-  meta: {
-    generatedAt: string;
-    totalJobs: number;
-    jobsPassingFilter: number;
-    filterRate: number;
-    uniqueSkillsFound: number;
-  };
-  skillFrequency: Array<{
-    skill: string;
-    category: string;
-    count: number;
-    percentage: number;
-    inYourSkillSet: boolean;
-  }>;
-  yourSkillsMarketDemand: Array<{
-    skill: string;
-    count: number;
-    percentage: number;
-    marketStrength: "strong" | "moderate" | "weak";
-  }>;
-  marketSkillGaps: Array<{
-    skill: string;
-    category: string;
-    count: number;
-    percentage: number;
-    trending: boolean;
-  }>;
-  pipelineBreakdown: {
-    visa: { total: number; topSkills: Array<{ skill: string; count: number }> };
-    local: { total: number; topSkills: Array<{ skill: string; count: number }> };
-    global: { total: number; topSkills: Array<{ skill: string; count: number }> };
-  };
-  scoreDistribution: Array<{ bucket: string; count: number }>;
-  seniorityBreakdown: Array<{ level: string; count: number }>;
-  topCompanies: Array<{ company: string; count: number; pipeline: string }>;
-  remoteSignals: { remote: number; hybrid: number; onSite: number; relocation: number };
-  postingDayBreakdown: Array<{ day: string; count: number }>;
-  coOccurrence: Array<{ skillA: string; skillB: string; count: number }>;
-  insights: string[];
-}
+import { MarketAnalysis } from "@/types";
 
 export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
   const approvedStore = await readStore();
@@ -60,6 +19,7 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
     global: {},
   };
   const coOccur: Record<string, number> = {};
+  const filteredSkills: Record<string, number> = {};
   const companyCounts: Record<string, { count: number; pipeline: string }> = {};
   const dayCounts: Record<string, number> = {
     Monday: 0,
@@ -90,6 +50,11 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
         skillCounts[skill] = (skillCounts[skill] || 0) + 1;
         pipelineSkills[job.mode][skill] = (pipelineSkills[job.mode][skill] || 0) + 1;
         skillsInJob.push(skill);
+
+        // Track skills in filtered-out jobs
+        if (!approvedIds.has(job.id) && !PERSONAL_SKILLS.has(skill)) {
+          filteredSkills[skill] = (filteredSkills[skill] || 0) + 1;
+        }
       }
     });
 
@@ -107,7 +72,6 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
     else if (score <= 80) scoreBuckets["61-80"]++;
     else scoreBuckets["81-100"]++;
 
-    // Unified Seniority Logic
     const level = getSeniority(job.title);
     seniority[level]++;
 
@@ -163,6 +127,20 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
+  const jobsPassingFilter = rawJobs.filter((j) => approvedIds.has(j.id)).length;
+  const totalFiltered = totalJobs - jobsPassingFilter;
+
+  const filteredOutReactSkills = Object.entries(filteredSkills)
+    .map(([skill, count]) => ({
+      skill,
+      category: SKILL_REGISTRY[skill].category,
+      count,
+      percentage: totalFiltered > 0 ? Math.round((count / totalFiltered) * 100) : 0,
+      reason: "Commonly found in roles you don't match",
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 15);
+
   const insights: string[] = [];
   const topSkill = skillFrequency[0];
   if (topSkill && topSkill.inYourSkillSet && topSkill.percentage > 60) {
@@ -193,8 +171,6 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
   insights.push(
     `Seniority Demand: **${seniorPct}%** of roles are explicitly targeting Senior-level talent.`,
   );
-
-  const jobsPassingFilter = rawJobs.filter((j) => approvedIds.has(j.id)).length;
 
   return {
     meta: {
@@ -236,6 +212,7 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
       })
       .sort((a, b) => b.count - a.count)
       .slice(0, 50),
+    filteredOutReactSkills,
     insights,
   };
 }

@@ -37,6 +37,13 @@ export interface MarketAnalysis {
   remoteSignals: { remote: number; hybrid: number; onSite: number; relocation: number };
   postingDayBreakdown: Array<{ day: string; count: number }>;
   coOccurrence: Array<{ skillA: string; skillB: string; count: number }>;
+  filteredOutReactSkills: Array<{
+    skill: string;
+    category: string;
+    count: number;
+    percentage: number;
+    reason: string;
+  }>;
   insights: string[];
 }
 
