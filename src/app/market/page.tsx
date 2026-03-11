@@ -5,6 +5,8 @@ import AppHeader from "@/components/AppHeader";
 import { readStore } from "@/lib/storage";
 import MarketLayout from "./components/MarketLayout";
 
+export const dynamic = "force-dynamic";
+
 export default async function MarketPage() {
   const data = await computeMarketAnalysis();
   const store = await readStore();
