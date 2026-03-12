@@ -54,7 +54,12 @@ export async function filterJobsWithGemini(
       const job = batch.find((j) => j.id === res.id);
       if (job) {
         if (res.passed) {
-          results.push({ ...job, geminiPassed: true, geminiReason: res.reason });
+          results.push({
+            ...job,
+            geminiPassed: true,
+            geminiReason: res.reason,
+            redFlags: res.redFlags || [],
+          });
         } else {
           rejectedIds.push(job.id);
           const quoteText = res.quote ? ` | Quote: "${res.quote}"` : "";
@@ -122,34 +127,24 @@ async function callGemini(batch: Job[], modelName: string): Promise<GeminiFilter
 
   const prompt = `
 YOU ARE A STRICT JOB FILTERING AGENT for a Senior React Developer based in Egypt (GMT+2).
-Your goal is to REJECT any job that has even a small hint of location restriction that excludes Egypt, or any tech/seniority mismatch.
+Your goal is to REJECT any job that has even a small hint of location restriction that excludes Egypt, or any tech/seniority mismatch. 
+Additionally, you must IDENTIFY cultural "Red Flags" (toxic environments, poor work-life balance signals).
 
 CRITICAL REJECTION RULES (If ANY apply, "passed": false):
+... [SAME RULES AS BEFORE] ...
 
-1. STRICT LOCATION & TIMEZONE:
-   - REJECT if the description mentions "Must be in the US", "US Only", "United States", "UK Only", "Canada Only", "Europe Only", "LATAM Only", "APAC Only".
-   - REJECT if it mentions "US Hubs", "US Citizenship", "Green Card", or "Security Clearance" (unless for Egypt).
-   - REJECT if the role is remote but restricted to a specific country/region that is NOT Global or EMEA.
-   - REJECT if the timezone is PST, EST, CST, MST, or "North America" without mentioning "Global" or "EMEA" flexibility.
-   - REJECT if it mentions "office presence", "hybrid", "onsite in X city" (unless it is Cairo/Giza).
-   - BE AGGRESSIVE: If it says "Remote in the US", it is a REJECT.
-
-2. ISRAEL-RELATED (BDS ALIGNMENT):
-   - REJECT if the company is headquartered in Israel (e.g., Wix, Fiverr, Monday.com, Check Point, Papaya Global, Tipalti, etc.).
-   - REJECT if the company has major R&D centers in Israel or is known for direct military tech support to Israel.
-
-3. TECH STACK (NO EXCEPTIONS):
-   - REJECT if "React", "Next.js", or "React Native" is not the PRIMARY frontend technology.
-   - REJECT "Fullstack" roles if they are heavily backend-skewed (Java, .NET, Go, Rust, Python).
-   - REJECT purely Backend, DevOps, SRE, or Mobile (Swift/Kotlin) roles.
-
-4. SENIORITY GATE:
-   - REJECT Lead, Manager, VP, Director, Architect (unless it's a "Senior" individual contributor role).
-   - REJECT Intern, Junior, Trainee, Graduate, or Associate roles. We only want Mid-level to Senior individual contributors.
+CULTURAL RED FLAG DETECTION:
+Identify signals like:
+- "Rockstar/Ninja" expectations (indicates ego-driven or unstable environments).
+- "Work hard, play hard" or "Whatever it takes" (burnout risk).
+- "We are a family" (blurred professional boundaries).
+- Mentions of consistent overtime or high-pressure without compensation.
+- Extreme "fast-paced" environments where "chaos is normal".
 
 OUTPUT FORMAT:
-Return ONLY a valid JSON array of objects: [{"id": "string", "passed": boolean, "reason": "concise explanation", "quote": "exact quote from description that caused rejection"}]
-If "passed" is true, the "quote" field can be an empty string.
+Return ONLY a valid JSON array of objects: 
+[{"id": "string", "passed": boolean, "reason": "concise explanation", "quote": "exact quote", "redFlags": ["flag1", "flag2"]}]
+If no red flags are found, return an empty array for "redFlags".
 
 JOBS TO EVALUATE:
 ${JSON.stringify(jobData, null, 2)}

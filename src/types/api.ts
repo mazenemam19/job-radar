@@ -212,6 +212,7 @@ export interface GeminiFilterResult {
   reason: string;
   quote?: string; // Supporting quote from the description for rejections
   id: string;
+  redFlags?: string[];
 }
 
 export type DomainCounts = Record<string, number>;

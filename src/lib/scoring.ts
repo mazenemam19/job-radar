@@ -89,8 +89,19 @@ export function isClearlyNonFrontend(title: string): boolean {
   return !FE_TITLE_WHITELIST.test(t);
 }
 
-export function isTooSeniorOrTooJunior(title: string): boolean {
-  return SENIOR_KEYWORDS.test(title) || JUNIOR_KEYWORDS.test(title);
+export function isTooSeniorOrTooJunior(title: string, mode?: JobMode): boolean {
+  // Always reject Intern/Junior/Entry keywords
+  if (JUNIOR_KEYWORDS.test(title)) return true;
+
+  // For Local (Egypt), we still strictly require "Senior" keywords
+  if (mode === "local") {
+    return !SENIOR_KEYWORDS.test(title);
+  }
+
+  // For Visa and Global Remote, we allow BOTH "Senior" AND "Mid" roles.
+  // Since we already filtered out Junior keywords above, any title that doesn't
+  // hit JUNIOR_KEYWORDS is either Senior or Mid.
+  return false;
 }
 
 export function isGeographicallyBlacklisted(text: string): boolean {
@@ -232,7 +243,7 @@ function skillMatch(text: string, skill: string): boolean {
   return new RegExp(`\\b${escaped}\\b`).test(text);
 }
 
-export function scoreJob(input: ScoreInput): ScoreResult {
+export function scoreJob(input: ScoreInput, mode?: JobMode): ScoreResult {
   const text = `${input.title} ${input.description}`.toLowerCase();
 
   // ── GATE: Tech Signal Check ─────────────────────────────────────────────
@@ -250,7 +261,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
   }
 
   // ── GATE: Non-Frontend / Backend / Clearance Check ──────────────────────
-  if (isClearlyNonFrontend(input.title) || isTooSeniorOrTooJunior(input.title)) {
+  if (isClearlyNonFrontend(input.title) || isTooSeniorOrTooJunior(input.title, mode)) {
     return {
       matchedSkills: [],
       bonusSkills: [],

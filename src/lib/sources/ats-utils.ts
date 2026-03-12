@@ -293,7 +293,7 @@ export function processJobs(
       description: r.description,
       location: r.location,
       postedAt: r.postedAt,
-    });
+    }, mode);
 
     const isMatch = scored.skillMatchScore > 0;
     const actualSponsorship =
@@ -1040,7 +1040,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
           description: fullDescription,
           location: "MENA",
           postedAt: attr.postedAt,
-        }),
+        }, mode),
         fetchedAt: now,
       });
     }

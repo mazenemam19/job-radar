@@ -110,7 +110,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
     const text = `${j.title} ${j.description}`;
     return (
       !isClearlyNonFrontend(j.title) &&
-      !isTooSeniorOrTooJunior(j.title) &&
+      !isTooSeniorOrTooJunior(j.title, j.mode) &&
       !isGenericTitleButBackendRole(j.title, j.description) &&
       !isGeographicallyBlacklisted(text) &&
       !requiresCitizenshipOrClearance(text)
@@ -138,7 +138,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
       const text = `${j.title} ${j.description}`;
       return (
         !isClearlyNonFrontend(j.title) &&
-        !isTooSeniorOrTooJunior(j.title) &&
+        !isTooSeniorOrTooJunior(j.title, j.mode) &&
         !isGenericTitleButBackendRole(j.title, j.description) &&
         !isGeographicallyBlacklisted(text) &&
         !requiresCitizenshipOrClearance(text)

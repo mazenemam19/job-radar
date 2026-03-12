@@ -118,7 +118,7 @@ export async function runAllSources(): Promise<CronLog> {
   const newCandidates = rawFetched.filter((j) => {
     if (existingIds.has(j.id)) return false;
     if (seenCandidateIds.has(j.id)) return false;
-    if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title)) return false;
+    if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title, j.mode)) return false;
     if (isGenericTitleButBackendRole(j.title, j.description)) return false;
     if (requiresCitizenshipOrClearance(j.title + " " + j.description)) return false;
 
