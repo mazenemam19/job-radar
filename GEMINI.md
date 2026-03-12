@@ -9,6 +9,8 @@
 - **Age Limit**: Strict **7-day auto-expiry**. Jobs older than 1 week are pruned from storage and skipped during scans.
 - **Scanning Strategy**: 100% of defined companies are scanned in every run. Rotation/Batching was removed.
 - **Rate Limiting**: Workable fetchers use a sequential queue with a **1.5s - 3s delay**. `pLimit` caps global concurrency at **3-5 concurrent fetchers** to prevent network timeouts (`AbortError`).
+- **Cumulative Market Data**: `raw-market-store.json` maintains a **30-day sliding window** (capped at 3000 jobs). New scans merge data instead of overwriting.
+- **Market Scope**: Non-React jobs are allowed into the raw store (with metadata + truncated 500ch descriptions) to provide accurate "Top 30" ecosystem charts.
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development. ALWAYS create a standalone test script. Run the full cron job ONLY ONCE as a final validation.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. No HTML scraping.
 - **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution.
@@ -33,6 +35,13 @@
   - `scan-state.json`: Tracking engine activity timestamps.
   - `health-store.json`: Persistent lifetime reliability (Success/Total) counts.
 - **Batching**: Health stats are batched and committed to Supabase in a **single update** at the end of each run to maximize performance.
+- **Caching Policy**: ALL Supabase reads must use `cache: 'no-store'` via the `supabase` client configuration to bypass Next.js 14 fetch caching.
+
+## 🛡️ Security Mandate
+
+- **Secret Protection**: `CRON_SECRET` must NEVER be passed as a prop from Server Components to Client Components.
+- **Manual Challenge**: In production, the "Run Scan" button must trigger a `window.prompt` for the secret. The secret is sent via the `x-cron-secret` header.
+- **API Validation**: `/api/cron` validates both `Authorization: Bearer` (Vercel) and `x-cron-secret` (Dashboard) headers.
 
 ## 🛠️ Key Logic Sync
 
@@ -45,6 +54,7 @@
 ### ✅ Verified Working & Active
 
 - ArpuPlus, Blink22, Eva Pharma, Flextock, Moonfare, valU, Sary, MaxAB.
+- **Wuzzuf**: Optimized to capture `requirements`, `jobType`, and `careerLevel` metadata. Merges these into descriptions to strictly filter out Internships/Entry Level roles.
 
 ### ❌ Removed / Unsupported / Zero Jobs
 
