@@ -27,6 +27,7 @@ export interface Job {
   recencyScore: number;
   relocationBonus: number;
   totalScore: number;
+  redFlags?: string[];
   fetchedAt: string;
   geminiPassed?: boolean;
   geminiReason?: string;

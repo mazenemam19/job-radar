@@ -6,26 +6,14 @@ export interface MarketAnalysis {
     filterRate: number;
     uniqueSkillsFound: number;
   };
-  skillFrequency: Array<{
-    skill: string;
-    category: string;
-    count: number;
-    percentage: number;
-    inYourSkillSet: boolean;
-  }>;
+  skillFrequency: SkillFrequency[];
   yourSkillsMarketDemand: Array<{
     skill: string;
     count: number;
     percentage: number;
     marketStrength: "strong" | "moderate" | "weak";
   }>;
-  marketSkillGaps: Array<{
-    skill: string;
-    category: string;
-    count: number;
-    percentage: number;
-    trending: boolean;
-  }>;
+  marketSkillGaps: SkillGap[];
   pipelineBreakdown: {
     visa: { total: number; topSkills: Array<{ skill: string; count: number }> };
     local: { total: number; topSkills: Array<{ skill: string; count: number }> };
@@ -60,6 +48,7 @@ export interface SkillFrequency {
   count: number;
   percentage: number;
   inYourSkillSet: boolean;
+  trend?: number; // % change vs previous period
 }
 
 export interface SkillGap {
@@ -68,6 +57,7 @@ export interface SkillGap {
   count: number;
   percentage: number;
   trending: boolean;
+  trend?: number; // % change vs previous period
 }
 
 export interface PipelineData {

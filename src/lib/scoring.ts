@@ -1,11 +1,12 @@
 // src/lib/scoring.ts
-import type { ScoreInput, ScoreResult } from "@/types";
+import type { ScoreInput, ScoreResult } from "../types";
 import {
   EXPERT_SKILLS,
   SECONDARY_SKILLS,
   BONUS_SKILLS,
   SENIOR_KEYWORDS,
   JUNIOR_KEYWORDS,
+  TOXIC_KEYWORDS,
   computeRecencyScore,
 } from "./constants";
 
@@ -210,6 +211,19 @@ export function requiresCitizenshipOrClearance(text: string): boolean {
   ].some((re) => re.test(t));
 }
 
+// ── Red Flag Detection ────────────────────────────────────────────────────
+
+export function detectRedFlags(description: string): string[] {
+  const flags: string[] = [];
+  const text = description.toLowerCase();
+  for (const { regex, label } of TOXIC_KEYWORDS) {
+    if (regex.test(text)) {
+      flags.push(label);
+    }
+  }
+  return flags;
+}
+
 // ── Scoring ────────────────────────────────────────────────────────────────
 
 function skillMatch(text: string, skill: string): boolean {
@@ -230,6 +244,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
       recencyScore: 0,
       relocationBonus: 0,
       totalScore: 0,
+      redFlags: [],
     };
   }
 
@@ -243,6 +258,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
       recencyScore: 0,
       relocationBonus: 0,
       totalScore: 0,
+      redFlags: [],
     };
   }
 
@@ -259,6 +275,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
       recencyScore: 0,
       relocationBonus: 0,
       totalScore: 0,
+      redFlags: [],
     };
   }
 
@@ -283,6 +300,7 @@ export function scoreJob(input: ScoreInput): ScoreResult {
       recencyScore: 0,
       relocationBonus: 0,
       totalScore: 0,
+      redFlags: [],
     };
 
   const bonusSkills = BONUS_SKILLS.filter((s) => skillMatch(text, s.toLowerCase()));
@@ -293,6 +311,8 @@ export function scoreJob(input: ScoreInput): ScoreResult {
   const relocationBonus = /\brelocation\b/.test(input.description.toLowerCase()) ? 10 : 0;
   const totalScore = Math.round(skillMatchScore * 0.6 + recencyScore * 0.3 + relocationBonus * 0.1);
 
+  const redFlags = detectRedFlags(input.description);
+
   return {
     matchedSkills: [...matchedExpert, ...matchedSecondary],
     bonusSkills,
@@ -301,5 +321,6 @@ export function scoreJob(input: ScoreInput): ScoreResult {
     recencyScore,
     relocationBonus,
     totalScore,
+    redFlags,
   };
 }

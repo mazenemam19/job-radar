@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Job } from "@/types";
 
@@ -68,8 +69,47 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
 export default function JobCard({ job, index }: { job: Job; index: number }) {
   const router = useRouter();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [strategy, setStrategy] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const qual = job.totalScore >= 80 ? "excellent" : job.totalScore >= 60 ? "good" : "";
   const localCls = job.mode === "local" ? "local-mode" : "";
+
+  async function generateStrategy() {
+    if (isGenerating) return;
+
+    let secretToUse = "";
+    if (process.env.NODE_ENV === "production") {
+      const enteredSecret = window.prompt("Enter CRON_SECRET to generate strategy:");
+      if (!enteredSecret) return;
+      secretToUse = enteredSecret;
+    }
+
+    setIsGenerating(true);
+    try {
+      const headers: Record<string, string> = {};
+      if (secretToUse) headers["x-cron-secret"] = secretToUse;
+
+      const res = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/strategy`, {
+        headers,
+      });
+      const data = await res.json();
+      if (data.strategy) {
+        setStrategy(data.strategy);
+      } else if (data.error === "Unauthorized") {
+        alert("Invalid secret.");
+      }
+    } catch (e) {
+      console.error("Strategy generation failed", e);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <article
@@ -88,6 +128,16 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
       </div>
 
       <h2 className="card-title">{job.title}</h2>
+
+      {job.redFlags && job.redFlags.length > 0 && (
+        <div className="red-flags">
+          {job.redFlags.map((flag) => (
+            <span key={flag} className="red-flag-badge" title="Toxic culture signal detected">
+              🚩 {flag}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="card-meta">
         <span>📍 {job.location}</span>
@@ -133,6 +183,9 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
         <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-apply">
           Apply Now ↗
         </a>
+        <button className="btn-strategy" onClick={generateStrategy} disabled={isGenerating}>
+          {isGenerating ? "🤖 Thinking..." : strategy ? "✅ Strategy Ready" : "🎯 Get Strategy"}
+        </button>
         {job.description && (
           <button
             className="btn-details"
@@ -142,6 +195,34 @@ export default function JobCard({ job, index }: { job: Job; index: number }) {
           </button>
         )}
       </div>
+
+      {strategy &&
+        mounted &&
+        createPortal(
+          <div className="strategy-overlay" onClick={() => setStrategy(null)}>
+            <div className="strategy-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="strategy-header">
+                <h3>🤖 AI Application Strategy</h3>
+                <button className="close-btn" onClick={() => setStrategy(null)}>
+                  ×
+                </button>
+              </div>
+              <div className="strategy-body">
+                <div className="strategy-content">
+                  {strategy.split("\n").map((line, i) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
+              </div>
+              <div className="strategy-footer">
+                <button className="btn-close" onClick={() => setStrategy(null)}>
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </article>
   );
 }

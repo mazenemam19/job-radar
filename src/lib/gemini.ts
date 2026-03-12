@@ -1,6 +1,7 @@
 // src/lib/gemini.ts
 import { GoogleGenAI } from "@google/genai";
-import type { Job, GeminiFilterResult } from "@/types";
+import type { Job, GeminiFilterResult } from "../types";
+import { PERSONAL_SKILLS } from "./constants";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -172,4 +173,60 @@ ${JSON.stringify(jobData, null, 2)}
   }
 
   return JSON.parse(jsonMatch[0]) as GeminiFilterResult[];
+}
+
+/**
+ * Generate a personalized application strategy for a specific job.
+ */
+export async function generateApplicationStrategy(job: Job): Promise<string> {
+  if (!genAI) {
+    return "Gemini API key not configured. Cannot generate strategy.";
+  }
+
+  const prompt = `
+YOU ARE AN EXPERT CAREER COACH for a Senior React Developer.
+Given the following Job Description and my Personal Skills, generate a bullet-point application strategy.
+
+MY PERSONAL SKILLS:
+${Array.from(PERSONAL_SKILLS).join(", ")}
+
+JOB DETAILS:
+Title: ${job.title}
+Company: ${job.company}
+Description: ${job.description.substring(0, 4000)}
+
+GOAL: Provide 4-6 actionable, high-impact bullet points on what to emphasize in my cover letter or interview to stand out. 
+Identify direct matches between my skills and their requirements. 
+Keep it professional, strategic, and concise. Do NOT use markdown bolding in the bullet points themselves, just plain text bullets starting with "-".
+
+OUTPUT FORMAT:
+Plain text bullet points only.
+`;
+
+  let lastError: unknown = null;
+  for (const modelName of MODEL_QUEUE) {
+    try {
+      const result = await genAI.models.generateContent({
+        model: modelName,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      if (result.text) return result.text.trim();
+    } catch (err: unknown) {
+      lastError = err;
+      const status =
+        (err as { status?: number })?.status ||
+        (err as { response?: { status?: number } })?.response?.status;
+      console.warn(
+        `[gemini] Strategy generation failed for ${modelName} (Status: ${status}). Trying next...`,
+      );
+      if (status === 429) {
+        // Wait a bit if rate limited
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      continue;
+    }
+  }
+
+  console.error("[gemini] All models failed for strategy generation.", lastError);
+  return "Failed to generate strategy after multiple attempts. Please try again later.";
 }

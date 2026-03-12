@@ -13,4 +13,5 @@ export interface ScoreResult {
   recencyScore: number;
   relocationBonus: number;
   totalScore: number;
+  redFlags: string[];
 }

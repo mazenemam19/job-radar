@@ -1,6 +1,6 @@
 // src/lib/storage.ts
 import { supabase } from "./supabase";
-import { Job, JobStore, CronLog } from "@/types";
+import { Job, JobStore, CronLog } from "../types";
 import {
   isClearlyNonFrontend,
   isTooSeniorOrTooJunior,
@@ -48,6 +48,11 @@ export async function readStore(): Promise<JobStore> {
 
 export async function writeStore(store: JobStore): Promise<void> {
   await supabase.from("storage").upsert({ key: DB_KEY, data: store });
+}
+
+export async function getJobById(id: string): Promise<Job | null> {
+  const store = await readStore();
+  return store.jobs.find((j) => j.id === id) || null;
 }
 
 // ── RAW MARKET STORE ( all fetched data before filtering ) ───────────────────

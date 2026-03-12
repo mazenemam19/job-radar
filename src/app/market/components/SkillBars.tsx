@@ -28,6 +28,11 @@ export default function SkillBars({ data }: { data: SkillFrequency[] }) {
                 <span className={`dot ${item.inYourSkillSet ? "active" : ""}`} />
                 <span className="skill-name">{item.skill}</span>
                 <span className="category-tag">{item.category}</span>
+                {item.trend !== undefined && item.trend !== 0 && (
+                  <span className={`trend-tag ${item.trend > 0 ? "up" : "down"}`}>
+                    {item.trend > 0 ? "↑" : "↓"} {Math.abs(item.trend)}%
+                  </span>
+                )}
               </div>
               <div className="skill-metrics">
                 <span className="count">{item.count}</span>
@@ -115,6 +120,21 @@ export default function SkillBars({ data }: { data: SkillFrequency[] }) {
           border-radius: 4px;
           border: 1px solid var(--border);
           font-weight: 700;
+        }
+        .trend-tag {
+          font-family: var(--font-mono);
+          font-size: 8.5px;
+          font-weight: 800;
+          padding: 1px 5px;
+          border-radius: 4px;
+        }
+        .trend-tag.up {
+          color: var(--green);
+          background: rgba(74, 222, 128, 0.1);
+        }
+        .trend-tag.down {
+          color: #fb7185;
+          background: rgba(251, 113, 133, 0.1);
         }
         .skill-metrics {
           font-family: var(--font-mono);

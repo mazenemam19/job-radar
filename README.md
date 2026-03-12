@@ -18,8 +18,13 @@ A personalized job-hunting dashboard tailored for a **Senior React/Next.js Engin
 
 - **Multi-Tier Filtering**:
   1. **Regex Gate**: Fast local filtering for tech stack, seniority, and location-aware patterns (e.g., US-only, Hybrid).
-  2. **Gemini LLM Tier**: Nuanced check for location alignment, BDS policy (Israel-related), and tech stack skew. Includes exact supporting quotes for transparency.
-- **Market Intelligence**: Analyzes raw signals to identify skill demand, co-occurrence trends, and market gaps. Includes a cumulative 30-day history (~3000 jobs) and a "Missing Skill Advantage" tracker to identify high-value technologies you should acquire.
+  2. **Culture Detector**: Analyzes descriptions for toxic red flags (e.g., \"Rockstar,\" \"High Pressure\") with 🚩 visual indicators.
+  3. **Gemini LLM Tier**: Nuanced check for location alignment, BDS policy (Israel-related), and tech stack skew. Includes exact supporting quotes for transparency.
+- **AI Application Strategist**: A \"Get Strategy\" button that uses Gemini to generate 4-6 bullet-point strategies for your cover letter or interview based on your specific skills and the job requirements.
+- **Market Intelligence**: Analyzes raw signals to identify skill demand, co-occurrence trends, and market gaps. Includes:
+  - **Historical Trends**: 7-day vs 30-day frequency comparison with ↑/↓ indicators.
+  - **Missing Skill Advantage**: Identifies high-value technologies you should acquire.
+  - **Pipeline Breakdown**: Granular stats for Visa, Local, and Global markets.
 - **Source Health Diagnostics**: Real-time reliability tracking (Success/Total API calls) and granular filtering stats. Automatically filters out stale/inactive companies from the dashboard.
 - **Unified Architecture**: Single source of truth for constants and modularized types for full consistency.
 - **Production Security**: "Run Scan" button is protected by a manual `CRON_SECRET` challenge in production environments to prevent unauthorized scans.

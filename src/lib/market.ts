@@ -1,7 +1,7 @@
 // src/lib/market.ts
-import { readStore, readRawStore } from "@/lib/storage";
+import { readStore, readRawStore } from "./storage";
 import { SKILL_REGISTRY, PERSONAL_SKILLS, getSeniority } from "./constants";
-import { MarketAnalysis } from "@/types";
+import { MarketAnalysis, Job } from "../types";
 
 export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
   const approvedStore = await readStore();
@@ -11,6 +11,40 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
 
   const totalJobs = rawJobs.length;
   const approvedIds = new Set(approvedStore.jobs.map((j) => j.id));
+
+  // ── Trend Logic (7d vs 30d baseline) ──
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 864e5;
+  const recentJobs = rawJobs.filter((j) => Date.parse(j.postedAt) >= sevenDaysAgo);
+  const historicalJobs = rawJobs.filter((j) => Date.parse(j.postedAt) < sevenDaysAgo);
+
+  const calculateSkillFrequencies = (jobs: Job[]) => {
+    const counts: Record<string, number> = {};
+    const total = jobs.length;
+    if (total === 0) return { counts, percentages: {} as Record<string, number> };
+
+    jobs.forEach((job) => {
+      const text = (job.title + " " + job.description).toLowerCase();
+      Object.entries(SKILL_REGISTRY).forEach(([skill, config]) => {
+        const searchTerms = [skill, ...config.aliases];
+        const found = searchTerms.some((term) => {
+          const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+          return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+        });
+        if (found) counts[skill] = (counts[skill] || 0) + 1;
+      });
+    });
+
+    const percentages: Record<string, number> = {};
+    Object.entries(counts).forEach(([skill, count]) => {
+      percentages[skill] = (count / total) * 100;
+    });
+    return { counts, percentages };
+  };
+
+  const recentData = calculateSkillFrequencies(recentJobs);
+  const historicalData = calculateSkillFrequencies(historicalJobs);
+  // ──────────────────────────────────────
 
   const skillCounts: Record<string, number> = {};
   const pipelineSkills: Record<string, Record<string, number>> = {
@@ -90,13 +124,26 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
   });
 
   const allSkillFrequency = Object.entries(skillCounts)
-    .map(([skill, count]) => ({
-      skill,
-      category: SKILL_REGISTRY[skill].category,
-      count,
-      percentage: Math.round((count / totalJobs) * 100),
-      inYourSkillSet: PERSONAL_SKILLS.has(skill),
-    }))
+    .map(([skill, count]) => {
+      const recentPct = recentData.percentages[skill] || 0;
+      const historicalPct = historicalData.percentages[skill] || 0;
+      let trend: number | undefined = undefined;
+
+      if (historicalPct > 0) {
+        trend = Math.round(recentPct - historicalPct);
+      } else if (recentPct > 0) {
+        trend = Math.round(recentPct);
+      }
+
+      return {
+        skill,
+        category: SKILL_REGISTRY[skill].category,
+        count,
+        percentage: Math.round((count / totalJobs) * 100),
+        inYourSkillSet: PERSONAL_SKILLS.has(skill),
+        trend,
+      };
+    })
     .sort((a, b) => b.count - a.count);
 
   const skillFrequency = allSkillFrequency.slice(0, 30);
@@ -121,6 +168,7 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
       count: s.count,
       percentage: s.percentage,
       trending: s.percentage > 25,
+      trend: s.trend,
     }));
 
   const getTopSkills = (mode: string) =>

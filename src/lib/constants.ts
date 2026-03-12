@@ -238,6 +238,19 @@ export const BONUS_SKILLS = [
 export const SENIOR_KEYWORDS = /\bsenior|sr\b|principal|staff|lead/i;
 export const JUNIOR_KEYWORDS = /\bjunior|jr|intern|entry|trainee|associate/i;
 
+// ── Red Flag / Culture Detection ──────────────────────────────────────────
+export const TOXIC_KEYWORDS = [
+  { regex: /\brockstar\b/i, label: "Rockstar Culture" },
+  { regex: /\bwork\s+hard\s+(?:and\s+)?play\s+hard\b/i, label: "Burnout Risk" },
+  { regex: /\bfast-paced|high-pressure\b/i, label: "High Pressure" },
+  {
+    regex: /\b(?:we\s+are\s+a\s+|we're\s+a\s+|join\s+our\s+)?family\b/i,
+    label: "Blurred Boundaries",
+  },
+  { regex: /\bovertime\b/i, label: "Poor WLB" },
+  { regex: /\bdo\s+whatever\s+it\s+takes\b/i, label: "Exploitative" },
+];
+
 export function getSeniority(title: string): "Senior" | "Mid" | "Junior/Other" {
   const t = title.toLowerCase();
   if (SENIOR_KEYWORDS.test(t)) return "Senior";

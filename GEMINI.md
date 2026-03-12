@@ -10,7 +10,11 @@
 - **Scanning Strategy**: 100% of defined companies are scanned in every run. Rotation/Batching was removed.
 - **Rate Limiting**: Workable fetchers use a sequential queue with a **1.5s - 3s delay**. `pLimit` caps global concurrency at **3-5 concurrent fetchers** to prevent network timeouts (`AbortError`).
 - **Cumulative Market Data**: `raw-market-store.json` maintains a **30-day sliding window** (capped at 3000 jobs). New scans merge data instead of overwriting.
-- **Market Scope**: Non-React jobs are allowed into the raw store (with metadata + truncated 500ch descriptions) to provide accurate "Top 30" ecosystem charts.
+- **Market Scope**: Non-React jobs are allowed into the raw store (with metadata + truncated 500ch descriptions) to provide accurate \"Top 30\" ecosystem charts.
+- **Career Acceleration**:
+  - **AI Application Strategist**: Personalized bullet-point strategies for cover letters/interviews generated via Gemini fallback queue.
+  - **Red Flag Detector**: Automatic detection of toxic culture keywords (Rockstar, Burnout, High Pressure, Blurred Boundaries).
+- **Trend Logic**: Market Dashboard calculates trends by comparing the last **7 days** of data against the previous **23 days** baseline.
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development. ALWAYS create a standalone test script. Run the full cron job ONLY ONCE as a final validation.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. No HTML scraping.
 - **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution.
