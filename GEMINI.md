@@ -62,7 +62,8 @@
 
 - **Source Health Refinement**: The runner re-calculates health counts (`count`, `geminiFiltered`, `totalSurvivors`) at the end of each run based on survivors in the 7-day store. This ensures the health dashboard perfectly matches the main job dashboard.
 - **Mapping**: All mapping between jobs and stats uses `.toLowerCase().trim()` for robustness.
-- **Location-Aware Regex**: Hybrid/Onsite rejections are location-aware (e.g. only rejected if location matches a non-Egypt blacklist).
+- **Location-Aware Regex**: Geographical rejections MUST analyze the `location` field in addition to the title and description.
+- **Greenhouse Accuracy**: Always use the `offices` array in Greenhouse fetchers to avoid broad/incorrect hub names returned in the default `location.name` field.
 
 ## 🏢 Company Specific Insights (March 2026)
 
