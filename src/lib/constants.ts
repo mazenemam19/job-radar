@@ -236,7 +236,7 @@ export const BONUS_SKILLS = [
 
 // ── Seniority Logic ──────────────────────────────────────────────────────
 export const SENIOR_KEYWORDS = /\bsenior|sr\b|principal|staff|lead/i;
-export const JUNIOR_KEYWORDS = /\bjunior|jr|intern|entry|trainee|associate/i;
+export const JUNIOR_KEYWORDS = /\bjunior|jr|intern|entry|trainee|associate|mid-level|experienced\b/i;
 
 // ── Red Flag / Culture Detection ──────────────────────────────────────────
 export const TOXIC_KEYWORDS = [

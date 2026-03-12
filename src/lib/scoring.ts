@@ -1,5 +1,5 @@
 // src/lib/scoring.ts
-import type { ScoreInput, ScoreResult } from "../types";
+import type { ScoreInput, ScoreResult, JobMode } from "../types";
 import {
   EXPERT_SKILLS,
   SECONDARY_SKILLS,

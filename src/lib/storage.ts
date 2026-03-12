@@ -118,15 +118,10 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
   });
 
   validIncoming.forEach((j) => {
-    if (!existingMap.has(j.id)) {
-      const ms = Date.parse(j.postedAt);
-      if (!isNaN(ms) && ms >= cutoff) {
+    // If it's a match, we add or update it
+    existingMap.set(j.id, j);
+    if (!store.jobs.some(prev => prev.id === j.id)) {
         added.push(j);
-        existingMap.set(j.id, j);
-      }
-    } else {
-      // Update existing job with fresh scores/data from this run
-      existingMap.set(j.id, j);
     }
   });
 
@@ -136,6 +131,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
       if (isNaN(ms) || ms < cutoff) return false;
 
       const text = `${j.title} ${j.description}`;
+      // RE-APPLY ALL FILTERS to ensure integrity
       return (
         !isClearlyNonFrontend(j.title) &&
         !isTooSeniorOrTooJunior(j.title, j.mode) &&
