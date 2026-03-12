@@ -64,6 +64,7 @@ NOTIFY_TO=...
 ### Utility Scripts:
 
 - `pnpm run cron:now`: Manually trigger a full scan.
+- `npx ts-node --project tsconfig.scripts.json src/scripts/force-cleanup.ts`: Force-apply current filtering logic to the database.
 
 ---
 

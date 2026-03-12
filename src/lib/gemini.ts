@@ -150,8 +150,7 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
    - REJECT purely Backend, DevOps, SRE, or Mobile (Swift/Kotlin) roles.
 
 4. SENIORITY GATE (PIPELINE AWARE):
-   - For roles in Egypt (Cairo/Giza): REJECT unless it is explicitly "Senior", "Principal", "Staff", or "Lead".
-   - For Global/Visa roles: ALLOW both "Mid-level" and "Senior" individual contributor roles.
+   - ALLOW both "Mid-level" and "Senior" individual contributor roles for ALL pipelines (Egypt, Global, and Visa).
    - ALWAYS REJECT Intern, Junior, Trainee, Graduate, or Associate roles regardless of location.
    - REJECT Managers, VPs, or Directors (unless they are "Senior" individual contributors).
 

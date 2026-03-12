@@ -93,14 +93,15 @@ export function isTooSeniorOrTooJunior(title: string, mode?: JobMode): boolean {
   // Always reject Intern/Junior/Entry keywords
   if (JUNIOR_KEYWORDS.test(title)) return true;
 
-  // For Local (Egypt), we still strictly require "Senior" keywords
+  // For Local (Egypt), we allow Senior OR Mid-level/Experienced
   if (mode === "local") {
-    return !SENIOR_KEYWORDS.test(title);
+    // Only reject if it doesn't mention Senior OR Mid-level
+    const isSenior = SENIOR_KEYWORDS.test(title);
+    const isMid = /\bmid\b|experienced/i.test(title);
+    return !isSenior && !isMid;
   }
 
-  // For Visa and Global Remote, we allow BOTH "Senior" AND "Mid" roles.
-  // Since we already filtered out Junior keywords above, any title that doesn't
-  // hit JUNIOR_KEYWORDS is either Senior or Mid.
+  // For Visa and Global Remote, we allow everything that isn't JUNIOR_KEYWORDS
   return false;
 }
 
