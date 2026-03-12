@@ -75,8 +75,23 @@ export async function readRawStore(): Promise<Job[]> {
   }
 }
 
-export async function writeRawStore(jobs: Job[]): Promise<void> {
-  await supabase.from("storage").upsert({ key: DB_RAW_KEY, data: jobs });
+export async function writeRawStore(incoming: Job[]): Promise<void> {
+  const existing = await readRawStore();
+  const existingIds = new Set(existing.map((j) => j.id));
+
+  const incomingFiltered = incoming.filter((j) => !existingIds.has(j.id));
+  const merged = [...existing, ...incomingFiltered];
+
+  const cutoff = Date.now() - MAX_RAW_AGE_DAYS * 864e5;
+  const filtered = merged
+    .filter((j) => {
+      const ms = Date.parse(j.postedAt);
+      return !isNaN(ms) && ms >= cutoff;
+    })
+    .sort((a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt))
+    .slice(0, 3000);
+
+  await supabase.from("storage").upsert({ key: DB_RAW_KEY, data: filtered });
 }
 
 // ── MERGE LOGIC ─────────────────────────────────────────────────────────────

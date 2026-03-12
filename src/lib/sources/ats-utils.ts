@@ -261,8 +261,8 @@ export function processJobs(
       location: r.location,
       postedAt: r.postedAt,
     });
-    if (scored.skillMatchScore === 0) continue;
 
+    const isMatch = scored.skillMatchScore > 0;
     const actualSponsorship =
       visaSponsorship || /visa\s+sponsorship|relocation/i.test(r.description);
     const isRemote = /remote|work\s+from\s+home/i.test(title + r.location + r.description);
@@ -285,7 +285,8 @@ export function processJobs(
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      description: r.description.slice(0, 3000),
+      // For non-matches, we store a very short description to save space in the raw market store
+      description: isMatch ? r.description.slice(0, 3000) : r.description.slice(0, 500),
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
@@ -966,7 +967,7 @@ export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
     for (const entry of jobs) {
       const attr = entry.attributes || {};
       const title = (attr.title || "").trim();
-      if (seenIds.has(entry.id) || !/react|next|native/i.test(title)) continue;
+      if (seenIds.has(entry.id)) continue;
       seenIds.add(entry.id);
       const companyName =
         attr.company_name ||

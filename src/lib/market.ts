@@ -89,7 +89,7 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
     } catch {}
   });
 
-  const skillFrequency = Object.entries(skillCounts)
+  const allSkillFrequency = Object.entries(skillCounts)
     .map(([skill, count]) => ({
       skill,
       category: SKILL_REGISTRY[skill].category,
@@ -99,7 +99,9 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
     }))
     .sort((a, b) => b.count - a.count);
 
-  const yourSkillsMarketDemand = skillFrequency
+  const skillFrequency = allSkillFrequency.slice(0, 30);
+
+  const yourSkillsMarketDemand = allSkillFrequency
     .filter((s) => s.inYourSkillSet)
     .map((s) => ({
       skill: s.skill,
@@ -111,7 +113,7 @@ export async function computeMarketAnalysis(): Promise<MarketAnalysis | null> {
         | "weak",
     }));
 
-  const marketSkillGaps = skillFrequency
+  const marketSkillGaps = allSkillFrequency
     .filter((s) => !s.inYourSkillSet)
     .map((s) => ({
       skill: s.skill,
