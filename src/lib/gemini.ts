@@ -131,7 +131,29 @@ Your goal is to REJECT any job that has even a small hint of location restrictio
 Additionally, you must IDENTIFY cultural "Red Flags" (toxic environments, poor work-life balance signals).
 
 CRITICAL REJECTION RULES (If ANY apply, "passed": false):
-... [SAME RULES AS BEFORE] ...
+
+1. STRICT LOCATION & TIMEZONE:
+   - REJECT if the description mentions "Must be in the US", "US Only", "United States", "UK Only", "Canada Only", "Europe Only", "LATAM Only", "APAC Only".
+   - REJECT if it mentions "US Hubs", "US Citizenship", "Green Card", or "Security Clearance" (unless for Egypt).
+   - REJECT if the role is remote but restricted to a specific country/region that is NOT Global or EMEA.
+   - REJECT if the timezone is PST, EST, CST, MST, or "North America" without mentioning "Global" or "EMEA" flexibility.
+   - REJECT if it mentions "office presence", "hybrid", "onsite in X city" (unless it is Cairo/Giza).
+   - BE AGGRESSIVE: If it says "Remote in the US", it is a REJECT.
+
+2. ISRAEL-RELATED (BDS ALIGNMENT):
+   - REJECT if the company is headquartered in Israel (e.g., Wix, Fiverr, Monday.com, Check Point, Papaya Global, Tipalti, etc.).
+   - REJECT if the company has major R&D centers in Israel or is known for direct military tech support to Israel.
+
+3. TECH STACK (NO EXCEPTIONS):
+   - REJECT if "React", "Next.js", or "React Native" is not the PRIMARY frontend technology.
+   - REJECT "Fullstack" roles if they are heavily backend-skewed (Java, .NET, Go, Rust, Python).
+   - REJECT purely Backend, DevOps, SRE, or Mobile (Swift/Kotlin) roles.
+
+4. SENIORITY GATE (PIPELINE AWARE):
+   - For roles in Egypt (Cairo/Giza): REJECT unless it is explicitly "Senior", "Principal", "Staff", or "Lead".
+   - For Global/Visa roles: ALLOW both "Mid-level" and "Senior" individual contributor roles.
+   - ALWAYS REJECT Intern, Junior, Trainee, Graduate, or Associate roles regardless of location.
+   - REJECT Managers, VPs, or Directors (unless they are "Senior" individual contributors).
 
 CULTURAL RED FLAG DETECTION:
 Identify signals like:
@@ -143,8 +165,8 @@ Identify signals like:
 
 OUTPUT FORMAT:
 Return ONLY a valid JSON array of objects: 
-[{"id": "string", "passed": boolean, "reason": "concise explanation", "quote": "exact quote", "redFlags": ["flag1", "flag2"]}]
-If no red flags are found, return an empty array for "redFlags".
+[{"id": "string", "passed": boolean, "reason": "concise explanation", "quote": "exact quote from description that caused rejection", "redFlags": ["flag1", "flag2"]}]
+If "passed" is true, the "quote" field can be an empty string. If no red flags are found, return an empty array for "redFlags".
 
 JOBS TO EVALUATE:
 ${JSON.stringify(jobData, null, 2)}
