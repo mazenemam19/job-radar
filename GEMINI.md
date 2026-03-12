@@ -5,7 +5,7 @@
 - **Honesty & Verification Mandate**: ALWAYS provide a clear, data-backed summary of changes. For any expansion task, explicitly list initial and final counts. Never conflate verification of existing items with the addition of new ones.
 
 - **Tech Gate**: ALL jobs must be **React**, **Next.js**, or **React Native**. Generic frontend roles are strictly filtered out in the scrapers/fetchers.
-- **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. 
+- **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles.
   - **Local Pipeline**: Strictly require "Senior" individual contributor roles.
   - **Visa/Global Pipelines**: Allow both "Senior" and "Mid-level" individual contributor roles to increase international volume.
 - **AI Red Flag Detector**: Every Gemini scan must proactively identify cultural red flags (toxic culture, burnout risk, poor WLB) and return them as part of the job metadata.
@@ -23,6 +23,12 @@
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development. ALWAYS create a standalone test script. Run the full cron job ONLY ONCE as a final validation.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. No HTML scraping.
 - **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution.
+
+## 🛠️ Code Quality & CI/CD Integrity
+
+- **NO `as any` ALLOWED**: You are strictly forbidden from using `as any` in TypeScript. Always define proper interfaces or use unknown/type-guards if necessary.
+- **NEVER Bypass Hooks**: Do not use `--no-verify` when committing code. If linting fails, fix the code. Bypassing hooks is considered a violation of system integrity.
+- **Lint Before Commit**: Always run `pnpm run lint` or ensure `lint-staged` passes before finalized a task.
 
 ## 🏛️ Unified Architecture & One Source of Truth
 

@@ -7,6 +7,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.warn("Supabase credentials missing. Storage operations will fail.");
 }
 
+// Supabase client configuration
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     persistSession: false,
