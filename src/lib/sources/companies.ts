@@ -344,14 +344,6 @@ export const ALL_COMPANIES: CompanyConfig[] = [
   },
   {
     ats: "greenhouse",
-    name: "Babbel",
-    slug: "babbel",
-    country: "Germany",
-    countryFlag: "🇩🇪",
-    pipelines: ["visa"],
-  },
-  {
-    ats: "greenhouse",
     name: "Adyen",
     slug: "adyen",
     country: "Netherlands",

@@ -4,6 +4,7 @@
 import { CronLog, SourceSummary } from "@/types";
 import { STATUS_LABELS } from "@/lib/constants";
 import { useState, useMemo } from "react";
+import { ALL_COMPANIES } from "@/lib/sources/companies";
 
 export default function SourceHealthDashboard({
   logs,
@@ -17,15 +18,27 @@ export default function SourceHealthDashboard({
   const summaries = useMemo(() => {
     if (!logs || logs.length === 0) return [];
 
+    const activeCompanyNames = new Set([
+      ...ALL_COMPANIES.map((c) => c.name),
+      "Wuzzuf",
+      "RemoteOK",
+      "London Startup Jobs",
+      "Bright Skies",
+    ]);
+
     const sortedLogs = [...logs].sort(
       (a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime(),
     );
 
-    // Collect ALL source names seen across all history
+    // Collect source names, but ONLY if they are currently active
     const sourceNames = new Set<string>();
     sortedLogs.forEach((log) => {
       if (log.sourceDetails) {
-        Object.keys(log.sourceDetails).forEach((name) => sourceNames.add(name));
+        Object.keys(log.sourceDetails).forEach((name) => {
+          if (activeCompanyNames.has(name)) {
+            sourceNames.add(name);
+          }
+        });
       }
     });
 
