@@ -18,6 +18,8 @@
   - **AI Application Strategist**: Personalized bullet-point strategies for cover letters/interviews generated via Gemini fallback queue.
   - **Red Flag Detector**: Automatic detection of toxic culture keywords (Rockstar, Burnout, High Pressure, Blurred Boundaries).
 - **Trend Logic**: Market Dashboard calculates trends by comparing the last **7 days** of data against the previous **23 days** baseline.
+- **Data Integrity**: `mergeJobs` must re-filter existing jobs during every run to ensure that if filtering logic (Regex or AI) changes, stale/invalid jobs are purged from the store.
+- **Force Cleanup**: Use `src/scripts/force-cleanup.ts` to immediately synchronize the database with new filtering logic without waiting for a fresh scan.
 - **Testing Mandate**: NEVER use `pnpm run cron:now` for iterative development. ALWAYS create a standalone test script. Run the full cron job ONLY ONCE as a final validation.
 - **No Scraping**: Only use official JSON APIs or robust, verified direct endpoints. No HTML scraping.
 - **Environment Mandate**: NEVER use `NodeNext` or `ESNext` for script module resolution.

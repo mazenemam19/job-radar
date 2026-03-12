@@ -20,6 +20,7 @@ A personalized job-hunting dashboard tailored for a **Senior React/Next.js Engin
   1. **Regex Gate**: Fast local filtering for tech stack, seniority, and location-aware patterns (e.g., US-only, Hybrid).
   2. **Culture Detector**: Analyzes descriptions for toxic red flags (e.g., \"Rockstar,\" \"High Pressure\") with 🚩 visual indicators.
   3. **Gemini LLM Tier**: Nuanced check for location alignment, BDS policy (Israel-related), and tech stack skew. Includes exact supporting quotes for transparency.
+- **Seniority Arbitrage**: Automatically adjusts seniority gates based on pipeline (Strictly Senior for Local, allows Mid-level for Visa/Global) to maximize high-quality international opportunities.
 - **AI Application Strategist**: A \"Get Strategy\" button that uses Gemini to generate 4-6 bullet-point strategies for your cover letter or interview based on your specific skills and the job requirements.
 - **Market Intelligence**: Analyzes raw signals to identify skill demand, co-occurrence trends, and market gaps. Includes:
   - **Historical Trends**: 7-day vs 30-day frequency comparison with ↑/↓ indicators.
@@ -59,6 +60,12 @@ SMTP_USER=...
 SMTP_PASS=...
 NOTIFY_TO=...
 ```
+
+### Utility Scripts:
+
+- `pnpm run cron:now`: Manually trigger a full scan.
+- `npx ts-node --project tsconfig.scripts.json src/scripts/check-db.ts`: Inspect database counts and keys.
+- `npx ts-node --project tsconfig.scripts.json src/scripts/force-cleanup.ts`: Force-apply current filtering logic to the database.
 
 ---
 
