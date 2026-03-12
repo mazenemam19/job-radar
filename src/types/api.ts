@@ -48,6 +48,7 @@ export interface GreenhouseJob {
   id: number;
   title: string;
   location: { name: string } | null;
+  offices: Array<{ name: string; location: string | null }>;
   absolute_url: string;
   updated_at: string;
   content: string;

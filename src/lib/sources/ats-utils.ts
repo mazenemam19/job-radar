@@ -372,14 +372,22 @@ export async function fetchGreenhouse(
     const { jobs } = (await res.json()) as { jobs: GreenhouseJob[] };
     const rawCount = jobs.length;
     const processed = processJobs(
-      jobs.map((r) => ({
-        id: `${mode}_gh_${c.slug}_${r.id}`,
-        title: r.title,
-        location: r.location?.name ?? c.city ?? c.country,
-        url: r.absolute_url,
-        postedAt: r.updated_at,
-        description: stripHtml(r.content || ""),
-      })),
+      jobs.map((r) => {
+        const officeNames = (r.offices || [])
+          .map((o) => o.name)
+          .filter((n) => n && n !== "Remote")
+          .join(", ");
+        const location = officeNames || r.location?.name || c.city || c.country;
+
+        return {
+          id: `${mode}_gh_${c.slug}_${r.id}`,
+          title: r.title,
+          location,
+          url: r.absolute_url,
+          postedAt: r.updated_at,
+          description: stripHtml(r.content || ""),
+        };
+      }),
       c,
       mode,
       visaSponsorship,

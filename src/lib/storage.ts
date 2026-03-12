@@ -107,7 +107,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
   const added: Job[] = [];
 
   const validIncoming = incoming.filter((j) => {
-    const text = `${j.title} ${j.description}`;
+    const text = `${j.title} ${j.description} ${j.location}`;
     return (
       !isClearlyNonFrontend(j.title) &&
       !isTooSeniorOrTooJunior(j.title, j.mode) &&
@@ -130,7 +130,7 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
       const ms = Date.parse(j.postedAt);
       if (isNaN(ms) || ms < cutoff) return false;
 
-      const text = `${j.title} ${j.description}`;
+      const text = `${j.title} ${j.description} ${j.location}`;
       // RE-APPLY ALL FILTERS to ensure integrity
       return (
         !isClearlyNonFrontend(j.title) &&

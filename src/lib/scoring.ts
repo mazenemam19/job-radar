@@ -144,7 +144,7 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /collaboration\s+of\s+being\s+together/i,
     /work-life\s+harmony/i,
     /value\s+in\s+our\s+office\s+culture/i,
-    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|nyc|san\s+francisco|bay\s+area|lisbon|madrid|barcelona|aveiro)\b/i,
+    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|nyc|san\s+francisco|bay\s+area|lisbon|madrid|barcelona|aveiro|london|berlin|paris|copenhagen|stockholm|amsterdam)\b/i,
   ];
 
   if (/\b(global|emea|egypt|cairo|giza|anywhere|worldwide)\b/i.test(t)) {
@@ -249,7 +249,7 @@ function skillMatch(text: string, skill: string): boolean {
 }
 
 export function scoreJob(input: ScoreInput, mode?: JobMode): ScoreResult {
-  const text = `${input.title} ${input.description}`.toLowerCase();
+  const text = `${input.title} ${input.description} ${input.location}`.toLowerCase();
 
   // ── GATE: Tech Signal Check ─────────────────────────────────────────────
   if (!REACT_REQUIRED.test(text)) {
