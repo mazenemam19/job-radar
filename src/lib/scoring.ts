@@ -82,6 +82,8 @@ export function isClearlyNonFrontend(title: string): boolean {
     /\bquality\s+assurance\b/,
     /\bautomation\s+tester\b/,
     /\btest\s+engineer\b/,
+    /\b(sre|site\s+reliability|lua|infrastructure|devops)\b/,
+    /\bdata\s+(infrastructure|engineer|platform)\b/,
     /\bhardware\b/,
     /\bintern\b/,
   ];
@@ -128,14 +130,16 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /\bcanada\s+only\b/i,
     /\beurope\s+only\b/i,
     /\bamericas\s+only\b/i,
+    /\b(amer|north\s+america)\s+only\b/i,
     /\blatam\s+only\b/i,
     /\bapac\s+only\b/i,
     // Patterns found in recent quotes
-    /remote\s*-\s*(united\s+states|usa|us)/i,
+    /\bremote\s*-\s*(united\s+states|usa|us|portugal|spain|france|germany|canada)\b/i,
+    /\bus\s*-\s*remote\s+zone\b/i,
     /based\s+in\s+the\s+americas\s+or\s+europe/i,
     /restricted\s+to\s+candidates\s+in\s+(the\s+)?(us|usa|united\s+states)/i,
     /available\s+locations:\s*(bengaluru|india|bangalore)/i,
-    // Hybrid/Office requirements
+    // Hybrid/Office requirements (Reject if not Egypt)
     /hybrid\s+workplace/i,
     /hybrid\s+role/i,
     /in-person\s+participation\s+is\s+required/i,
@@ -144,7 +148,6 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     /collaboration\s+of\s+being\s+together/i,
     /work-life\s+harmony/i,
     /value\s+in\s+our\s+office\s+culture/i,
-    /\b(portugal|spain|france|germany|italy|poland|switzerland|india|nyc|san\s+francisco|bay\s+area|lisbon|madrid|barcelona|aveiro|london|berlin|paris|copenhagen|stockholm|amsterdam)\b/i,
   ];
 
   if (/\b(global|emea|egypt|cairo|giza|anywhere|worldwide)\b/i.test(t)) {
