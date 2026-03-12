@@ -103,7 +103,8 @@ export async function writeRawStore(incoming: Job[]): Promise<void> {
 
 export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; added: Job[] } {
   const cutoff = Date.now() - MAX_JOB_AGE_DAYS * 864e5;
-  const existingIds = new Set(store.jobs.map((j) => j.id));
+  const existingMap = new Map(store.jobs.map((j) => [j.id, j]));
+  const added: Job[] = [];
 
   const validIncoming = incoming.filter((j) => {
     const text = `${j.title} ${j.description}`;
@@ -116,15 +117,24 @@ export function mergeJobs(store: JobStore, incoming: Job[]): { store: JobStore; 
     );
   });
 
-  const added = validIncoming.filter((j) => {
-    if (existingIds.has(j.id)) return false;
-    const ms = Date.parse(j.postedAt);
-    if (isNaN(ms) || ms < cutoff) return false;
-    return true;
+  validIncoming.forEach((j) => {
+    if (!existingMap.has(j.id)) {
+      const ms = Date.parse(j.postedAt);
+      if (!isNaN(ms) && ms >= cutoff) {
+        added.push(j);
+        existingMap.set(j.id, j);
+      }
+    } else {
+      // Update existing job with fresh scores/data from this run
+      existingMap.set(j.id, j);
+    }
   });
 
-  const merged = [...store.jobs, ...added]
+  const merged = Array.from(existingMap.values())
     .filter((j) => {
+      const ms = Date.parse(j.postedAt);
+      if (isNaN(ms) || ms < cutoff) return false;
+
       const text = `${j.title} ${j.description}`;
       return (
         !isClearlyNonFrontend(j.title) &&

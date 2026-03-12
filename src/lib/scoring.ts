@@ -9,6 +9,7 @@ import {
   TOXIC_KEYWORDS,
   computeRecencyScore,
 } from "./constants";
+import { parseRelativeDate } from "./sources/ats-utils";
 
 // ── Gate Logic ───────────────────────────────────────────────────────────
 
@@ -307,7 +308,8 @@ export function scoreJob(input: ScoreInput): ScoreResult {
   const matchedSet = new Set([...matchedExpert, ...matchedSecondary].map((s) => s.toLowerCase()));
   const missingSkills = EXPERT_SKILLS.filter((s) => !matchedSet.has(s.toLowerCase())).slice(0, 6);
 
-  const recencyScore = computeRecencyScore(input.postedAt);
+  const parsedDate = parseRelativeDate(input.postedAt);
+  const recencyScore = computeRecencyScore(parsedDate);
   const relocationBonus = /\brelocation\b/.test(input.description.toLowerCase()) ? 10 : 0;
   const totalScore = Math.round(skillMatchScore * 0.6 + recencyScore * 0.3 + relocationBonus * 0.1);
 

@@ -31,6 +31,39 @@ import path from "path";
 
 // ── Shared Helper Functions ──────────────────────────────────────────────────
 
+/** Parses strings like '1 day ago', '2 hours ago', 'yesterday' into ISO strings. */
+export function parseRelativeDate(text: string): string {
+  if (!text) return new Date().toISOString();
+  const t = text.toLowerCase().trim();
+  const now = new Date();
+
+  if (t === "yesterday") {
+    return new Date(now.getTime() - 864e5).toISOString();
+  }
+  if (t === "just now" || t === "today") {
+    return now.toISOString();
+  }
+
+  const match = t.match(/(\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/);
+  if (match) {
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    const msMap: Record<string, number> = {
+      minute: 60 * 1000,
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000,
+      year: 365 * 24 * 60 * 60 * 1000,
+    };
+    return new Date(now.getTime() - value * msMap[unit]).toISOString();
+  }
+
+  // Fallback to native parse
+  const parsed = Date.parse(text);
+  return isNaN(parsed) ? now.toISOString() : new Date(parsed).toISOString();
+}
+
 function detectCountry(
   location: string,
   fallback: { name: string; flag: string },
