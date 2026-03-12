@@ -136,6 +136,7 @@ export function isGeographicallyBlacklisted(text: string): boolean {
     // Patterns found in recent quotes
     /\bremote\s*-\s*(united\s+states|usa|us|portugal|spain|france|germany|canada)\b/i,
     /\bus\s*-\s*remote\s+zone\b/i,
+    /\bamer\b/i, // Standalone AMER region
     /based\s+in\s+the\s+americas\s+or\s+europe/i,
     /restricted\s+to\s+candidates\s+in\s+(the\s+)?(us|usa|united\s+states)/i,
     /available\s+locations:\s*(bengaluru|india|bangalore)/i,

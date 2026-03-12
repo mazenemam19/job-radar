@@ -138,6 +138,7 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
    - REJECT if the role is remote but restricted to a specific country/region that is NOT Global or EMEA.
    - REJECT if the timezone is PST, EST, CST, MST, or "North America" without mentioning "Global" or "EMEA" flexibility.
    - REJECT if it mentions "office presence", "hybrid", "onsite in X city" (unless it is Cairo/Giza).
+   - EXCEPTION: If a global remote company mentions "office anchor days" ONLY for employees living near their hubs (e.g. Vercel), but the role is otherwise open to Egypt/EMEA, do NOT reject.
    - BE AGGRESSIVE: If it says "Remote in the US", it is a REJECT.
 
 2. ISRAEL-RELATED (BDS ALIGNMENT):
@@ -151,7 +152,8 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
 
 4. SENIORITY GATE (PIPELINE AWARE):
    - ALLOW both "Mid-level" and "Senior" individual contributor roles for ALL pipelines (Egypt, Global, and Visa).
-   - ALWAYS REJECT Intern, Junior, Trainee, Graduate, or Associate roles regardless of location.
+   - ALWAYS REJECT Intern, Junior, Trainee, Graduate, or "Associate" RANK roles (e.g. Associate Developer). 
+   - NOTE: Some companies use "Associate" as a general term for employee (e.g. "Associates at X company"); do NOT reject these if the job title is Mid-level or Senior.
    - ALWAYS REJECT "Lead", "Staff", "Principal", "Architect", "Director", "VP", or "Head of" roles. We only want Mid to Senior individual contributors.
 
 CULTURAL RED FLAG DETECTION:
