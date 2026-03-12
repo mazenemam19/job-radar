@@ -152,7 +152,7 @@ CRITICAL REJECTION RULES (If ANY apply, "passed": false):
 4. SENIORITY GATE (PIPELINE AWARE):
    - ALLOW both "Mid-level" and "Senior" individual contributor roles for ALL pipelines (Egypt, Global, and Visa).
    - ALWAYS REJECT Intern, Junior, Trainee, Graduate, or Associate roles regardless of location.
-   - REJECT Managers, VPs, or Directors (unless they are "Senior" individual contributors).
+   - ALWAYS REJECT "Lead", "Staff", "Principal", "Architect", "Director", "VP", or "Head of" roles. We only want Mid to Senior individual contributors.
 
 CULTURAL RED FLAG DETECTION:
 Identify signals like:

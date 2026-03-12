@@ -6,6 +6,7 @@ import {
   BONUS_SKILLS,
   SENIOR_KEYWORDS,
   JUNIOR_KEYWORDS,
+  STAFF_KEYWORDS,
   TOXIC_KEYWORDS,
   computeRecencyScore,
 } from "./constants";
@@ -92,6 +93,9 @@ export function isClearlyNonFrontend(title: string): boolean {
 export function isTooSeniorOrTooJunior(title: string, mode?: JobMode): boolean {
   // Always reject Intern/Junior/Entry keywords
   if (JUNIOR_KEYWORDS.test(title)) return true;
+
+  // Always reject Staff/Principal/Architect/Director/VP keywords
+  if (STAFF_KEYWORDS.test(title)) return true;
 
   // For Local (Egypt), we allow Senior OR Mid-level/Experienced
   if (mode === "local") {
