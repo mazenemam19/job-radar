@@ -5,7 +5,10 @@
 - **Honesty & Verification Mandate**: ALWAYS provide a clear, data-backed summary of changes. For any expansion task, explicitly list initial and final counts. Never conflate verification of existing items with the addition of new ones.
 
 - **Tech Gate**: ALL jobs must be **React**, **Next.js**, or **React Native**. Generic frontend roles are strictly filtered out in the scrapers/fetchers.
-- **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. Lead/Managerial roles are also excluded unless they are "Senior" individual contributor roles.
+- **Level Gate**: Strictly exclude **Junior**, **Intern**, **Trainee**, and **Associate** roles. 
+  - **Local Pipeline**: Strictly require "Senior" individual contributor roles.
+  - **Visa/Global Pipelines**: Allow both "Senior" and "Mid-level" individual contributor roles to increase international volume.
+- **AI Red Flag Detector**: Every Gemini scan must proactively identify cultural red flags (toxic culture, burnout risk, poor WLB) and return them as part of the job metadata.
 - **Age Limit**: Strict **7-day auto-expiry**. Jobs older than 1 week are pruned from storage and skipped during scans.
 - **Scanning Strategy**: 100% of defined companies are scanned in every run. Rotation/Batching was removed.
 - **Rate Limiting**: Workable fetchers use a sequential queue with a **1.5s - 3s delay**. `pLimit` caps global concurrency at **3-5 concurrent fetchers** to prevent network timeouts (`AbortError`).
