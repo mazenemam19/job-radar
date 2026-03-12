@@ -204,7 +204,11 @@ export async function runAllSources(): Promise<CronLog> {
     runAt: new Date().toISOString(),
     newJobs: added.length,
     totalJobs: updated.jobs.length,
-    sources: { visa: visaJobs.length, local: localJobs.length, global: globalJobs.length },
+    sources: {
+      visa: added.filter((j) => j.mode === "visa").length,
+      local: added.filter((j) => j.mode === "local").length,
+      global: added.filter((j) => j.mode === "global").length,
+    },
     sourceDetails,
     durationMs,
     errors,
