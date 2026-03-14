@@ -25,7 +25,9 @@ export default function MarketLayout({ data }: { data: MarketAnalysis }) {
               Updated: {new Date(data.meta.generatedAt).toLocaleString()}
             </span>
             <span className="divider">|</span>
-            <span className="source-count">Analyzing {data.meta.totalJobs} raw job listings</span>
+            <span className="source-count">
+              Analyzing {data.meta.totalJobs} raw react job listings
+            </span>
           </div>
         </div>
         <div className="filter-stat">
