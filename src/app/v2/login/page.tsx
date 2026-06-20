@@ -1,8 +1,8 @@
-// src/app/v2/login/page.tsx
 "use client";
 
-import { createClient } from "@/lib/v2/supabase/client";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/v2/supabase/client";
 
 const ERROR_MESSAGES: Record<string, string> = {
   no_code: "Authentication failed — no code received. Please try again.",
@@ -10,22 +10,36 @@ const ERROR_MESSAGES: Record<string, string> = {
   blocked: "Your account has been deactivated. Contact the administrator.",
 };
 
-export default function LoginPage() {
+function LoginContent() {
   const params = useSearchParams();
-  const error = params?.get("error");
-  const next = params?.get("next") ?? "/v2/dashboard";
+
+  // Safely extract params and avoid null-pointer or index type restrictions in TypeScript
+  const errorParam = params ? params.get("error") : null;
+  const nextParam = params ? params.get("next") : null;
+
+  const errorMessage = errorParam ? ERROR_MESSAGES[errorParam] || errorParam : null;
+  const nextRoute = nextParam ?? "/v2/dashboard";
 
   async function signInWithGoogle() {
-    const supabase = createClient();
-    const callbackUrl = `${window.location.origin}/auth/v2/callback?next=${encodeURIComponent(next)}`;
+    try {
+      const supabase = createClient();
 
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-        scopes: "email profile",
-      },
-    });
+      // Strict client-side check for the window object
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const callbackUrl = `${origin}/auth/v2/callback?next=${encodeURIComponent(nextRoute)}`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl,
+          scopes: "email profile",
+        },
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("OAuth initialization failed:", err);
+    }
   }
 
   return (
@@ -59,7 +73,7 @@ export default function LoginPage() {
           AI-powered job feed personalised to your skills and preferences
         </p>
 
-        {error && (
+        {errorMessage && (
           <div
             style={{
               padding: "10px 14px",
@@ -71,7 +85,7 @@ export default function LoginPage() {
               marginBottom: 20,
             }}
           >
-            {ERROR_MESSAGES[error] ?? error}
+            {errorMessage}
           </div>
         )}
 
@@ -120,5 +134,29 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "#08080f",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#64748b",
+            fontFamily: "Inter, system-ui, sans-serif",
+          }}
+        >
+          Loading...
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
