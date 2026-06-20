@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cron:now": "ts-node --project tsconfig.scripts.json src/scripts/cron.ts",
-    "cron": "node -e \"const {execSync}=require('child_process');setInterval(()=>execSync('pnpm run cron:now',{stdio:'inherit'}),6*60*60*1000);execSync('pnpm run cron:now',{stdio:'inherit'})\"",
+    "cron:now": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron.ts",
+    "cron:v2": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron-v2.ts",
+    "cron": "node -e \"const {execSync}=require('child_process');setInterval(()=>execSync('pnpm run cron:v2',{stdio:'inherit'}),6*60*60*1000);execSync('pnpm run cron:v2',{stdio:'inherit'})\"",
     "format": "prettier --write .",
     "prepare": "husky"
   },
@@ -23,29 +24,38 @@
   },
   "dependencies": {
     "@google/genai": "^1.43.0",
-    "@supabase/supabase-js": "^2.98.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.0",
+    "gsap": "^3.15.0",
     "next": "14.2.5",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.14",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/nodemailer": "^6.4.15",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10",
     "dotenv": "^16.4.5",
     "eslint": "^8.57.1",
     "eslint-config-next": "14",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
     "lint-staged": "^16.3.1",
     "postcss": "^8",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
   }
 }
