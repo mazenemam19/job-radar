@@ -13,18 +13,18 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/v2/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/v2/pipeline", label: "Pipeline", icon: "🔭" },
-  { href: "/v2/tracker", label: "Tracker", icon: "📋" },
-  { href: "/v2/salary", label: "Salary", icon: "💼" },
-  { href: "/v2/settings", label: "Settings", icon: "⚙️" },
+  { href: "/dashboard", label: "Dashboard", icon: "⚡" },
+  { href: "/pipeline", label: "Pipeline", icon: "🔭" },
+  { href: "/tracker", label: "Tracker", icon: "📋" },
+  { href: "/salary", label: "Salary", icon: "💼" },
+  { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { href: "/v2/admin/users", label: "Users", icon: "👥" },
-  { href: "/v2/admin/companies", label: "Companies", icon: "🏢" },
-  { href: "/v2/admin/defaults", label: "Defaults", icon: "🎛️" },
-  { href: "/v2/admin/submissions", label: "Submissions", icon: "📬" },
+  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin/companies", label: "Companies", icon: "🏢" },
+  { href: "/admin/defaults", label: "Defaults", icon: "🎛️" },
+  { href: "/admin/submissions", label: "Submissions", icon: "📬" },
 ];
 
 interface Props {
@@ -40,7 +40,7 @@ export default function AppShell({ children, isAdmin, userEmail }: Props) {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/v2/login");
+    router.push("/");
   }
 
   return (

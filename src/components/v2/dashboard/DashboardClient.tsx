@@ -25,7 +25,7 @@ export default function DashboardClient() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v2/dashboard");
+      const res = await fetch("/api/dashboard");
       const data = await res.json();
 
       if (!data.ok) {
@@ -47,7 +47,7 @@ export default function DashboardClient() {
 
   // Load tracker entry IDs to show "tracked" state on cards
   const loadTrackedIds = useCallback(async () => {
-    const res = await fetch("/api/v2/tracker");
+    const res = await fetch("/api/tracker");
     const data = await res.json();
     if (data.ok) {
       setTrackedIds(new Set((data.data as TrackerEntry[]).map((e) => e.job_id)));

@@ -1,11 +1,11 @@
 // src/middleware.ts
 // NEW FILE — does not exist in the original codebase.
 //
-// Protects /v2/* routes:
-//   - Unauthenticated → /v2/login
-//   - Authenticated + onboarding incomplete → /v2/onboarding
-//   - Admin route + non-admin → /v2/dashboard
-//   - Blocked user → /v2/login?error=blocked
+// Protects /* routes:
+//   - Unauthenticated → /login
+//   - Authenticated + onboarding incomplete → /onboarding
+//   - Admin route + non-admin → /dashboard
+//   - Blocked user → /login?error=blocked
 //
 // The old app routes (/, /api/cron, etc.) are NOT matched by the config
 // below and are completely unaffected.
@@ -13,11 +13,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// /v2 paths that don't require any authentication
-const PUBLIC_PATHS = new Set(["/v2", "/v2/login"]);
+//  paths that don't require any authentication
+const PUBLIC_PATHS = new Set(["/", "/login", "/submit"]);
 
-// /v2 paths that need auth but are exempt from the onboarding redirect
-const ONBOARDING_EXEMPT = new Set(["/v2/onboarding", "/v2/login"]);
+//  paths that need auth but are exempt from the onboarding redirect
+const ONBOARDING_EXEMPT = new Set(["/onboarding", "/login"]);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -58,15 +58,15 @@ export async function middleware(request: NextRequest) {
   // ── Public paths ────────────────────────────────────────────
   if (PUBLIC_PATHS.has(pathname)) {
     // If already authenticated, send away from login page
-    if (pathname === "/v2/login" && user) {
-      return NextResponse.redirect(new URL("/v2/dashboard", request.url));
+    if (pathname === "/login" && user) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return response;
   }
 
-  // ── All remaining /v2/* paths need authentication ────────────
+  // ── All remaining /* paths need authentication ────────────
   if (!user) {
-    const loginUrl = new URL("/v2/login", request.url);
+    const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -82,28 +82,35 @@ export async function middleware(request: NextRequest) {
   // ── Blocked user ─────────────────────────────────────────────
   if (profile && !profile.is_active) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/v2/login?error=blocked", request.url));
+    return NextResponse.redirect(new URL("/login?error=blocked", request.url));
   }
 
   // ── Admin gate ───────────────────────────────────────────────
-  if (pathname.startsWith("/v2/admin")) {
+  if (pathname.startsWith("/admin")) {
     if (!profile || profile.role !== "admin") {
-      return NextResponse.redirect(new URL("/v2/dashboard", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return response;
   }
 
   // ── Onboarding gate ──────────────────────────────────────────
-  // If onboarding not complete, redirect to /v2/onboarding
+  // If onboarding not complete, redirect to /onboarding
   // UNLESS they're already heading there or to an exempt path.
   if (!ONBOARDING_EXEMPT.has(pathname) && profile && !profile.onboarding_complete) {
-    return NextResponse.redirect(new URL("/v2/onboarding", request.url));
+    return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
   return response;
 }
 
 export const config = {
-  // Only match /v2/* routes. All old app routes (/, /api/cron, etc.) are untouched.
-  matcher: ["/v2/:path*"],
+  matcher: [
+    // Only intercept routes that explicitly start with your protected sections
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/pipeline/:path*",
+    "/salary/:path*",
+    "/settings/:path*",
+    "/tracker/:path*",
+  ],
 };

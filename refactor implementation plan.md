@@ -356,7 +356,7 @@ Built using the **Antigravity Design** pattern (see design section below). For n
 2. Create all new DB tables (SQL migrations) — zero impact on existing `storage` table
 3. Seed `default_settings` with exact values from current `constants.ts`
 4. Seed `ats_companies` from `ALL_COMPANIES` array in `companies.ts` (one-time migration script)
-5. New cron handler (`/api/v2/cron`) — reads from `ats_companies` DB table instead of hardcoded array, fetches all jobs, writes to `raw_jobs` table, marks all user caches stale. Old `/api/cron` stays untouched.
+5. New cron handler (`/api/cron`) — reads from `ats_companies` DB table instead of hardcoded array, fetches all jobs, writes to `raw_jobs` table, marks all user caches stale. Old `/api/cron` stays untouched.
 6. Per-user dashboard: on load, if cache stale → run Gemini (user's key + user's prompt) + scoring (user's settings) → write `user_jobs_cache` → return jobs. Apply Issues #3-#6 fixes in new code.
 7. Admin dashboard: Users list, ATS Companies CRUD, Default Settings CRUD
 8. Onboarding flow: Google login → Gemini key → skip/customize → dashboard

@@ -47,7 +47,7 @@ export default function TrackerModal({ job, onClose, onSaved }: Props) {
     };
 
     try {
-      const res = await fetch("/api/v2/tracker", {
+      const res = await fetch("/api/tracker", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

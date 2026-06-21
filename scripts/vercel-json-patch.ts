@@ -10,7 +10,7 @@
 {
   "crons": [
     { "path": "/api/cron",    "schedule": "0 16 * * *" },  // existing — DO NOT REMOVE
-    { "path": "/api/v2/cron", "schedule": "0 9 * * *"  }   // new v2 cron at 09:00 UTC
+    { "path": "/api/cron", "schedule": "0 9 * * *"  }   // new v2 cron at 09:00 UTC
   ]
 }
 */

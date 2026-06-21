@@ -96,7 +96,7 @@ export function UsersTable() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/v2/admin/users");
+      const res = await fetch("/api/admin/users");
       const d = await res.json();
       if (d.ok) setUsers(d.data);
       setLoading(false);
@@ -104,7 +104,7 @@ export function UsersTable() {
   }, []);
 
   async function toggleActive(user: UserRow) {
-    const res = await fetch(`/api/v2/admin/users/${user.id}`, {
+    const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_active: !user.is_active }),
@@ -236,7 +236,7 @@ export function CompaniesTable() {
   const [showNew, setShowNew] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/v2/admin/companies");
+    const res = await fetch("/api/admin/companies");
     const d = await res.json();
     if (d.ok) setCompanies(d.data);
     setLoading(false);
@@ -247,7 +247,7 @@ export function CompaniesTable() {
   }, [load]);
 
   async function saveNew() {
-    const res = await fetch("/api/v2/admin/companies", {
+    const res = await fetch("/api/admin/companies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -262,7 +262,7 @@ export function CompaniesTable() {
 
   async function saveEdit() {
     if (!editId) return;
-    const res = await fetch(`/api/v2/admin/companies/${editId}`, {
+    const res = await fetch(`/api/admin/companies/${editId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -277,7 +277,7 @@ export function CompaniesTable() {
 
   async function deleteCompany(id: string) {
     if (!confirm("Delete this company?")) return;
-    await fetch(`/api/v2/admin/companies/${id}`, { method: "DELETE" });
+    await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
     setCompanies((p) => p.filter((c) => c.id !== id));
   }
 
@@ -559,7 +559,7 @@ export function DefaultsForm() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/v2/admin/defaults");
+      const res = await fetch("/api/admin/defaults");
       const d = await res.json();
       if (d.ok) setForm(d.data);
       setLoading(false);
@@ -569,7 +569,7 @@ export function DefaultsForm() {
   async function save() {
     setSaving(true);
     setSaved(false);
-    const res = await fetch("/api/v2/admin/defaults", {
+    const res = await fetch("/api/admin/defaults", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -762,7 +762,7 @@ export function SubmissionsTable() {
   const [testing, setTesting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/v2/admin/submissions");
+    const res = await fetch("/api/admin/submissions");
     const d = await res.json();
     if (d.ok) setSubmissions(d.data);
     setLoading(false);
@@ -774,7 +774,7 @@ export function SubmissionsTable() {
 
   async function runTest(id: string) {
     setTesting(id);
-    const res = await fetch("/api/v2/admin/test-ats", {
+    const res = await fetch("/api/admin/test-ats", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ submission_id: id }),
@@ -787,7 +787,7 @@ export function SubmissionsTable() {
   }
 
   async function reviewSubmission(id: string, status: "approved" | "rejected") {
-    const res = await fetch(`/api/v2/admin/submissions/${id}`, {
+    const res = await fetch(`/api/admin/submissions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),

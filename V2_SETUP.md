@@ -119,7 +119,7 @@ Merge the v2 cron entry into your existing `vercel.json`.
 {
   "crons": [
     { "path": "/api/cron", "schedule": "0 16 * * *" },
-    { "path": "/api/v2/cron", "schedule": "0 9 * * *" }
+    { "path": "/api/cron", "schedule": "0 9 * * *" }
   ]
 }
 ```
@@ -186,22 +186,22 @@ src/lib/v2/__tests__/settings.test.ts               ← NEW
 src/lib/v2/__tests__/runner.test.ts                 ← NEW
 src/lib/v2/__tests__/ats-bridge.test.ts             ← NEW
 src/app/auth/v2/callback/route.ts                   ← NEW
-src/app/api/v2/cron/route.ts                        ← NEW
-src/app/api/v2/dashboard/route.ts                   ← NEW
-src/app/api/v2/tracker/route.ts                     ← NEW
-src/app/api/v2/tracker/[id]/route.ts                ← NEW
-src/app/api/v2/salary/route.ts                      ← NEW
-src/app/api/v2/settings/route.ts                    ← NEW
-src/app/api/v2/submit/route.ts                      ← NEW
-src/app/api/v2/strategy/route.ts                    ← NEW
-src/app/api/v2/admin/users/route.ts                 ← NEW
-src/app/api/v2/admin/users/[id]/route.ts            ← NEW
-src/app/api/v2/admin/companies/route.ts             ← NEW
-src/app/api/v2/admin/companies/[id]/route.ts        ← NEW
-src/app/api/v2/admin/defaults/route.ts              ← NEW
-src/app/api/v2/admin/submissions/route.ts           ← NEW
-src/app/api/v2/admin/submissions/[id]/route.ts      ← NEW
-src/app/api/v2/admin/test-ats/route.ts              ← NEW
+src/app/api/cron/route.ts                        ← NEW
+src/app/api/dashboard/route.ts                   ← NEW
+src/app/api/tracker/route.ts                     ← NEW
+src/app/api/tracker/[id]/route.ts                ← NEW
+src/app/api/salary/route.ts                      ← NEW
+src/app/api/settings/route.ts                    ← NEW
+src/app/api/submit/route.ts                      ← NEW
+src/app/api/strategy/route.ts                    ← NEW
+src/app/api/admin/users/route.ts                 ← NEW
+src/app/api/admin/users/[id]/route.ts            ← NEW
+src/app/api/admin/companies/route.ts             ← NEW
+src/app/api/admin/companies/[id]/route.ts        ← NEW
+src/app/api/admin/defaults/route.ts              ← NEW
+src/app/api/admin/submissions/route.ts           ← NEW
+src/app/api/admin/submissions/[id]/route.ts      ← NEW
+src/app/api/admin/test-ats/route.ts              ← NEW
 src/app/v2/layout.tsx                               ← NEW
 src/app/v2/page.tsx                                 ← NEW (landing)
 src/app/v2/login/page.tsx                           ← NEW
@@ -252,8 +252,8 @@ vitest.config.ts                                    ← NEW
 
 ### "Lazy C" cache model
 
-- **Cron** (`/api/v2/cron`): fetches all raw jobs → writes to `raw_jobs` → bumps `app_config.last_cron_at`
-- **Dashboard** (`/api/v2/dashboard`): on load, compares `user_jobs_cache.cached_at` vs `app_config.last_cron_at`
+- **Cron** (`/api/cron`): fetches all raw jobs → writes to `raw_jobs` → bumps `app_config.last_cron_at`
+- **Dashboard** (`/api/dashboard`): on load, compares `user_jobs_cache.cached_at` vs `app_config.last_cron_at`
   - If fresh → return cached jobs instantly
   - If stale → run Gemini with user's key and prompt → score → cache → return
 - First load after cron = 10-15s (Gemini). Every subsequent load = instant.

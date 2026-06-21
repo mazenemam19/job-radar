@@ -35,7 +35,7 @@ export default function SettingsForm() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/v2/settings");
+      const res = await fetch("/api/settings");
       const json = await res.json();
       if (json.ok) {
         const d: SettingsData = json.data;
@@ -117,7 +117,7 @@ export default function SettingsForm() {
     if (geminiKey.trim()) body.gemini_api_key = geminiKey.trim();
 
     try {
-      const res = await fetch("/api/v2/settings", {
+      const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

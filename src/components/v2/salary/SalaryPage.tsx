@@ -20,7 +20,7 @@ export default function SalaryPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const url = filterPipeline ? `/api/v2/salary?pipeline=${filterPipeline}` : "/api/v2/salary";
+      const url = filterPipeline ? `/api/salary?pipeline=${filterPipeline}` : "/api/salary";
       const res = await fetch(url);
       const data = await res.json();
       if (data.ok) setAggregates(data.data);
@@ -51,7 +51,7 @@ export default function SalaryPage() {
     };
 
     try {
-      const res = await fetch("/api/v2/salary", {
+      const res = await fetch("/api/salary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

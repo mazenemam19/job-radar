@@ -27,7 +27,7 @@ export default function OnboardingFlow() {
     setLoading(true);
     setKeyError(null);
     try {
-      const res = await fetch("/api/v2/settings", {
+      const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gemini_api_key: apiKey.trim() }),
@@ -48,18 +48,18 @@ export default function OnboardingFlow() {
   async function skipCustomisation() {
     setLoading(true);
     // uses_defaults = true (already the DB default), just mark onboarding done
-    await fetch("/api/v2/settings", {
+    await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uses_defaults: true, onboarding_complete: true }),
     });
-    router.push("/v2/dashboard");
+    router.push("/dashboard");
   }
 
   async function goCustomise() {
     // Mark onboarding done, send to settings page to customise
     setLoading(true);
-    await fetch("/api/v2/settings", {
+    await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uses_defaults: false, onboarding_complete: true }),

@@ -22,7 +22,7 @@ export default function TrackerPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/v2/tracker");
+      const res = await fetch("/api/tracker");
       const data = await res.json();
       if (data.ok) setEntries(data.data);
       else setError(data.error);
@@ -38,7 +38,7 @@ export default function TrackerPage() {
   }, []);
 
   async function updateStatus(id: string, status: TrackerStatus) {
-    await fetch(`/api/v2/tracker/${id}`, {
+    await fetch(`/api/tracker/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -52,7 +52,7 @@ export default function TrackerPage() {
 
   async function deleteEntry(id: string) {
     if (!confirm("Remove from tracker?")) return;
-    await fetch(`/api/v2/tracker/${id}`, { method: "DELETE" });
+    await fetch(`/api/tracker/${id}`, { method: "DELETE" });
     setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 

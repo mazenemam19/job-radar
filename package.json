@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cron:now": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron.ts",
     "cron:v2": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron-v2.ts",
     "cron": "node -e \"const {execSync}=require('child_process');setInterval(()=>execSync('pnpm run cron:v2',{stdio:'inherit'}),6*60*60*1000);execSync('pnpm run cron:v2',{stdio:'inherit'})\"",
     "format": "prettier --write .",

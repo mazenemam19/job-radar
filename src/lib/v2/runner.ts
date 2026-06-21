@@ -8,7 +8,7 @@
 //     are invalidated and rebuilt lazily on next dashboard load
 //  4. All bug fixes (#3-#6) are applied in scoring.ts; runner is just the orchestrator
 //
-// This file is IMPORTED by /api/v2/cron/route.ts and never modifies old files.
+// This file is IMPORTED by /api/cron/route.ts and never modifies old files.
 
 import { createAdminClient } from "./supabase/admin";
 import { fetchCompany } from "./ats-bridge";

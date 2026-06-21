@@ -12,7 +12,7 @@ on:
 
 jobs:
   trigger-cron-v2:
-    name: Trigger /api/v2/cron
+    name: Trigger /api/cron
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -23,7 +23,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.VERCEL_PRODUCTION_URL }}/api/v2/cron")
+            "${{ secrets.VERCEL_PRODUCTION_URL }}/api/cron")
 
           echo "Response status: $RESPONSE"
 
