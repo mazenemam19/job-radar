@@ -1,11 +1,11 @@
 // src/app/api/admin/defaults/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import { getDefaultSettings } from "@/lib/v2/settings";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getDefaultSettings } from "@/lib/settings";
 
-import type { Database } from "@/lib/v2/database.types";
+import type { Database } from "@/lib/database.types";
 
 async function requireAdmin() {
   const user = await getUser();

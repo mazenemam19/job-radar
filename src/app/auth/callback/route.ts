@@ -1,10 +1,10 @@
-// src/app/auth/v2/callback/route.ts
+// src/app/auth/callback/route.ts
 // Handles the Google OAuth redirect after Supabase Auth authenticates the user.
 // Exchanges the code for a session, creates/updates the user_profiles row,
 // then redirects to onboarding (new user) or dashboard (returning user).
 
-import { createServerClient } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {

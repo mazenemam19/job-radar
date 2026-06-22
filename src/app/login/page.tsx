@@ -2,7 +2,8 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/v2/supabase/client";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 const ERROR_MESSAGES: Record<string, string> = {
   no_code: "Authentication failed — no code received. Please try again.",
@@ -65,9 +66,23 @@ function LoginContent() {
           textAlign: "center",
         }}
       >
+        <Link
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: "#64748b",
+            fontSize: 13,
+            textDecoration: "none",
+            marginBottom: 20,
+          }}
+        >
+          ← Back
+        </Link>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🎯</div>
         <h1 style={{ margin: "0 0 6px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-          Job Radar v2
+          Job Radar
         </h1>
         <p style={{ margin: "0 0 32px", color: "#64748b", fontSize: 14, lineHeight: 1.5 }}>
           AI-powered job feed personalised to your skills and preferences

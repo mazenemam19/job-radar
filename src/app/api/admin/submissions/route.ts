@@ -1,8 +1,8 @@
 // src/app/api/admin/submissions/route.ts
 
 import { NextResponse } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 async function requireAdmin() {
   const user = await getUser();

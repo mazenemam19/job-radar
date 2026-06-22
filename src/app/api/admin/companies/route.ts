@@ -1,9 +1,9 @@
 // src/app/api/admin/companies/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import type { ATSType } from "@/lib/v2/types";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { ATSType } from "@/lib/types";
 
 const VALID_ATS: ATSType[] = [
   "greenhouse",

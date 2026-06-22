@@ -1,11 +1,11 @@
 // src/app/api/tracker/[id]/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import type { TrackerStatus } from "@/lib/v2/types";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { TrackerStatus } from "@/lib/types";
 
-import type { Database } from "@/lib/v2/database.types";
+import type { Database } from "@/lib/database.types";
 
 const VALID_STATUSES: TrackerStatus[] = [
   "applied",

@@ -1,348 +1,280 @@
 // src/lib/scoring.ts
-import type { ScoreInput, ScoreResult, JobMode } from "../types";
-import {
-  EXPERT_SKILLS,
-  SECONDARY_SKILLS,
-  BONUS_SKILLS,
-  SENIOR_KEYWORDS,
-  JUNIOR_KEYWORDS,
-  STAFF_KEYWORDS,
-  TOXIC_KEYWORDS,
-  computeRecencyScore,
-} from "./constants";
-import { parseRelativeDate } from "./sources/ats-utils";
+// Bug fixes vs old code (src/lib/scoring.ts):
+//
+// FIX #3: recencyScore is always computed LIVE from postedAt (never stored/frozen).
+//         The exported computeRecencyScore() function is used both here and in the UI.
+//
+// FIX #5: date_unknown jobs use fetched_at as postedAt. Their recency decays
+//         normally from fetch time rather than being permanently "now".
+//
+// FIX #6: recencyScore is computed independently of the skill gate. A job that
+//         fails the skill gate gets recencyScore computed (not forced to 0) and
+//         then the job is simply not stored (total_score gate applied at merge time).
+//
+// REGEX:  STAFF_KEYWORDS uses proper word boundaries on both ends:
+//         /\b(lead|staff|principal|architect|director|vp|head)\b/i
 
-// ── Gate Logic ───────────────────────────────────────────────────────────
+import type { RawJob, ResolvedSettings, ScoredJob } from "./types";
 
-// Accept these titles even if they don't have frontend/react explicitly
-const FE_TITLE_WHITELIST =
-  /\b(frontend|front-end|react|react\.js|reactjs|ui engineer|web engineer|product engineer|design engineer|application engineer|software engineer|software developer)\b/i;
+// ── Seniority gate regex ─────────────────────────────────────
 
-// Mandatory tech keywords - React is a MUST
-const REACT_REQUIRED = /\b(react|next\.?js)\b/i;
+/** Fixed regex: word boundaries protect ALL terms, not just lead/head. */
+export const STAFF_KEYWORDS = /\b(lead|staff|principal|architect|director|vp|head)\b/i;
 
-const SCORE_DENOMINATOR = 18;
+const SENIOR_KEYWORDS = /\b(senior|sr\.?|principal|staff|lead)\b/i;
+const MID_KEYWORDS = /\b(mid[-\s]?level|mid[-\s]?senior|intermediate)\b/i;
+const JUNIOR_KEYWORDS = /\b(junior|jr\.?|entry[\s-]?level|intern|graduate)\b/i;
 
-// ── Title & Description filters ─────────────────────────────────────────────
+// ── Recency ──────────────────────────────────────────────────
 
-export function isClearlyNonFrontend(title: string): boolean {
-  const t = title.toLowerCase();
-
-  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(t)) return true;
-  if (/\bbackend\b|\bback[\s-]end\b/.test(t)) return true;
-
-  if (/\b(rust|c\+\+|cpp|golang|go|python|ruby|rails|java|kotlin|php|scala|elixir)\b/.test(t)) {
-    if (!/\b(frontend|front-end|react)\b/i.test(t)) return true;
-  }
-
-  const rejections = [
-    /\bdevops\b/,
-    /\bdev[\s-]ops\b/,
-    /\bsite[\s-]reliability\b/,
-    /\bsre\b/,
-    /\bplatform\s+engineer\b/,
-    /\binfrastructure\s+engineer\b/,
-    /\bcloud\s+engineer\b/,
-    /\bsecurity\s+engineer\b/,
-    /\bnetwork\s+engineer\b/,
-    /\bembedded\s+(software|engineer)\b/,
-    /\bfirmware\b/,
-    /\bml[\s-]?ops\b/,
-    /\bmlops\b/,
-    /\bdatabase\s+reliability\b/,
-    /\bdbre\b/,
-    /\bdatabase\s+engineer\b/,
-    /\bdba\b/,
-    /\bsysadmin\b/,
-    /\bsystem\s+administrator\b/,
-    /\bdata\s+(engineer|scientist|analyst)\b/,
-    /\bmachine\s+learning\s+engineer\b/,
-    /\b(ai|ml)\s+engineer\b/,
-    /\bproject\s+manager\b/,
-    /\bprogram\s+manager\b/,
-    /\bproduct\s+(manager|owner)\b/,
-    /\baccount\s+manager\b/,
-    /\bscrum\s+master\b/,
-    /\boperations\s+manager\b/,
-    /\bsales\s+(manager|engineer|specialist)\b/,
-    /\bbusiness\s+(analyst|development)\b/,
-    /\bcustomer\s+success\b/,
-    /\bsupport\s+(engineer|specialist|analyst)\b/,
-    /\bhelpdesk\b/,
-    /\bhelp\s+desk\b/,
-    /\bservice\s+desk\b/,
-    /\brecruiter\b/,
-    /\bhr\s+(manager|specialist|generalist)\b/,
-    /\bfinance\s+(manager|analyst|lead)\b/,
-    /\baccountant\b/,
-    /\bmarketing\s+(manager|specialist|analyst|operations)\b/,
-    /\bcompliance\s+(analyst|engineer|manager|specialist|operations)\b/,
-    /\bproduct\s+designer\b/,
-    /\bux\s+(designer|researcher)\b/,
-    /\bquality\s+assurance\b/,
-    /\bautomation\s+tester\b/,
-    /\btest\s+engineer\b/,
-    /\b(sre|site\s+reliability|lua|infrastructure|devops)\b/,
-    /\bdata\s+(infrastructure|engineer|platform)\b/,
-    /\bhardware\b/,
-    /\bintern\b/,
-  ];
-
-  if (rejections.some((re) => re.test(t))) return true;
-  return !FE_TITLE_WHITELIST.test(t);
+/**
+ * Compute recency score LIVE from a date string.
+ * FIX #3: Never pass a pre-stored score; always call this with the current clock.
+ *
+ * Score decays linearly from 100 (just posted) to 0 at 7 days old, then stays 0.
+ * Formula: 100 - (ageDays / 7) * 100  — mirrors the original constants.ts formula exactly.
+ *
+ * Examples:
+ *   0 days old  → 100
+ *   3.5 days    →  50
+ *   7 days      →   0
+ *   14 days     →   0
+ */
+export function computeRecencyScore(postedAt: string): number {
+  const ms = Date.parse(postedAt);
+  if (Number.isNaN(ms)) return 0;
+  const ageDays = (Date.now() - ms) / 86_400_000;
+  return Math.max(0, Math.round(100 - (ageDays / 7) * 100));
 }
 
-export function isTooSeniorOrTooJunior(title: string, mode?: JobMode): boolean {
-  // Always reject Intern/Junior/Entry keywords
-  if (JUNIOR_KEYWORDS.test(title)) return true;
+// ── Skill matching ───────────────────────────────────────────
 
-  // Always reject Staff/Principal/Architect/Director/VP keywords
-  if (STAFF_KEYWORDS.test(title)) return true;
-
-  // For Local (Egypt), we allow Senior OR Mid-level/Experienced
-  if (mode === "local") {
-    // Only reject if it doesn't mention Senior OR Mid-level
-    const isSenior = SENIOR_KEYWORDS.test(title);
-    const isMid = /\bmid\b|experienced/i.test(title);
-    return !isSenior && !isMid;
-  }
-
-  // For Visa and Global Remote, we allow everything that isn't JUNIOR_KEYWORDS
-  return false;
+/** Returns list of skills found in the description (case-insensitive). */
+export function matchSkills(description: string, skills: string[]): string[] {
+  const lower = description.toLowerCase();
+  return skills.filter((s) => lower.includes(s.toLowerCase()));
 }
 
-export function isGeographicallyBlacklisted(text: string): boolean {
-  const t = text.toLowerCase();
+/**
+ * Compute raw skill match score.
+ *
+ * Expert skills each count as 3 points.
+ * Secondary skills each count as 1 point.
+ * Score is divided by score_denominator and capped at 100.
+ */
+export function computeSkillMatchScore(
+  description: string,
+  settings: Pick<ResolvedSettings, "expert_skills" | "secondary_skills" | "score_denominator">,
+): { score: number; matched: string[] } {
+  const expertMatched = matchSkills(description, settings.expert_skills);
+  const secondaryMatched = matchSkills(description, settings.secondary_skills);
 
-  const blacklist = [
-    /\bisrael\b/,
-    /\btel\s+aviv\b/,
-    /\btel-aviv\b/,
-    /\bhaifa\b/,
-    /\bherzliya\b/,
-    /\bjerusalem\b/,
-    /\bra'anana\b/,
-    /\bgush\s+dan\b/,
-    /\bcentral\s+district\b/,
-    // Country restrictions
-    /\b(us|usa|united\s+states|u\.?s\.?a\.?)\s+only\b/i,
-    /\b(uk|u\.?k\.?|united\s+kingdom)\s+only\b/i,
-    /\bcanada\s+only\b/i,
-    /\beurope\s+only\b/i,
-    /\bamericas\s+only\b/i,
-    /\b(amer|north\s+america)\s+only\b/i,
-    /\blatam\s+only\b/i,
-    /\bapac\s+only\b/i,
-    // Patterns found in recent quotes
-    /\bremote\s*-\s*(united\s+states|usa|us|portugal|spain|france|germany|canada)\b/i,
-    /\bus\s*-\s*remote\s+zone\b/i,
-    /\bamer\b/i, // Standalone AMER region
-    /based\s+in\s+the\s+americas\s+or\s+europe/i,
-    /restricted\s+to\s+candidates\s+in\s+(the\s+)?(us|usa|united\s+states)/i,
-    /available\s+locations:\s*(bengaluru|india|bangalore)/i,
-    // Hybrid/Office requirements (Reject if not Egypt)
-    /hybrid\s+workplace/i,
-    /hybrid\s+role/i,
-    /in-person\s+participation\s+is\s+required/i,
-    /office\s+presence\s+is\s+required/i,
-    /office\s+culture/i,
-    /collaboration\s+of\s+being\s+together/i,
-    /work-life\s+harmony/i,
-    /value\s+in\s+our\s+office\s+culture/i,
-  ];
+  const raw = expertMatched.length * 3 + secondaryMatched.length;
+  const score = Math.min(100, Math.round((raw / settings.score_denominator) * 100));
 
-  if (/\b(global|emea|egypt|cairo|giza|anywhere|worldwide)\b/i.test(t)) {
-    if (/\bisrael|tel\s+aviv|haifa|herzliya/i.test(t)) return true;
+  return {
+    score,
+    matched: [...expertMatched, ...secondaryMatched],
+  };
+}
+
+// ── Relocation bonus ─────────────────────────────────────────
+
+const RELOCATION_PATTERN = /\b(relocation|relo\b|visa\s+sponsorship|work\s+permit)\b/i;
+
+export function hasRelocationSupport(job: RawJob): boolean {
+  return (
+    job.visa_sponsorship ||
+    RELOCATION_PATTERN.test(job.description) ||
+    RELOCATION_PATTERN.test(job.title)
+  );
+}
+
+// ── Seniority gate ───────────────────────────────────────────
+
+/**
+ * Returns true if the job should be kept based on seniority gates.
+ *
+ * - If seniority_allow_mid = false: only Senior+ titles pass.
+ * - If seniority_allow_mid = true: Mid-Senior and above pass.
+ * - Junior/intern always rejected.
+ * - Unlabelled jobs: allowed (Gemini will evaluate further).
+ */
+export function passesSeniorityGate(job: RawJob, allowMid: boolean): boolean {
+  const text = `${job.title} ${job.description}`;
+
+  if (JUNIOR_KEYWORDS.test(text)) return false;
+  if (STAFF_KEYWORDS.test(text)) return true; // Staff/lead = senior
+  if (SENIOR_KEYWORDS.test(text)) return true;
+  if (MID_KEYWORDS.test(text)) return allowMid;
+
+  // No seniority signal – pass through to Gemini
+  return true;
+}
+
+// ── Settings gate & Pre-filters ──────────────────────────────
+
+/**
+ * Evaluates whether a raw job passes all user settings and pre-filter regex gates.
+ * Run BEFORE sending jobs to Gemini.
+ */
+export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boolean {
+  // 1. Seniority Gate
+  if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
     return false;
   }
 
-  return blacklist.some((re) => re.test(t));
-}
+  const titleLower = job.title.toLowerCase();
+  const descLower = job.description.toLowerCase();
+  const locLower = job.location.toLowerCase();
+  const textCombined = `${titleLower} ${descLower} ${locLower}`;
 
-export function isGenericTitleButBackendRole(title: string, description: string): boolean {
-  const t = title.toLowerCase();
-  const desc = description.toLowerCase();
-
-  const isSpecificallyFE = /\b(frontend|front-end|react|ui)\b/i.test(t);
-
-  if (/\bfull[\s-]?stack\b|\bfullstack\b/.test(desc)) return true;
-  if (!REACT_REQUIRED.test(desc)) return true;
-
-  const backendSignals = [
-    /\bkubernetes\b/,
-    /\bterraform\b/,
-    /\binfrastructure\b/,
-    /\bpostgresql\b|\bpostgres\b/,
-    /\bkafka\b/,
-    /\bsite\s+reliability\b/,
-    /\bci\/cd\s+pipeline\b/,
-    /\bspring\s*boot\b/,
-    /\bjvm\b/,
-    /\bdistributed\s+systems\b/,
-    /\bmicroservices\b/,
-    /\brabbitmq\b/,
-    /\belasticsearch\b/,
-    /\bbackend\s+api\b/,
-    /\brest\s+api\b/,
-    /\bgolang\b|\bgo\s+backend\b/,
-    /\bpython\s+(fastapi|django|flask)\b/,
-    /\brust\b/,
-    /\bc\+\+|\bcpp\b/,
-    /\bsystems\s+programming\b/,
-    /\bjava\b.*\bscala\b/i,
-  ];
-
-  const feSignals = [
-    /\breact\b/,
-    /\bnext\.?js\b/,
-    /\btypescript\b/,
-    /\bjavascript\b/,
-    /\btailwind\b/,
-  ];
-
-  const bCount = backendSignals.filter((re) => re.test(desc)).length;
-  const fCount = feSignals.filter((re) => re.test(desc)).length;
-
-  if (!isSpecificallyFE && bCount >= 3 && bCount > fCount) return true;
-  if (isSpecificallyFE && bCount >= 6 && bCount > fCount * 2) return true;
-
-  return false;
-}
-
-export function requiresCitizenshipOrClearance(text: string): boolean {
-  const t = text.toLowerCase();
-  return [
-    /must\s+be\s+a?\s*(us|uk|eu|canadian|australian|u\.?s\.?|u\.?k\.?)?\s*citizen/,
-    /citizenship\s+required/,
-    /security\s+clearance\s+required/,
-    /cannot\s+(provide|offer|give)\s+visa\s+sponsorship/,
-    /unable\s+to\s+(provide|offer|give|support)\s+visa\s+sponsorship/,
-    /we\s+are\s+unable\s+to\s+offer\s+visa/,
-    /not\s+ able\s+to\s+(provide|offer|give)\s+sponsorship/,
-    /unable\s+to\s+sponsor/,
-    /we\s+(do\s+not|don'?t)\s+sponsor/,
-    /no\s+visa\s+sponsorship/,
-    /remotely?\s+in\s+the\s+(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
-    /must\s+be\s+located\s+in\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
-    /\bu\.?s\.?\s+hubs?\b/,
-    /\bu\.?s\.?-only\b/,
-    /only\s+open\s+to\s+(residents|citizens|candidates)\s+of\s+(the\s+)?(united\s+states|us|uk|canada|u\.?s\.?|u\.?k\.?)/,
-    /\bhybrid\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
-    /\b(onsite|on-site|in-office|office-based)\b.*\b(london|berlin|paris|nyc|san\s+francisco|bay\s+area|bangalore|bengaluru|lisbon|madrid|barcelona|aveiro)\b/i,
-  ].some((re) => re.test(t));
-}
-
-// ── Red Flag Detection ────────────────────────────────────────────────────
-
-export function detectRedFlags(description: string): string[] {
-  const flags: string[] = [];
-  const text = description.toLowerCase();
-  for (const { regex, label } of TOXIC_KEYWORDS) {
-    if (regex.test(text)) {
-      flags.push(label);
+  // 2. Excluded Keywords (Dynamic role gate matching against job title)
+  if (settings.excluded_keywords && settings.excluded_keywords.length > 0) {
+    const hasExcluded = settings.excluded_keywords.some((word) => {
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      return regex.test(titleLower);
+    });
+    if (hasExcluded) {
+      return false;
     }
   }
-  return flags;
+
+  // 3. Required Keywords (Dynamic tech/role gate matching against job title/description)
+  // We use settings.required_keywords if provided, otherwise fallback to settings.expert_skills
+  const techKeywords =
+    settings.required_keywords && settings.required_keywords.length > 0
+      ? settings.required_keywords
+      : settings.expert_skills;
+
+  if (techKeywords && techKeywords.length > 0) {
+    const hasRequired = techKeywords.some((word) => {
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      return regex.test(textCombined);
+    });
+    if (!hasRequired) {
+      return false;
+    }
+  }
+
+  // 4. Blacklisted Locations (Dynamic location/clearance blacklist matching against title/description/location)
+  if (settings.blacklisted_locations && settings.blacklisted_locations.length > 0) {
+    const hasBlacklisted = settings.blacklisted_locations.some((word) => {
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      return regex.test(textCombined) || textCombined.includes(word.toLowerCase());
+    });
+    if (hasBlacklisted) {
+      return false;
+    }
+  }
+
+  // 5. Skill Match Check: Ensure there is at least one skill match from the user's stack to keep relevancy high
+  const expertMatched = matchSkills(job.description, settings.expert_skills);
+  const secondaryMatched = matchSkills(job.description, settings.secondary_skills);
+  if (expertMatched.length === 0 && secondaryMatched.length === 0) {
+    return false;
+  }
+
+  return true;
 }
 
-// ── Scoring ────────────────────────────────────────────────────────────────
+// ── Date gate ────────────────────────────────────────────────
 
-function skillMatch(text: string, skill: string): boolean {
-  const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-  return new RegExp(`\\b${escaped}\\b`).test(text);
+/**
+ * Returns true if the job is within the configured age window.
+ * Uses posted_at (or fetched_at for date_unknown jobs – FIX #5).
+ */
+export function passesDateGate(job: RawJob, maxAgeDays: number): boolean {
+  const dateStr = job.date_unknown ? job.fetched_at : job.posted_at;
+  const ms = Date.parse(dateStr);
+  if (Number.isNaN(ms)) return false;
+  const ageDays = (Date.now() - ms) / 86_400_000;
+  return ageDays <= maxAgeDays;
 }
 
-export function scoreJob(input: ScoreInput, mode?: JobMode): ScoreResult {
-  const text = `${input.title} ${input.description} ${input.location}`.toLowerCase();
+// ── Main scoring function ────────────────────────────────────
 
-  // ── GATE: Tech Signal Check ─────────────────────────────────────────────
-  if (!REACT_REQUIRED.test(text)) {
-    return {
-      matchedSkills: [],
-      bonusSkills: [],
-      missingSkills: EXPERT_SKILLS.slice(0, 6),
-      skillMatchScore: 0,
-      recencyScore: 0,
-      relocationBonus: 0,
-      totalScore: 0,
-      redFlags: [],
-    };
+/**
+ * Score a raw job against user settings.
+ *
+ * FIX #6: recencyScore is computed regardless of skill gate result.
+ * The caller (runner) decides whether to store the job based on total_score > 0.
+ *
+ * Returns null if the seniority gate fails (hard reject, no score).
+ * Returns a ScoredJob (with total_score possibly = 0) if skill gate fails.
+ */
+export function scoreJob(
+  job: RawJob,
+  settings: ResolvedSettings,
+  geminiPass = false,
+  geminiReason: string | null = null,
+): ScoredJob | null {
+  // Seniority hard gate – null means "do not store at all"
+  if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
+    return null;
   }
 
-  // ── GATE: Non-Frontend / Backend / Clearance Check ──────────────────────
-  if (isClearlyNonFrontend(input.title) || isTooSeniorOrTooJunior(input.title, mode)) {
-    return {
-      matchedSkills: [],
-      bonusSkills: [],
-      missingSkills: EXPERT_SKILLS.slice(0, 6),
-      skillMatchScore: 0,
-      recencyScore: 0,
-      relocationBonus: 0,
-      totalScore: 0,
-      redFlags: [],
-    };
-  }
+  // FIX #6: compute recency independently – never forced to 0
+  // FIX #3: always compute live (not from a stored value)
+  const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
+  const recency_score = computeRecencyScore(dateForRecency);
 
-  if (
-    isGeographicallyBlacklisted(text) ||
-    isGenericTitleButBackendRole(input.title, input.description) ||
-    requiresCitizenshipOrClearance(text)
-  ) {
-    return {
-      matchedSkills: [],
-      bonusSkills: [],
-      missingSkills: EXPERT_SKILLS.slice(0, 6),
-      skillMatchScore: 0,
-      recencyScore: 0,
-      relocationBonus: 0,
-      totalScore: 0,
-      redFlags: [],
-    };
-  }
-
-  const matchedExpert = EXPERT_SKILLS.filter((s) => skillMatch(text, s.toLowerCase()));
-  const matchedSecondary = SECONDARY_SKILLS.filter((s) => skillMatch(text, s.toLowerCase()));
-
-  let skillMatchScore = Math.min(
-    100,
-    Math.round(
-      ((matchedExpert.length * 3 + matchedSecondary.length * 1) / SCORE_DENOMINATOR) * 100,
-    ),
+  const { score: skill_match_score, matched: matched_skills } = computeSkillMatchScore(
+    job.description,
+    settings,
   );
-  if (/\b(frontend|front-end|react)\b/i.test(input.title))
-    skillMatchScore = Math.min(100, skillMatchScore + 20);
 
-  if (skillMatchScore < 5)
-    return {
-      matchedSkills: [],
-      bonusSkills: [],
-      missingSkills: EXPERT_SKILLS.slice(0, 6),
-      skillMatchScore: 0,
-      recencyScore: 0,
-      relocationBonus: 0,
-      totalScore: 0,
-      redFlags: [],
-    };
+  // Bonus skills are informational only — shown to the user, never scored.
+  // (Matches the original single-tenant behavior: nice-to-have skills like
+  // Node/Docker/AWS surfaced separately from the pass/fail skill match.)
+  const bonus_skills = matchSkills(job.description, settings.bonus_skills);
 
-  const bonusSkills = BONUS_SKILLS.filter((s) => skillMatch(text, s.toLowerCase()));
-  const matchedSet = new Set([...matchedExpert, ...matchedSecondary].map((s) => s.toLowerCase()));
-  const missingSkills = EXPERT_SKILLS.filter((s) => !matchedSet.has(s.toLowerCase())).slice(0, 6);
+  const relocation_bonus = hasRelocationSupport(job) ? 100 : 0;
 
-  const parsedDate = parseRelativeDate(input.postedAt);
-  const recencyScore = computeRecencyScore(parsedDate);
-  const relocationBonus = /\brelocation\b/.test(input.description.toLowerCase()) ? 10 : 0;
-  const totalScore = Math.round(skillMatchScore * 0.6 + recencyScore * 0.3 + relocationBonus * 0.1);
-
-  const redFlags = detectRedFlags(input.description);
+  const { skill, recency, relocation } = settings.scoring_weights;
+  const total_score = Math.round(
+    skill_match_score * skill + recency_score * recency + relocation_bonus * relocation,
+  );
 
   return {
-    matchedSkills: [...matchedExpert, ...matchedSecondary],
-    bonusSkills,
-    missingSkills,
-    skillMatchScore,
-    recencyScore,
-    relocationBonus,
-    totalScore,
-    redFlags,
+    ...job,
+    skill_match_score,
+    recency_score,
+    relocation_bonus,
+    total_score,
+    matched_skills,
+    bonus_skills,
+    gemini_pass: geminiPass,
+    gemini_reason: geminiReason,
   };
+}
+
+// ── Merge / dedup ────────────────────────────────────────────
+
+/**
+ * Merges new scored jobs into an existing array.
+ * Deduplication by job.id (URL hash).
+ *
+ * FIX #6: totalScore > 0 gate applied HERE before storing.
+ *         Jobs with total_score = 0 (skill mismatch) are dropped.
+ *
+ * Returns jobs sorted descending by total_score.
+ */
+export function mergeJobs(existing: ScoredJob[], incoming: ScoredJob[]): ScoredJob[] {
+  const map = new Map(existing.map((j) => [j.id, j]));
+
+  for (const job of incoming) {
+    // FIX #6: gate on total_score > 0
+    if (job.total_score <= 0) continue;
+    // Newer entry wins (fetched_at comparison)
+    const prev = map.get(job.id);
+    if (!prev || job.fetched_at > prev.fetched_at) {
+      map.set(job.id, job);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.total_score - a.total_score);
 }

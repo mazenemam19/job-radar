@@ -1,5 +1,5 @@
-// src/app/v2/settings/page.tsx
-import SettingsForm from "@/components/v2/settings/SettingsForm";
+// src/app/settings/page.tsx
+import SettingsForm from "@/components/settings/SettingsForm";
 export default function SettingsRoute() {
   return <SettingsForm />;
 }

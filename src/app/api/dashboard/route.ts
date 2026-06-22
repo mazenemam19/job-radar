@@ -7,14 +7,15 @@
 // First load after a cron run takes 10-15s; all subsequent opens are instant.
 
 import { NextResponse } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import { resolveUserSettings } from "@/lib/v2/settings";
-import { filterJobsWithGemini } from "@/lib/v2/gemini";
-import { scoreJob, mergeJobs, passesDateGate, passesSettingsGate } from "@/lib/v2/scoring";
-import { isCacheFresh } from "@/lib/v2/runner";
-import type { RawJob, ScoredJob, PipelineLog } from "@/lib/v2/types";
-import type { Json } from "@/lib/v2/database.types";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveUserSettings } from "@/lib/settings";
+import { filterJobsWithGemini } from "@/lib/gemini";
+import { scoreJob, mergeJobs, passesDateGate, passesSettingsGate } from "@/lib/scoring";
+import { isCacheFresh } from "@/lib/runner";
+import { sendJobAlertEmail } from "@/lib/email";
+import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
+import type { Json } from "@/lib/database.types";
 
 export const maxDuration = 60; // Vercel: allow up to 60s for Gemini filter
 
@@ -56,6 +57,22 @@ export async function GET() {
   }
 
   // ── Cache is stale — rebuild ─────────────────────────────────
+
+  // Read the previous cache's job IDs before we overwrite it — this is how
+  // we know which jobs in the new result are genuinely new vs. already seen.
+  // `hadPreviousCache` matters: on a user's very first-ever load there's
+  // nothing to diff against, and every job would look "new" — we don't want
+  // to email someone their entire initial match list as if it just appeared.
+  const { data: previousCache } = await db
+    .from("user_jobs_cache")
+    .select("jobs")
+    .eq("user_id", user.id)
+    .single();
+
+  const hadPreviousCache = !!previousCache;
+  const previousJobIds = new Set(
+    ((previousCache?.jobs as unknown as ScoredJob[]) ?? []).map((j) => j.id),
+  );
 
   // Load user settings and profile (need API key)
   const [settings, { data: profile }] = await Promise.all([
@@ -141,6 +158,16 @@ export async function GET() {
     },
     { onConflict: "user_id" },
   );
+
+  // ── Step 8: New-job email alert (fire and forget) ────────────
+  if (hadPreviousCache && settings.email_alerts_enabled && user.email) {
+    const newJobs = finalJobs.filter((j) => !previousJobIds.has(j.id));
+    if (newJobs.length > 0) {
+      sendJobAlertEmail(newJobs, user.email).catch((err) => {
+        console.error("[dashboard] Failed to send job alert email:", err);
+      });
+    }
+  }
 
   return NextResponse.json({
     ok: true,

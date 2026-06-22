@@ -1,10 +1,10 @@
 // src/app/api/strategy/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import { generateApplicationStrategy } from "@/lib/v2/gemini";
-import { resolveUserSettings } from "@/lib/v2/settings";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { generateApplicationStrategy } from "@/lib/gemini";
+import { resolveUserSettings } from "@/lib/settings";
 
 export async function POST(request: NextRequest) {
   const user = await getUser();

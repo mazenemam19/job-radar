@@ -1,9 +1,9 @@
 // src/app/api/settings/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import { resolveUserSettings, saveUserSettings } from "@/lib/v2/settings";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveUserSettings, saveUserSettings } from "@/lib/settings";
 
 // ── GET /api/settings ─────────────────────────────────────
 

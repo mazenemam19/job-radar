@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cron:v2": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron-v2.ts",
-    "cron": "node -e \"const {execSync}=require('child_process');setInterval(()=>execSync('pnpm run cron:v2',{stdio:'inherit'}),6*60*60*1000);execSync('pnpm run cron:v2',{stdio:'inherit'})\"",
+    "cron": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron.ts",
+    "salary-reminders": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json scripts/send-salary-reminders.ts",
     "format": "prettier --write .",
     "prepare": "husky"
   },
@@ -25,6 +25,7 @@
     "@google/genai": "^1.43.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.0",
+    "dompurify": "^3.4.11",
     "gsap": "^3.15.0",
     "next": "14.2.5",
     "node-cron": "^3.0.3",
@@ -34,6 +35,7 @@
     "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^20",
     "@types/nodemailer": "^6.4.15",
     "@types/react": "^18",

@@ -1,5 +1,5 @@
-// src/app/v2/admin/page.tsx
-import { createAdminClient } from "@/lib/v2/supabase/admin";
+// src/app/admin/page.tsx
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 
 export default async function AdminIndexPage() {
@@ -11,6 +11,7 @@ export default async function AdminIndexPage() {
     { count: jobCount },
     { count: pendingCount },
     { data: lastCron },
+    { data: appConfig },
   ] = await Promise.all([
     db.from("user_profiles").select("*", { count: "exact", head: true }),
     db.from("ats_companies").select("*", { count: "exact", head: true }).eq("is_active", true),
@@ -22,21 +23,31 @@ export default async function AdminIndexPage() {
       .order("run_at", { ascending: false })
       .limit(1)
       .single(),
+    db.from("app_config").select("workable_blocked, workable_budget").eq("id", 1).single(),
   ]);
 
+  const workableBlocked =
+    (appConfig?.workable_blocked as { slug: string; until: string }[] | null) ?? [];
+  const activeBlocks = workableBlocked.filter((e) => new Date(e.until).getTime() > Date.now());
+  const workableBudget = appConfig?.workable_budget as {
+    visa: number;
+    global: number;
+    local: number;
+  } | null;
+
   const stats = [
-    { label: "Users", value: userCount ?? 0, href: "/v2/admin/users", icon: "👥" },
+    { label: "Users", value: userCount ?? 0, href: "/admin/users", icon: "👥" },
     {
       label: "Active companies",
       value: companyCount ?? 0,
-      href: "/v2/admin/companies",
+      href: "/admin/companies",
       icon: "🏢",
     },
     { label: "Raw jobs in pool", value: jobCount ?? 0, href: null, icon: "📦" },
     {
       label: "Pending submissions",
       value: pendingCount ?? 0,
-      href: "/v2/admin/submissions",
+      href: "/admin/submissions",
       icon: "📬",
     },
   ];
@@ -82,6 +93,64 @@ export default async function AdminIndexPage() {
         </div>
       )}
 
+      {/* Workable rate-limit status */}
+      <div
+        style={{
+          background: "#0d0d1a",
+          border: "1px solid #1e1e30",
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 28,
+        }}
+      >
+        <h2 style={{ margin: "0 0 12px", fontSize: 14, color: "#94a3b8" }}>
+          Workable rate-limit status
+        </h2>
+        {workableBudget && (
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              flexWrap: "wrap",
+              marginBottom: activeBlocks.length ? 14 : 0,
+            }}
+          >
+            <Stat label="Visa budget" value={String(workableBudget.visa)} />
+            <Stat label="Local budget" value={String(workableBudget.local)} />
+            <Stat label="Global budget" value={String(workableBudget.global)} />
+          </div>
+        )}
+        {activeBlocks.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#64748b" }}>
+            No companies currently blocked from rate limiting.
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+              {activeBlocks.length} compan{activeBlocks.length === 1 ? "y" : "ies"} blocked until
+              429 cooldown clears:
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {activeBlocks.map((b) => (
+                <span
+                  key={b.slug}
+                  title={`Blocked until ${new Date(b.until).toLocaleString()}`}
+                  style={{
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                    background: "rgba(251,113,133,0.12)",
+                    color: "#fb7185",
+                    fontSize: 12,
+                  }}
+                >
+                  {b.slug}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Quick links */}
       <div
         style={{
@@ -92,22 +161,22 @@ export default async function AdminIndexPage() {
       >
         {[
           {
-            href: "/v2/admin/users",
+            href: "/admin/users",
             label: "Manage users",
             desc: "View all users, activate / block accounts",
           },
           {
-            href: "/v2/admin/companies",
+            href: "/admin/companies",
             label: "ATS Companies",
             desc: "Add, edit, remove companies from the scrape list",
           },
           {
-            href: "/v2/admin/defaults",
+            href: "/admin/defaults",
             label: "Default settings",
             desc: "Edit the default filter profile inherited by all users",
           },
           {
-            href: "/v2/admin/submissions",
+            href: "/admin/submissions",
             label: "ATS Submissions",
             desc: "Review HR-submitted companies, run tests, approve",
           },

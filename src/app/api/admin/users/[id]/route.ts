@@ -3,10 +3,10 @@
 // Role escalation is explicitly forbidden — `role` is stripped from all payloads.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-import type { Database } from "@/lib/v2/database.types";
+import type { Database } from "@/lib/database.types";
 
 async function requireAdmin() {
   const user = await getUser();

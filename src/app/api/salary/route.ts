@@ -1,15 +1,15 @@
 // src/app/api/salary/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/v2/supabase/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
+import { getUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   SalaryAggregate,
   SalaryCurrency,
   EmploymentType,
   WorkArrangement,
   Pipeline,
-} from "@/lib/v2/types";
+} from "@/lib/types";
 
 // ── GET /api/salary — aggregated charts data ──────────────
 

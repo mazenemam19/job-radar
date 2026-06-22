@@ -3,8 +3,8 @@
 // Inserts a row into ats_submissions with status='pending' for admin review.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/v2/supabase/admin";
-import type { ATSType } from "@/lib/v2/types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { ATSType } from "@/lib/types";
 
 const VALID_ATS: ATSType[] = [
   "greenhouse",

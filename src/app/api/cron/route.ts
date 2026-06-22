@@ -8,7 +8,7 @@
 // happens lazily when a user opens their dashboard ("Lazy C" model).
 
 import { NextResponse, type NextRequest } from "next/server";
-import { runCronJob } from "@/lib/v2/runner";
+import { runCronJob } from "@/lib/runner";
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -60,7 +60,7 @@ async function handler(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[api/v2/cron] Fatal error:", message);
+    console.error("[api/cron] Fatal error:", message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

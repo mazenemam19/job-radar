@@ -1,5 +1,5 @@
 "use client";
-// src/app/v2/page.tsx
+// src/app/page.tsx
 // Milestone 3: Landing page for non-authenticated visitors.
 // Antigravity design: glassmorphism cards, GSAP scroll animations, floating elements.
 // Uses prefers-reduced-motion to disable animations for accessibility.
@@ -7,8 +7,9 @@
 // GSAP and its ScrollTrigger plugin must be installed:
 //   pnpm add gsap
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 // Demo jobs for the read-only preview (fake, seeded data)
 const DEMO_JOBS = [
@@ -98,6 +99,25 @@ export default function LandingPage() {
   const demoRef = useRef<HTMLDivElement>(null);
   const featRef = useRef<HTMLDivElement>(null);
   const funnelRef = useRef<HTMLDivElement>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setIsLoggedIn(!!data.user);
+    });
+  }, []);
+
+  useEffect(() => {
+    // Safety net: if an OAuth code lands here instead of /auth/callback (e.g.
+    // because the redirect URL wasn't in Supabase's allowed Redirect URLs list),
+    // forward it on manually rather than stranding the user on the landing page
+    // with an unexchanged code in the URL.
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) {
+      window.location.replace(`/auth/callback?code=${encodeURIComponent(code)}`);
+    }
+  }, []);
 
   useEffect(() => {
     // Respect prefers-reduced-motion
@@ -242,7 +262,7 @@ export default function LandingPage() {
       >
         <div style={{ fontSize: 18, fontWeight: 700, color: "#818cf8" }}>🎯 Job Radar</div>
         <Link
-          href="/login"
+          href={isLoggedIn ? "/dashboard" : "/login"}
           style={{
             padding: "9px 20px",
             background: "#6366f1",
@@ -253,7 +273,7 @@ export default function LandingPage() {
             fontWeight: 600,
           }}
         >
-          Sign in with Google →
+          {isLoggedIn ? "Dashboard →" : "Sign in with Google →"}
         </Link>
       </nav>
 
@@ -329,7 +349,7 @@ export default function LandingPage() {
           style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}
         >
           <Link
-            href="/login"
+            href={isLoggedIn ? "/dashboard" : "/login"}
             style={{
               padding: "14px 32px",
               background: "#6366f1",
@@ -342,7 +362,7 @@ export default function LandingPage() {
               transition: "transform 0.2s ease",
             }}
           >
-            Get started free →
+            {isLoggedIn ? "Go to dashboard →" : "Get started free →"}
           </Link>
           <Link
             href="/submit"
@@ -642,11 +662,12 @@ export default function LandingPage() {
           Ready to find your next role?
         </h2>
         <p style={{ margin: "0 auto 32px", maxWidth: 480, fontSize: 16, color: "#64748b" }}>
-          Sign in with Google, add your Gemini API key, and your personalised feed is ready in 30
-          seconds.
+          {isLoggedIn
+            ? "Your personalised feed is waiting — head to your dashboard."
+            : "Sign in with Google, add your Gemini API key, and your personalised feed is ready in 30 seconds."}
         </p>
         <Link
-          href="/login"
+          href={isLoggedIn ? "/dashboard" : "/login"}
           style={{
             display: "inline-block",
             padding: "16px 40px",
@@ -659,7 +680,7 @@ export default function LandingPage() {
             boxShadow: "0 0 60px #6366f150",
           }}
         >
-          Sign in with Google — it&apos;s free →
+          {isLoggedIn ? "Go to dashboard →" : "Sign in with Google — it's free →"}
         </Link>
       </section>
 
@@ -675,7 +696,7 @@ export default function LandingPage() {
           color: "#475569",
         }}
       >
-        Job Radar v2 · Built on Next.js, Supabase, Google Gemini · No ads, no data selling ·{" "}
+        Job Radar · Built on Next.js, Supabase, Google Gemini · No ads, no data selling ·{" "}
         <Link href="/submit" style={{ color: "#64748b", textDecoration: "none" }}>
           Submit your company
         </Link>

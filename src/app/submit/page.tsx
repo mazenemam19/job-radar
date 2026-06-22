@@ -4,6 +4,7 @@
 // HR managers submit their company ATS details for admin review.
 
 import { useState } from "react";
+import Link from "next/link";
 
 const ATS_TYPES = [
   {
@@ -91,6 +92,20 @@ export default function SubmitPage() {
       }}
     >
       <div style={{ maxWidth: 540, width: "100%" }}>
+        <Link
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: "#64748b",
+            fontSize: 13,
+            textDecoration: "none",
+            marginBottom: 20,
+          }}
+        >
+          ← Back
+        </Link>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>🏢</div>
           <h1 style={{ margin: "0 0 8px", fontSize: 24, color: "#e2e8f0", fontWeight: 700 }}>

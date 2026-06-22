@@ -1,76 +1,127 @@
 # 🎯 Job Radar
 
-A personalized job-hunting dashboard tailored for a **Senior React/Next.js Engineer based in Egypt**. It automatically scrapes frontend engineering jobs across three pipelines and scores them against your specific technical profile.
+A multi-tenant job-hunting dashboard. Anyone can sign in, configure their own
+skill list, seniority preferences, and filtering rules, and get a personalized
+feed of frontend roles scraped across hundreds of ATS-listed companies —
+scored against _their_ settings, not a hardcoded profile.
+
+This was originally a personal single-user tool; it's been rebuilt as a
+SaaS-style platform where every filtering decision (skills, seniority,
+excluded/required keywords, blacklisted locations, Gemini's filter prompt) is
+per-user and lives in `/settings`, not baked into the code.
 
 ---
 
 ## 🛤️ Pipelines
 
-| Pipeline             | What it finds                                | Key Sources                                          |
-| -------------------- | -------------------------------------------- | ---------------------------------------------------- |
-| ✈️ **Visa Sponsors** | EU/UK hubs that sponsor visas + relocation   | Doctolib, Wallapop, Stripe, SumUp, Wolt, Moonfare    |
-| 🇪🇬 **Local (Egypt)** | Cairo/Egypt companies hiring React devs      | Instabug, Bosta, Thndr, Nawy, Blink22, ArpuPlus      |
-| 🌐 **Global Remote** | Worldwide remote companies friendly to GMT+2 | Vercel, Linear, GitLab, Netlify, RemoteOK, Himalayas |
+Three pipelines, each independently toggleable per user in `/settings`:
+
+| Pipeline             | What it finds                             |
+| -------------------- | ----------------------------------------- |
+| ✈️ **Visa**          | Companies that sponsor visas / relocation |
+| 🇪🇬 **Local**         | Egypt-based companies                     |
+| 🌐 **Global Remote** | Worldwide remote-friendly companies       |
+
+Companies are sourced via Greenhouse, Lever, Ashby, Workable, Teamtailor,
+Breezy, SmartRecruiters, BambooHR, and JazzHR. New companies can be submitted
+publicly at `/submit` and approved by an admin at `/admin/submissions`.
 
 ---
 
-## 🚀 Key Features
+## 🚀 How filtering actually works
 
-- **Multi-Tier Filtering**:
-  1. **Regex Gate**: Fast local filtering for tech stack, seniority, and location-aware patterns (e.g., US-only, Hybrid).
-  2. **Culture Detector**: Analyzes descriptions for toxic red flags (e.g., \"Rockstar,\" \"High Pressure\") with 🚩 visual indicators.
-  3. **Gemini LLM Tier**: Nuanced check for location alignment, BDS policy (Israel-related), and tech stack skew. Includes exact supporting quotes for transparency.
-- **Seniority Arbitrage**: Automatically adjusts seniority gates based on pipeline (Strictly Senior for Local, allows Mid-level for Visa/Global) to maximize high-quality international opportunities.
-- **AI Application Strategist**: A \"Get Strategy\" button that uses Gemini to generate 4-6 bullet-point strategies for your cover letter or interview based on your specific skills and the job requirements.
-- **Market Intelligence**: Analyzes raw signals to identify skill demand, co-occurrence trends, and market gaps. Includes:
-  - **Historical Trends**: 7-day vs 30-day frequency comparison with ↑/↓ indicators.
-  - **Missing Skill Advantage**: Identifies high-value technologies you should acquire.
-  - **Pipeline Breakdown**: Granular stats for Visa, Local, and Global markets.
-- **Source Health Diagnostics**: Real-time reliability tracking (Success/Total API calls) and granular filtering stats. Automatically filters out stale/inactive companies from the dashboard.
-- **Unified Architecture**: Single source of truth for constants and modularized types for full consistency.
-- **Production Security**: "Run Scan" button is protected by a manual `CRON_SECRET` challenge in production environments to prevent unauthorized scans.
+Three stages, each cheaper than the next, so Gemini only ever sees jobs that
+already cleared the free filters first:
+
+1. **Date gate** — drops jobs older than `job_age_days` (per-user).
+2. **Settings gate** — regex-based: seniority, excluded/required keywords,
+   blacklisted locations, skill match — all against the user's own
+   `/settings`, never a hardcoded list.
+3. **Gemini gate** — the user's own Gemini API key evaluates what survived
+   stage 2 against their own custom filter prompt, with supporting quotes for
+   transparency. Fails open (a Gemini error doesn't silently lose a job).
+
+Scoring after that: skill match, recency (always computed live, never frozen
+at insert time), and relocation bonus — weights configurable per user.
+**Bonus skills** ("nice to have," e.g. Docker/AWS) are shown but never scored.
+
+Per-user results are cached (`user_jobs_cache`) and only recomputed when the
+shared raw job pool is newer than the cache — most dashboard loads are
+instant; only the first load after a cron run takes ~10-15s.
 
 ---
 
-## 📊 Scoring & Selection
+## ⏰ Scheduling
 
-- **Skill match (60%)** — `React`, `TypeScript`, `Next.js`, `Tailwind`, `Vite`, etc.
-- **Recency (30%)** — Strict **7-day auto-expiry**.
-- **Relocation bonus (10%)** — Explicit relocation support.
+Two GitHub Actions workflows, both calling `/api/cron`:
+
+- `.github/workflows/cron.yml` — the scrape, twice daily (09:00 + 16:00 UTC).
+- `.github/workflows/salary-reminders.yml` — monthly (1st @ 09:00 UTC), runs
+  `scripts/send-salary-reminders.ts` directly (not an API route).
+
+Both require these repo secrets: `CRON_SECRET`, `VERCEL_PRODUCTION_URL`,
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASS`.
+
+For local/manual runs: `pnpm run cron` and `pnpm run salary-reminders`.
+
+---
+
+## 📧 Email alerts
+
+Per-user opt-in (`/settings` → Email Alerts), two templates:
+
+- **New match found** — fires when a user's dashboard recomputes and finds
+  jobs they haven't seen before. Never fires on a user's very first load
+  (nothing to compare against yet).
+- **Monthly salary reminder** — nudges users whose salary report is stale.
 
 ---
 
 ## 🛠️ Architecture & Setup
 
-- **Frontend**: Next.js 14, Tailwind CSS.
-- **Backend**: Supabase PostgreSQL (JSONB) for storage.
-- **AI**: Google Gemini fallback queue.
-- **Database**: Create a `storage` table with `key` (text) and `data` (jsonb).
+- **Frontend**: Next.js 14 (App Router), inline-style dark theme.
+- **Backend**: Supabase Postgres. Key tables: `ats_companies`, `raw_jobs`,
+  `user_jobs_cache`, `user_settings`, `default_settings`, `app_config`,
+  `cron_logs_v2`, `ats_submissions`, `salary_reports`, `tracker_entries`.
+- **AI**: Each user supplies their own Gemini API key (`user_profiles.gemini_api_key`).
+- **Email**: Nodemailer via SMTP.
 
-### Environment Variables (`.env.local`):
+### Environment Variables (`.env.local`)
 
 ```env
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
-GEMINI_API_KEY=...
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 CRON_SECRET=...
 SMTP_HOST=...
 SMTP_PORT=...
 SMTP_USER=...
 SMTP_PASS=...
-NOTIFY_TO=...
+NEXT_PUBLIC_APP_URL=...
 ```
 
-### Utility Scripts:
+### Scripts
 
-- `pnpm run cron:now`: Manually trigger a full scan.
-- `npx ts-node --project tsconfig.scripts.json src/scripts/force-cleanup.ts`: Force-apply current filtering logic to the database.
+- `pnpm run dev` / `build` / `start` / `lint`
+- `pnpm run cron` — run the scrape once, locally.
+- `pnpm run salary-reminders` — run the monthly salary reminder check once, locally.
+
+### Admin
+
+`/admin` (role-gated via `user_profiles.role = 'admin'`): overview stats,
+user management, company management, global defaults, pending submissions,
+and Workable rate-limit status (currently blocked slugs, configured budget).
 
 ---
 
-## 📜 Principles & Mandates
+## 📜 Principles
 
-- **Strict Profile Alignment**: Only Senior React roles matching the Egypt-based profile are accepted.
-- **Zero Duplication**: Centralized fetching ensures each company is hit only once per run.
-- **Efficiency**: Concurrency limiting and health stat batching ensure network stability.
-- **Transparency**: Every AI rejection must be accompanied by an exact quote from the job description.
+- **Per-user source of truth**: filtering decisions live in `/settings`,
+  never hardcoded in the ingestion pipeline.
+- **Cheap filters before expensive ones**: date → regex → Gemini, in that
+  order, to keep Gemini token usage proportional to what's actually worth
+  checking.
+- **Transparency**: every Gemini rejection includes a supporting quote from
+  the job description.

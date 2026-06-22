@@ -8,8 +8,8 @@
 //   pnpm exec tsx scripts/send-salary-reminders.ts
 
 import { createClient } from "@supabase/supabase-js";
-import { sendSalaryReminderEmail } from "../src/lib/v2/email";
-import type { SalaryReport } from "../src/lib/v2/types";
+import { sendSalaryReminderEmail } from "../src/lib/email";
+import type { SalaryReport } from "../src/lib/types";
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -69,7 +69,7 @@ async function run() {
       await sendSalaryReminderEmail(
         r as unknown as SalaryReport,
         profile.email,
-        `${APP_URL}/v2/salary`,
+        `${APP_URL}/salary`,
       );
 
       // Update reminder_sent_at

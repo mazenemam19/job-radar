@@ -1,9 +1,9 @@
-// src/app/v2/pipeline/page.tsx
+// src/app/pipeline/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import FunnelView from "@/components/v2/pipeline/FunnelView";
-import type { PipelineLog } from "@/lib/v2/types";
+import FunnelView from "@/components/pipeline/FunnelView";
+import type { PipelineLog } from "@/lib/types";
 
 export default function PipelinePage() {
   const [log, setLog] = useState<PipelineLog | null>(null);
