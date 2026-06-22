@@ -17,15 +17,12 @@ import type {
   SRDetail,
   BambooJob,
   JazzJob,
-  WuzzufSearchResponse,
-  WuzzufDetailResponse,
-  RemoteOKJob,
   DomainCounts,
   WorkableCooldownEntry,
   WorkableBudgetConfig,
 } from "@/types";
-import { isClearlyNonFrontend, isTooSeniorOrTooJunior, scoreJob } from "../scoring";
 import { COUNTRY_MAP } from "../constants";
+import type { Json } from "@/lib/database.types";
 import fs from "fs";
 import path from "path";
 
@@ -93,29 +90,9 @@ export function isTimezoneIncompatible(text: string): boolean {
 
 const TMP_DIR = "/tmp";
 const REQ_COUNTS_PATH = path.resolve(TMP_DIR, "req-counts.json");
-const WORKABLE_COOLDOWN_PATH = path.resolve(TMP_DIR, "workable-cooldown.json");
-const WORKABLE_BLOCKED_PATH = path.resolve(TMP_DIR, "workable-blocked.json");
 
+let workableBlockedCache: WorkableCooldownEntry[] = [];
 let domainCountsCache: DomainCounts | null = null;
-let workableCooldownCache: WorkableCooldownEntry[] | null = null;
-
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 999, global: 999, local: 999 };
-let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
-const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
-
-export function resetWorkableUsed(mode?: JobMode): void {
-  if (mode) workableUsedByMode[mode] = 0;
-  else {
-    workableUsedByMode.visa = 0;
-    workableUsedByMode.global = 0;
-    workableUsedByMode.local = 0;
-  }
-}
-
-export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): void {
-  workableBudget = { ...DEFAULT_BUDGET, ...config };
-  resetWorkableUsed();
-}
 
 function ensureTmpDir(filePath: string): void {
   const dir = path.dirname(filePath);
@@ -151,48 +128,77 @@ function trackDomainRequest(url: string): void {
   } catch {}
 }
 
-function loadWorkableCooldowns(): WorkableCooldownEntry[] {
-  if (workableCooldownCache) return workableCooldownCache;
-  try {
-    const raw = fs.readFileSync(WORKABLE_COOLDOWN_PATH, "utf-8");
-    workableCooldownCache = JSON.parse(raw);
-  } catch {
-    workableCooldownCache = [];
+const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 999, global: 999, local: 999 };
+let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
+const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
+
+export function resetWorkableUsed(mode?: JobMode): void {
+  if (mode) workableUsedByMode[mode] = 0;
+  else {
+    workableUsedByMode.visa = 0;
+    workableUsedByMode.global = 0;
+    workableUsedByMode.local = 0;
   }
-  return workableCooldownCache || [];
 }
 
-function getWorkableCooldownUntil(slug: string): Date | null {
-  const entries = loadWorkableCooldowns();
-  const entry = entries.find((e) => e.slug === slug);
-  if (!entry) return null;
-  const ms = Date.parse(entry.until);
-  return isNaN(ms) ? null : new Date(ms);
+export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): void {
+  workableBudget = { ...DEFAULT_BUDGET, ...config };
+  resetWorkableUsed();
 }
 
-function loadWorkableBlocked(): WorkableCooldownEntry[] {
-  try {
-    return JSON.parse(fs.readFileSync(WORKABLE_BLOCKED_PATH, "utf-8"));
-  } catch {
-    return [];
+// ── Workable rate-limit state (Supabase-backed) ─────────────────────────────
+// This used to live in /tmp JSON files and a plain in-memory variable, which
+// does not survive across serverless invocations (Vercel functions and
+// GitHub Actions runs are both stateless per run) — meaning blocks and budget
+// config silently reset to defaults on every single cron run. Persisting to
+// app_config makes this actually work across runs.
+
+export async function loadWorkableStateFromDB(): Promise<void> {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const db = createAdminClient();
+  const { data } = await db
+    .from("app_config")
+    .select("workable_blocked, workable_budget")
+    .eq("id", 1)
+    .single();
+  if (data?.workable_blocked) {
+    workableBlockedCache = (data.workable_blocked as unknown as WorkableCooldownEntry[]).filter(
+      (e) => new Date(e.until).getTime() > Date.now(),
+    );
   }
+  if (data?.workable_budget) {
+    workableBudget = {
+      ...DEFAULT_BUDGET,
+      ...(data.workable_budget as Partial<WorkableBudgetConfig>),
+    };
+  }
+}
+
+export async function flushWorkable429sToDB(): Promise<void> {
+  const slugs = getWorkable429SlugsThisRun();
+  if (slugs.length === 0) return;
+  markWorkableSlugsBlocked24h(slugs);
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const db = createAdminClient();
+  await db
+    .from("app_config")
+    .update({
+      workable_blocked: workableBlockedCache as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
 }
 
 function setWorkableBlocked(slug: string, until: Date): void {
-  const entries = loadWorkableBlocked();
   const iso = until.toISOString();
-  const existing = entries.find((e) => e.slug === slug);
+  const existing = workableBlockedCache.find((e) => e.slug === slug);
   if (existing) existing.until = iso;
-  else entries.push({ slug, until: iso });
-  try {
-    ensureTmpDir(WORKABLE_BLOCKED_PATH);
-    fs.writeFileSync(WORKABLE_BLOCKED_PATH, JSON.stringify(entries, null, 2));
-  } catch {}
+  else workableBlockedCache.push({ slug, until: iso });
 }
 
 function isWorkableBlocked(slug: string): boolean {
-  const entries = loadWorkableBlocked();
-  const entry = entries.find((e) => e.slug === slug);
+  const entry = workableBlockedCache.find((e) => e.slug === slug);
   if (!entry) return false;
   return new Date(entry.until).getTime() > Date.now();
 }
@@ -268,9 +274,14 @@ export function processJobs(
 
   for (const r of raw) {
     const title = r.title.trim();
-    if (isClearlyNonFrontend(title) || isTooSeniorOrTooJunior(title)) continue;
+
+    // NOTE: title-based "too senior" / "non-frontend" filtering used to happen
+    // here via the old hardcoded scoring.ts. Removed deliberately — Job Radar
+    // is multi-tenant now. Role/seniority/skill filtering is the user's call,
+    // applied downstream against their own /settings, not baked into ingestion.
 
     // ── Global Mode Restrictions ──
+    // (Geographic/timezone eligibility, not role filtering — kept as-is.)
     if (mode === "global") {
       if (isTimezoneIncompatible(r.description + r.location)) continue;
 
@@ -288,14 +299,6 @@ export function processJobs(
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;
 
-    const scored = scoreJob({
-      title,
-      description: r.description,
-      location: r.location,
-      postedAt: r.postedAt,
-    }, mode);
-
-    const isMatch = scored.skillMatchScore > 0;
     const actualSponsorship =
       visaSponsorship || /visa\s+sponsorship|relocation/i.test(r.description);
     const isRemote = /remote|work\s+from\s+home/i.test(title + r.location + r.description);
@@ -318,13 +321,25 @@ export function processJobs(
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      // For non-matches, we store a very short description to save space in the raw market store
-      description: isMatch ? r.description.slice(0, 3000) : r.description.slice(0, 500),
+      // Flat truncation for all jobs now — the old "shrink non-matches" policy
+      // existed because everything was pre-filtered by skill match at ingestion.
+      // That gate is gone; storage policy shouldn't reintroduce the same bias.
+      description: r.description.slice(0, 3000),
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
       visaSponsorship: actualSponsorship,
-      ...scored,
+      // These fields are vestigial on the legacy `Job` type — nothing downstream
+      // reads them (the dashboard pipeline computes its own scores in JobCard.tsx via
+      // computeRecencyScore/passesSettingsGate against the user's real settings).
+      // Kept as neutral defaults only to satisfy the existing type contract.
+      matchedSkills: [],
+      bonusSkills: [],
+      missingSkills: [],
+      skillMatchScore: 0,
+      recencyScore: 0,
+      relocationBonus: 0,
+      totalScore: 0,
       fetchedAt: now,
     });
   }
@@ -550,15 +565,6 @@ export async function fetchWorkable(
       durationMs: Date.now() - t0,
       ok: false,
     };
-  const cooldownUntil = getWorkableCooldownUntil(c.slug);
-  if (cooldownUntil && cooldownUntil.getTime() > Date.now())
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: "Workable Cooldown",
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
 
   const budget = workableBudget;
   const limit = budget[mode as JobMode];
@@ -608,9 +614,13 @@ export async function fetchWorkable(
     const data = (await res.json()) as { jobs?: WorkableJob[] };
     const rawJobs = data.jobs || [];
     const rawCount = rawJobs.length;
-    const jobs = rawJobs.filter(
-      (r) => !isClearlyNonFrontend(r.title) && !isTooSeniorOrTooJunior(r.title),
-    );
+    // NOTE: this used to pre-filter by title via the old hardcoded scoring.ts
+    // before even fetching job details, as a Workable API budget optimization.
+    // Removed for the same reason as processJobs — role filtering is the
+    // user's call via /settings now, not a hardcoded gate. If Workable detail-fetch
+    // volume becomes a real budget concern, that's a separate, deliberate decision —
+    // not a silent side effect of this filter.
+    const jobs = rawJobs;
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
@@ -944,249 +954,5 @@ export async function fetchJazzHR(
       durationMs: Date.now() - t0,
       ok: false,
     };
-  }
-}
-
-// ── Wuzzuf ──────────────────────────────────────────────────────────────────
-
-export async function fetchWuzzuf(mode: JobMode): Promise<FetcherResult> {
-  const t0 = Date.now();
-  const searchUrl = "https://wuzzuf.net/api/search/job";
-  const queries = ["react", "next.js"];
-  const allWuzzufJobs: Job[] = [];
-  const seenIds = new Set<string>();
-  const now = new Date().toISOString();
-  let rawCount = 0;
-  let ok = true;
-  try {
-    const queryResults = await Promise.all(
-      queries.map(async (q) => {
-        const searchPayload = {
-          startIndex: 0,
-          pageSize: 20,
-          longitude: "31.2357",
-          latitude: "30.0444",
-          query: q,
-          searchFilters: {
-            post_date: ["within_1_week"],
-            years_of_experience_min: ["3"],
-            years_of_experience_max: ["6"],
-          },
-        };
-        const sRes = await fetch(searchUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
-          body: JSON.stringify(searchPayload),
-        });
-
-        if (!sRes.ok) {
-          ok = false;
-          return [];
-        }
-        const sData = (await sRes.json()) as WuzzufSearchResponse;
-        const ids = (sData?.data || []).map((j) => j.id).filter((id) => !seenIds.has(id));
-        if (ids.length === 0) return [];
-
-        // Add to seenIds immediately to avoid duplicate detail fetches in other query branches
-        ids.forEach((id) => seenIds.add(id));
-        rawCount += ids.length;
-
-        const detailUrl = `https://wuzzuf.net/api/job?filter[other][ids]=${ids.join(",")}`;
-        const dRes = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-        if (!dRes.ok) {
-          ok = false;
-          return [];
-        }
-        const dData = (await dRes.json()) as WuzzufDetailResponse;
-        return dData?.data || [];
-      }),
-    );
-
-    const jobs = queryResults.flat();
-    seenIds.clear(); // Reset for the actual title/dedupe check
-
-    for (const entry of jobs) {
-      const attr = entry.attributes || {};
-      const title = (attr.title || "").trim();
-      if (seenIds.has(entry.id)) continue;
-      seenIds.add(entry.id);
-      const companyName =
-        attr.company_name ||
-        attr.computedFields?.find((f) => f.name === "company_name")?.value?.[0] ||
-        "Wuzzuf Job";
-
-      const fullDescription = `
-        ${attr.description || ""} 
-        ${attr.requirements || ""} 
-        Job Type: ${attr.jobType || ""}
-        Career Level: ${attr.careerLevel?.name || ""}
-      `.trim();
-
-      const workplaceArrangement =
-        typeof attr.workplaceArrangement === "string"
-          ? attr.workplaceArrangement
-          : attr.workplaceArrangement?.displayedName || "";
-
-      allWuzzufJobs.push({
-        id: `local_wuzzuf_${entry.id}`,
-        source: "local",
-        mode,
-        sourceName: "Wuzzuf",
-        title,
-        company: companyName,
-        location: attr.location?.city?.name || "MENA",
-        country: attr.location?.country?.name || "MENA",
-        countryFlag: "🌍",
-        url: `https://wuzzuf.net/jobs/p/${attr.slug || entry.id}`,
-        description: stripHtml(fullDescription).slice(0, 3000),
-        isRemote: /remote/i.test(workplaceArrangement) || /remote/i.test(title),
-        postedAt: attr.postedAt,
-        dateUnknown: false,
-        visaSponsorship: false,
-        ...scoreJob({
-          title,
-          description: fullDescription,
-          location: "MENA",
-          postedAt: attr.postedAt,
-        }, mode),
-        fetchedAt: now,
-      });
-    }
-    return { jobs: allWuzzufJobs, rawCount, durationMs: Date.now() - t0, ok };
-  } catch (e) {
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `Error: ${e}`,
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  }
-}
-
-// ── RemoteOK ────────────────────────────────────────────────────────────────
-
-export async function fetchRemoteOK(mode: JobMode): Promise<FetcherResult> {
-  const t0 = Date.now();
-  const url = "https://remoteok.com/api";
-  const res = await safeFetch(url);
-
-  if (!res)
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: "Network/Timeout",
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  if (!res.ok)
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `HTTP ${res.status}`,
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  try {
-    const data = (await res.json()) as RemoteOKJob[];
-    const rawJobs = data.filter((item) => item.id && item.position);
-    const rawCount = rawJobs.length;
-    const out: Job[] = [];
-    for (const r of rawJobs) {
-      const title = r.position || "";
-      const description = stripHtml(r.description || "");
-      const scored = scoreJob({ title, description, location: "Remote", postedAt: r.date });
-      if (scored.skillMatchScore === 0) continue;
-      out.push({
-        id: `global_remoteok_${r.id}`,
-        source: "company",
-        mode,
-        sourceName: "RemoteOK",
-        title,
-        company: r.company || "RemoteOK",
-        location: "Remote 🌐",
-        country: "Global",
-        countryFlag: "🌍",
-        url: r.url,
-        description: description.slice(0, 500),
-        isRemote: true,
-        postedAt: r.date,
-        dateUnknown: false,
-        visaSponsorship: false,
-        ...scored,
-        fetchedAt: new Date().toISOString(),
-      });
-    }
-    return { jobs: out, rawCount, durationMs: Date.now() - t0, ok: true };
-  } catch (e) {
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `Parse Error: ${e}`,
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  }
-}
-
-// ── Custom Local Egyptian Company Fetchers ──────────────────────────────────
-
-export async function fetchBrightSkies(mode: JobMode): Promise<FetcherResult> {
-  const t0 = Date.now();
-  const company: BaseCompany = {
-    name: "Bright Skies",
-    country: "Egypt",
-    countryFlag: "🇪🇬",
-    city: "Cairo",
-  };
-  try {
-    const res = await fetch("https://brightskiesinc.com/graphql", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        operationName: "getJobs",
-        variables: { pageSize: 50, page: 1, title: "" },
-        query: `query getJobs($pageSize: Int!, $page: Int!, $title: String, $department: String, $location: String) { jobs(filters: {title: {contains: $title}, department: {contains: $department}, location: {contains: $location}}, pagination: {pageSize: $pageSize, page: $page}) { data { id attributes { title location job_type department } } } }`,
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok)
-      return {
-        jobs: [],
-        rawCount: 0,
-        error: `HTTP ${res.status}`,
-        durationMs: Date.now() - t0,
-        ok: false,
-      };
-    const data = (await res.json()) as {
-      data: {
-        jobs: {
-          data: {
-            id: string;
-            attributes: { title: string; location: string; department: string };
-          }[];
-        };
-      };
-    };
-    const rawJobs = data.data?.jobs?.data || [];
-    const rawCount = rawJobs.length;
-    const processed = processJobs(
-      rawJobs.map((item) => ({
-        id: `local_brightskies_${item.id}`,
-        title: item.attributes.title,
-        location: item.attributes.location || "Cairo",
-        url: `https://brightskiesinc.com/careers/jobs/${item.id}`,
-        postedAt: new Date().toISOString(),
-        description: item.attributes.department || "",
-      })),
-      company,
-      mode,
-      false,
-    );
-    // processJobs already sets sourceName to company.name ("Bright Skies")
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : "Unknown Error";
-    return { jobs: [], rawCount: 0, error, durationMs: Date.now() - t0, ok: false };
   }
 }

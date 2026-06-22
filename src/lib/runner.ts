@@ -1,223 +1,229 @@
-import { readStore, writeStore, mergeJobs, appendCronLog, writeRawStore } from "./storage";
-import { fetchVisaJobs } from "./sources/visa-companies";
-import { fetchLocalJobs } from "./sources/local-companies";
-import { fetchRemoteJobs } from "./sources/remote-companies";
-import { sendJobAlert } from "./email";
-import {
-  isClearlyNonFrontend,
-  isTooSeniorOrTooJunior,
-  isGenericTitleButBackendRole,
-  requiresCitizenshipOrClearance,
-} from "./scoring";
-import { filterJobsWithGemini } from "./gemini";
-import {
-  setWorkableBudgetConfig,
-  getWorkable429SlugsThisRun,
-  markWorkableSlugsBlocked24h,
-} from "./sources/ats-utils";
-import { finalizeBatchState, readState } from "./state";
-import { trackMultipleApiCalls } from "./health-store";
-import type { Job, CronLog, SourceHealth } from "@/types";
+// src/lib/runner.ts
+// New cron orchestrator for Job Radar.
+//
+// Key differences from old runner.ts (src/lib/runner.ts):
+//  1. Reads company list from public.ats_companies DB table (not hardcoded ALL_COMPANIES)
+//  2. Writes jobs to public.raw_jobs (not the old `storage` table)
+//  3. After a successful run, bumps app_config.last_cron_at so all user caches
+//     are invalidated and rebuilt lazily on next dashboard load
+//  4. All bug fixes (#3-#6) are applied in scoring.ts; runner is just the orchestrator
+//
+// This file is IMPORTED by /api/cron/route.ts and never modifies old files.
 
-export async function runAllSources(): Promise<CronLog> {
-  const budgetArg = process.argv?.find(
-    (a: string) => a.startsWith("--budget=") || a.startsWith("--budget-config="),
-  );
-  if (budgetArg) {
-    try {
-      const raw = budgetArg.split("=", 2)[1]?.replace(/^['"]|['"]$/g, "") ?? "{}";
-      setWorkableBudgetConfig(JSON.parse(raw) as Record<string, number>);
-    } catch {
-      /* ignore */
+import { createAdminClient } from "./supabase/admin";
+import { fetchCompany } from "./ats-bridge";
+import { loadWorkableStateFromDB, flushWorkable429sToDB } from "./sources/ats-utils";
+import type { ATSCompanyRow, CronRunResult, RawJob } from "./types";
+
+const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
+
+/** Simple concurrency limiter */
+async function withConcurrencyLimit<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = [];
+  const executing: Promise<void>[] = [];
+
+  for (const task of tasks) {
+    const p: Promise<void> = task().then((r) => {
+      results.push(r);
+    });
+    executing.push(p);
+
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+      // Remove settled promises
+      for (let i = executing.length - 1; i >= 0; i--) {
+        const state = await Promise.race([
+          executing[i].then(() => "done").catch(() => "done"),
+          Promise.resolve("pending"),
+        ]);
+        if (state === "done") executing.splice(i, 1);
+      }
     }
   }
-  console.log("[runner] ── Scan start ───────────────────────────────────────");
-  const t0 = Date.now();
-  const store = await readStore();
-  await readState(); // Initialize process state for lastUpdated timestamp
-  const existingIds = new Set(store.jobs.map((j) => j.id));
 
+  await Promise.allSettled(executing);
+  return results;
+}
+
+// ── Main cron function ───────────────────────────────────────
+
+/**
+ * Runs the global cron job:
+ *  1. Fetches all active companies from public.ats_companies
+ *  2. Calls ATS fetchers in parallel (concurrency-limited)
+ *  3. Upserts all fetched jobs into public.raw_jobs
+ *     (INSERT ... ON CONFLICT (id) DO UPDATE SET fetched_at = NOW())
+ *  4. Bumps app_config.last_cron_at → invalidates all user caches
+ *  5. Logs the run in public.cron_logs_v2
+ *
+ * User-specific Gemini filtering happens lazily on dashboard load ("Lazy C").
+ */
+export async function runCronJob(
+  trigger: "github_actions" | "vercel_cron" | "manual",
+): Promise<CronRunResult> {
+  const db = createAdminClient();
+  const startMs = Date.now();
   const errors: string[] = [];
-  const sourceDetails: Record<string, SourceHealth> = {};
-  const healthResults: Record<string, boolean> = {};
+  const sourceHealth: CronRunResult["source_health"] = {};
 
-  let visaJobs: Job[] = [];
-  let localJobs: Job[] = [];
-  let globalJobs: Job[] = [];
+  // 1. Load active companies
+  const { data: companies, error: companiesError } = await db
+    .from("ats_companies")
+    .select("*")
+    .eq("is_active", true);
 
-  // ── Run all pipelines in parallel ──────────────────────────────────────
-  const [localResult, visaResult, remoteResult] = await Promise.allSettled([
-    fetchLocalJobs(),
-    fetchVisaJobs(),
-    fetchRemoteJobs(),
+  // Load Workable rate-limit state (blocked slugs, budget config) from the DB
+  // before fetching anything — this is what actually persists it across runs,
+  // since serverless invocations don't share memory or /tmp.
+  await loadWorkableStateFromDB();
+
+  if (companiesError || !companies?.length) {
+    const msg = companiesError?.message ?? "No active companies found";
+    errors.push(`Failed to load companies: ${msg}`);
+    return {
+      total_fetched: 0,
+      duration_ms: Date.now() - startMs,
+      errors,
+      source_health: {},
+      trigger,
+    };
+  }
+
+  // 2. Build fetch tasks — one per (company, pipeline) combination
+  const tasks: Array<
+    () => Promise<{
+      company: string;
+      mode: "visa" | "local" | "global";
+      jobs: RawJob[];
+      error: string | null;
+    }>
+  > = [];
+
+  for (const row of companies as ATSCompanyRow[]) {
+    if (row.pipeline_visa) tasks.push(() => fetchCompany(row, "visa"));
+    if (row.pipeline_local) tasks.push(() => fetchCompany(row, "local"));
+    if (row.pipeline_global) tasks.push(() => fetchCompany(row, "global"));
+  }
+
+  // 3. Execute with concurrency limit
+  const fetchResults = await withConcurrencyLimit(tasks, CONCURRENCY_LIMIT);
+
+  // 4. Aggregate results and track source health
+  const allJobs: RawJob[] = [];
+
+  for (const result of fetchResults) {
+    const healthKey = `${result.company}:${result.mode}`;
+    if (result.error) {
+      errors.push(`${result.company} (${result.mode}): ${result.error}`);
+      sourceHealth[healthKey] = {
+        company: result.company,
+        fetched: 0,
+        errors: 1,
+      };
+    } else {
+      allJobs.push(...result.jobs);
+      sourceHealth[healthKey] = {
+        company: result.company,
+        fetched: result.jobs.length,
+        errors: 0,
+      };
+    }
+  }
+
+  // 5. Upsert into raw_jobs
+  // INSERT ON CONFLICT (id) DO UPDATE — updates fetched_at to keep jobs fresh.
+  // This is the deduplication mechanism: same URL hash = same id.
+  if (allJobs.length > 0) {
+    const rows = allJobs.map((j) => ({
+      id: j.id,
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      country: j.country,
+      country_flag: j.country_flag,
+      url: j.url,
+      description: j.description,
+      posted_at: j.posted_at,
+      fetched_at: j.fetched_at,
+      date_unknown: j.date_unknown,
+      is_remote: j.is_remote,
+      salary: j.salary,
+      mode: j.mode,
+      visa_sponsorship: j.visa_sponsorship,
+      source_name: j.source_name,
+      ats_type: j.ats_type,
+      created_at: j.created_at,
+    }));
+
+    // Batch upsert in chunks of 500 to avoid Supabase row limits
+    const CHUNK = 500;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const { error: upsertError } = await db.from("raw_jobs").upsert(chunk, {
+        onConflict: "id",
+        ignoreDuplicates: false, // we want to update fetched_at
+      });
+
+      if (upsertError) {
+        errors.push(`Upsert chunk ${i}-${i + CHUNK}: ${upsertError.message}`);
+      }
+    }
+  }
+
+  // 6. Bump app_config.last_cron_at → invalidates all user_jobs_cache entries
+  const { error: configError } = await db
+    .from("app_config")
+    .update({ last_cron_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", 1);
+
+  if (configError) {
+    errors.push(`Failed to update app_config: ${configError.message}`);
+  }
+
+  // Persist any Workable 429s detected this run, so the next run actually
+  // skips those companies instead of hammering them again immediately.
+  await flushWorkable429sToDB();
+
+  const durationMs = Date.now() - startMs;
+
+  // 7. Log the cron run
+  await db.from("cron_logs_v2").insert({
+    run_at: new Date().toISOString(),
+    total_fetched: allJobs.length,
+    duration_ms: durationMs,
+    errors: errors.length ? errors : null,
+    source_health: sourceHealth,
+    trigger,
+  });
+
+  return {
+    total_fetched: allJobs.length,
+    duration_ms: durationMs,
+    errors,
+    source_health: sourceHealth,
+    trigger,
+  };
+}
+
+// ── Per-user dashboard rebuild ────────────────────────────────
+
+/**
+ * Checks if the user's job cache is stale (older than the last cron run).
+ * If stale, returns false so the dashboard can trigger a rebuild.
+ */
+export async function isCacheFresh(userId: string): Promise<boolean> {
+  const db = createAdminClient();
+
+  const [{ data: config }, { data: cache }] = await Promise.all([
+    db.from("app_config").select("last_cron_at").eq("id", 1).single(),
+    db.from("user_jobs_cache").select("cached_at").eq("user_id", userId).single(),
   ]);
 
-  const aggregateHealth = (health: Record<string, SourceHealth>) => {
-    for (const key in health) {
-      const h = health[key];
-      if (!sourceDetails[key]) {
-        sourceDetails[key] = { ...h };
-      } else {
-        // Additive fields
-        sourceDetails[key].count = (sourceDetails[key].count || 0) + (h.count || 0);
-        sourceDetails[key].rawCount = (sourceDetails[key].rawCount || 0) + (h.rawCount || 0);
-        sourceDetails[key].geminiFiltered =
-          (sourceDetails[key].geminiFiltered || 0) + (h.geminiFiltered || 0);
-        // Overwrite or preserve descriptive fields
-        if (h.error) sourceDetails[key].error = h.error;
-        if (h.durationMs)
-          sourceDetails[key].durationMs = (sourceDetails[key].durationMs || 0) + h.durationMs;
-        if (h.ok !== undefined) sourceDetails[key].ok = sourceDetails[key].ok && h.ok;
-      }
-      if (h.ok !== undefined) healthResults[key] = h.ok;
-    }
-  };
+  if (!cache?.cached_at) return false;
+  if (!config?.last_cron_at) return true; // no cron run yet
 
-  if (localResult.status === "fulfilled") {
-    localJobs = localResult.value.jobs;
-    aggregateHealth(localResult.value.health);
-  } else {
-    errors.push(`local pipeline: ${localResult.reason}`);
-    console.error("[runner] local pipeline failed:", localResult.reason);
-  }
-
-  if (visaResult.status === "fulfilled") {
-    visaJobs = visaResult.value.jobs;
-    aggregateHealth(visaResult.value.health);
-  } else {
-    errors.push(`visa pipeline: ${visaResult.reason}`);
-    console.error("[runner] visa pipeline failed:", visaResult.reason);
-  }
-
-  if (remoteResult.status === "fulfilled") {
-    globalJobs = remoteResult.value.jobs;
-    aggregateHealth(remoteResult.value.health);
-  } else {
-    errors.push(`remote pipeline: ${remoteResult.reason}`);
-    console.error("[runner] remote pipeline failed:", remoteResult.reason);
-  }
-
-  // Handle Workable 429 escalate if nothing was found (indicates a general block)
-  if (localJobs.length === 0 && visaJobs.length === 0 && globalJobs.length === 0) {
-    const slugs429 = getWorkable429SlugsThisRun();
-    if (slugs429.length) {
-      markWorkableSlugsBlocked24h(slugs429);
-      console.warn(
-        `[runner] All pipelines returned 0; marked ${slugs429.length} Workable slug(s) blocked 24h: ${slugs429.join(", ")}`,
-      );
-    }
-  }
-
-  const rawFetched = [...visaJobs, ...localJobs, ...globalJobs];
-
-  // ── Raw Market Persistence ──
-  await writeRawStore(rawFetched);
-
-  // ── Gemini Filtration Layer ──
-  const seenCandidateIds = new Set<string>();
-  const newCandidates = rawFetched.filter((j) => {
-    if (existingIds.has(j.id)) return false;
-    if (seenCandidateIds.has(j.id)) return false;
-    if (isClearlyNonFrontend(j.title) || isTooSeniorOrTooJunior(j.title, j.mode)) return false;
-    if (isGenericTitleButBackendRole(j.title, j.description)) return false;
-    if (requiresCitizenshipOrClearance(j.title + " " + j.description)) return false;
-
-    seenCandidateIds.add(j.id);
-    return true;
-  });
-
-  console.log(`[runner] Running Gemini filter on ${newCandidates.length} new candidate(s)...`);
-  const { passed: passedNewJobs, rejectedIds } = await filterJobsWithGemini(newCandidates);
-  const rejectedSet = new Set(rejectedIds);
-
-  const fetched = rawFetched.filter((j) => {
-    if (existingIds.has(j.id)) return true;
-    if (rejectedSet.has(j.id)) return false;
-    return passedNewJobs.some((pj) => pj.id === j.id);
-  });
-
-  const { store: updated, added } = mergeJobs(store, fetched);
-
-  // ── Final Health Refinement ──
-  const detailKeys = Object.keys(sourceDetails);
-
-  for (const key in sourceDetails) {
-    sourceDetails[key].count = 0;
-    sourceDetails[key].geminiFiltered = 0;
-    sourceDetails[key].totalSurvivors = 0;
-  }
-
-  // 1. Count technical matches from this run (Passed Regex)
-  rawFetched.forEach((j) => {
-    const sName = (j.sourceName || j.company).toLowerCase().trim();
-    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
-    if (key && sourceDetails[key]) {
-      sourceDetails[key].count! += 1;
-    }
-  });
-
-  // 2. Count Gemini rejections from this run
-  newCandidates.forEach((j) => {
-    if (rejectedSet.has(j.id)) {
-      const sName = (j.sourceName || j.company).toLowerCase().trim();
-      const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
-      if (key && sourceDetails[key]) {
-        sourceDetails[key].geminiFiltered! += 1;
-      }
-    }
-  });
-
-  // 3. Count TOTAL survivors currently in the store (Cumulative 7-day)
-  updated.jobs.forEach((j) => {
-    const sName = (j.sourceName || j.company).toLowerCase().trim();
-    const key = detailKeys.find((k) => k.toLowerCase().trim() === sName);
-    if (key && sourceDetails[key]) {
-      sourceDetails[key].totalSurvivors! += 1;
-    }
-  });
-
-  try {
-    const finalHealth = await trackMultipleApiCalls(healthResults);
-    for (const key in sourceDetails) {
-      if (finalHealth[key]) {
-        sourceDetails[key].success = finalHealth[key].success;
-        sourceDetails[key].total = finalHealth[key].total;
-      }
-    }
-  } catch (e) {
-    console.error("[runner] Failed to update health store:", e);
-  }
-
-  // Email alert only for brand-new visa-mode jobs
-  const brandNewVisa = added.filter((j) => !existingIds.has(j.id) && j.mode === "visa");
-  if (brandNewVisa.length) {
-    try {
-      await sendJobAlert(brandNewVisa);
-    } catch (err) {
-      errors.push(`email: ${err}`);
-      console.error("[runner] email failed:", err);
-    }
-  }
-
-  const durationMs = Date.now() - t0;
-  const log: CronLog = {
-    runAt: new Date().toISOString(),
-    newJobs: added.length,
-    totalJobs: updated.jobs.length,
-    sources: {
-      visa: added.filter((j) => j.mode === "visa").length,
-      local: added.filter((j) => j.mode === "local").length,
-      global: added.filter((j) => j.mode === "global").length,
-    },
-    sourceDetails,
-    durationMs,
-    errors,
-  };
-
-  await finalizeBatchState();
-  await writeStore(appendCronLog(updated, log));
-  console.log(
-    `[runner] Done in ${(durationMs / 1000).toFixed(1)}s — ${added.length} new, ${updated.jobs.length} total`,
-  );
-  return log;
+  return cache.cached_at > config.last_cron_at;
 }

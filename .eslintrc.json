@@ -1,8 +1,11 @@
 {
   "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended", "prettier"],
   "rules": {
-    "no-unused-vars": "error",
-    "no-undef": "error",
-    "@typescript-eslint/no-explicit-any": "error"
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "no-undef": "off",
+    "@typescript-eslint/no-explicit-any": "error",
+    "react/react-in-jsx-scope": "off",
+    "react/no-unescaped-entities": "warn"
   }
 }

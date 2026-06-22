@@ -1,26 +1,27 @@
 // src/scripts/cron.ts
-// Entry point for: pnpm run cron:now
-// Runs the full scan and prints a summary.
+// Entry point for: pnpm run cron
+// Runs the full multi-tenant scrape scan.
 
 import { config } from "dotenv";
 import path from "path";
 
-// Explicitly load .env.local
+// Load local environment variables
 config({ path: path.resolve(process.cwd(), ".env.local") });
 
-import { runAllSources } from "../lib/runner";
+import { runCronJob } from "../lib/runner";
 
 (async () => {
   try {
-    const log = await runAllSources();
-    console.log("\n── Run summary ──────────────────────────────────────");
-    console.log(`  New jobs:    ${log.newJobs}`);
-    console.log(`  Total jobs:  ${log.totalJobs}`);
-    console.log(`  Duration:    ${(log.durationMs / 1000).toFixed(1)}s`);
-    console.log(`  Sources:     ${JSON.stringify(log.sources)}`);
+    console.log("[cron] Starting global scrape scan...");
+    const log = await runCronJob("manual");
+    console.log("\n── Run summary ───────────────────────────────────");
+    console.log(`  Total fetched:  ${log.total_fetched}`);
+    console.log(`  Duration:       ${(log.duration_ms / 1000).toFixed(1)}s`);
     if (log.errors.length) {
       console.warn(`  Errors (${log.errors.length}):`);
       log.errors.forEach((e) => console.warn(`    • ${e}`));
+    } else {
+      console.log("  Errors:         None");
     }
     console.log("─────────────────────────────────────────────────────\n");
     process.exit(0);

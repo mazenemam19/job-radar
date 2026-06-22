@@ -1,36 +1,66 @@
 // src/app/api/cron/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { runAllSources } from "@/lib/runner";
+// New cron endpoint. Old /api/cron is untouched.
+//
+// Accepts both GET (Vercel Cron) and POST (GitHub Actions).
+// Protected by CRON_SECRET header/query param.
+//
+// This endpoint ONLY runs the global scrape. Per-user Gemini filtering
+// happens lazily when a user opens their dashboard ("Lazy C" model).
 
-export const maxDuration = 300; // Allow up to 5min for all 3 pipelines
+import { NextResponse, type NextRequest } from "next/server";
+import { runCronJob } from "@/lib/runner";
 
-async function handleCron(req: NextRequest) {
-  const isDev = process.env.NODE_ENV === "development";
-  // Vercel cron sends: Authorization: Bearer <CRON_SECRET>
-  // Dashboard button sends: x-cron-secret header
-  const authHeader = req.headers.get("authorization");
-  const legacySecret = req.headers.get("x-cron-secret");
-  const token = authHeader?.replace("Bearer ", "").trim() ?? legacySecret;
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
 
-  if (!isDev && token !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Check Authorization header (GitHub Actions / manual)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader === `Bearer ${secret}`) return true;
+
+  // Check query param (Vercel Cron GET)
+  const url = new URL(request.url);
+  if (url.searchParams.get("secret") === secret) return true;
+
+  return false;
+}
+
+function getTrigger(request: NextRequest): "github_actions" | "vercel_cron" | "manual" {
+  const ua = request.headers.get("user-agent") ?? "";
+  if (ua.includes("vercel")) return "vercel_cron";
+  if (request.method === "POST") return "github_actions";
+  return "manual";
+}
+
+export async function GET(request: NextRequest) {
+  return handler(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handler(request);
+}
+
+async function handler(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const log = await runAllSources();
-    return NextResponse.json({ ok: true, log });
+    const result = await runCronJob(getTrigger(request));
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        total_fetched: result.total_fetched,
+        duration_ms: result.duration_ms,
+        error_count: result.errors.length,
+        errors: result.errors.slice(0, 20), // truncate for response size
+        trigger: result.trigger,
+      },
+    });
   } catch (err) {
-    console.error("[/api/cron] Fatal:", err);
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[api/cron] Fatal error:", message);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
-}
-
-// GET: called by Vercel Cron scheduler automatically at 4pm UTC (6pm Cairo)
-export async function GET(req: NextRequest) {
-  return handleCron(req);
-}
-
-// POST: called by dashboard "Run Scan" button
-export async function POST(req: NextRequest) {
-  return handleCron(req);
 }

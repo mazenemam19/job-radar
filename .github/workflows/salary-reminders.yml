@@ -1,0 +1,43 @@
+# .github/workflows/salary-reminders.yml
+# Monthly trigger for scripts/send-salary-reminders.ts — this script's logic
+# has existed since before this workflow file did; it was simply never given
+# a recurring trigger. Runs the script directly (it's a standalone Node
+# script, not an API route, so there's nothing to POST to).
+
+name: Monthly salary reminders
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'  # 1st of every month, 09:00 UTC
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  send-reminders:
+    name: Send salary update reminder emails
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run salary reminder script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
+        run: npm run salary-reminders
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "Salary reminder run failed. Check the Actions log above."
