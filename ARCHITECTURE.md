@@ -1,22 +1,18 @@
 # Job Radar — Architecture
 
-**Repo:** `mazenemam19/job-radar`
-**Branch:** `feature/multi-tenant-app`
-
-Job Radar is a multi-tenant job-hunting SaaS. It scrapes frontend (React/Next.js/React
-Native) roles from hundreds of ATS-listed companies, then filters and scores each job
-**per user**, against that user's own skills, seniority preference, keyword rules, and
-Gemini prompt — instead of one hardcoded profile. This document describes how the
+Job Radar is a multi-tenant job-hunting SaaS. It scrapes every job posted by
+hundreds of ATS-listed companies — **ingestion is role-agnostic**, pulling
+whatever each company has open, not just frontend roles — then filters and
+scores each job **per user**, against that user's own skills, seniority
+preference, keyword rules, and Gemini prompt — instead of one hardcoded
+profile. The app ships with a Senior React/Next.js engineer profile as the
+_default_ `default_settings` row (a holdover from its single-user origins;
+surfaced to new users during onboarding), but that's just data — any user can
+repoint their own `/settings` at any role/stack, and the same pipeline
+applies unchanged. This document describes how the
 system is put together on this branch, which rebuilds the original single-user tool
 into a multi-tenant platform without modifying the original ingestion/scoring code in
-place (see [Migration model](#migration-model)).
-
-> **Note on `GEMINI.md`:** the repo also contains a `GEMINI.md` "project memory" file.
-> It documents the _original single-tenant tool_ — a hardcoded profile ("Senior
-> React/Next.js Engineer based in Egypt"), fixed skill/seniority rules, etc. — and
-> predates this branch's settings-driven, per-user model described below. It does not
-> reflect the current architecture and is not used as a source for this document; treat
-> it as stale/historical unless it's updated to match this branch.
+place (see [Migration model](#12-migration-model)).
 
 ---
 
@@ -116,6 +112,15 @@ hardcoded constants and into per-user, database-backed settings, while keeping t
   shared candidate pool. Each user's dashboard then filters and scores that same pool
   against _their own_ `user_settings` row, producing a personal `user_jobs_cache` entry.
   This avoids re-scraping per user while keeping every user's results fully personalized.
+
+- **Ingestion is role-agnostic by design.** `processJobs()` in
+  `sources/ats-utils.ts` carries an explicit comment: title-based "too senior" /
+  "non-frontend" filtering used to happen at ingestion, and was **deliberately removed**
+  when the app went multi-tenant. The only filtering left at ingestion time is
+  geographic/timezone eligibility for the `global` pipeline — not role, seniority, or
+  skill. Every job a company posts, of any discipline, lands in `raw_jobs`; role
+  filtering is entirely a downstream, per-user decision made in the settings/scoring
+  gates (§6).
 
 - **Per-field settings inheritance.** `resolveUserSettings()` (`src/lib/settings.ts`)
   merges `user_settings` over `default_settings`, field by field — a user can override
@@ -349,6 +354,10 @@ returning a normalized `Job[]`. Shared concerns handled in this file:
   config, loaded from / flushed to `app_config` (`loadWorkableStateFromDB`,
   `flushWorkable429sToDB`) so the limiter survives across stateless serverless
   invocations, which don't share memory or disk between cron runs.
+- **`processJobs()`** — the shared normalization step every fetcher funnels through.
+  Applies only geography/timezone eligibility (for the `global` pipeline) and a hard
+  30-day age cap; it does **not** filter by title, role, or skill — that gate was
+  removed on purpose when the app went multi-tenant (see §3).
 
 `src/lib/ats-bridge.ts` is a thin adapter layer: it converts a `ats_companies` DB row
 into the `ATSConfig` shape the fetchers expect, dispatches to the right fetcher based on

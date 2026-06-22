@@ -2,13 +2,20 @@
 
 A multi-tenant job-hunting dashboard. Anyone can sign in, configure their own
 skill list, seniority preferences, and filtering rules, and get a personalized
-feed of frontend roles scraped across hundreds of ATS-listed companies —
-scored against _their_ settings, not a hardcoded profile.
+feed of roles scraped across hundreds of ATS-listed companies — scored
+against _their_ settings, not a hardcoded profile.
 
-This was originally a personal single-user tool; it's been rebuilt as a
-SaaS-style platform where every filtering decision (skills, seniority,
-excluded/required keywords, blacklisted locations, Gemini's filter prompt) is
-per-user and lives in `/settings`, not baked into the code.
+This was originally a personal single-user tool built around one hardcoded
+profile (a Senior React/Next.js engineer); it's been rebuilt as a SaaS-style
+platform. **Role filtering is no longer baked into ingestion at all** — the
+scraper pulls every job a company posts, of any discipline, into the shared
+pool. Every filtering decision (skills, seniority, excluded/required
+keywords, blacklisted locations, Gemini's filter prompt) now lives in
+`/settings`, per user. The app ships with a Senior React/Next.js profile as
+the _default_ starting point (a holdover from its single-user origins,
+visible during onboarding), but that default is just data in
+`default_settings` — any user can repoint their own `/settings` at backend,
+data, mobile, or any other role, and the same scoring/Gemini pipeline applies.
 
 > 📐 For the full system breakdown — data model, request flows (auth, cron
 > ingestion, per-user dashboard rebuild), the ATS ingestion layer, and the
