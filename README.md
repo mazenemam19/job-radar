@@ -10,6 +10,24 @@ SaaS-style platform where every filtering decision (skills, seniority,
 excluded/required keywords, blacklisted locations, Gemini's filter prompt) is
 per-user and lives in `/settings`, not baked into the code.
 
+> 📐 For the full system breakdown — data model, request flows (auth, cron
+> ingestion, per-user dashboard rebuild), the ATS ingestion layer, and the
+> security model — see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+
+---
+
+## ✨ Features
+
+| Page         | What it's for                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `/dashboard` | Personalized, scored job feed across all enabled pipelines                                      |
+| `/pipeline`  | Funnel view of how many jobs survive each filtering stage                                       |
+| `/tracker`   | Kanban-style tracker for applications (saved → applied → interviewing → offer/rejected/ghosted) |
+| `/salary`    | Community-sourced salary explorer; submit your own anonymized data point                        |
+| `/settings`  | Per-user skills, seniority, keyword rules, pipelines, and Gemini prompt                         |
+| `/submit`    | Public form to suggest a new company to scrape                                                  |
+| `/admin`     | Admin-only: users, companies, global defaults, pending submissions                              |
+
 ---
 
 ## 🛤️ Pipelines
@@ -38,8 +56,9 @@ already cleared the free filters first:
    blacklisted locations, skill match — all against the user's own
    `/settings`, never a hardcoded list.
 3. **Gemini gate** — the user's own Gemini API key evaluates what survived
-   stage 2 against their own custom filter prompt, with supporting quotes for
-   transparency. Fails open (a Gemini error doesn't silently lose a job).
+   stage 2 against their own custom filter prompt, returning a pass/fail plus
+   a short reason for each job. Fails open (a Gemini error doesn't silently
+   lose a job).
 
 Scoring after that: skill match, recency (always computed live, never frozen
 at insert time), and relocation bonus — weights configurable per user.
@@ -81,9 +100,13 @@ Per-user opt-in (`/settings` → Email Alerts), two templates:
 ## 🛠️ Architecture & Setup
 
 - **Frontend**: Next.js 14 (App Router), inline-style dark theme.
-- **Backend**: Supabase Postgres. Key tables: `ats_companies`, `raw_jobs`,
-  `user_jobs_cache`, `user_settings`, `default_settings`, `app_config`,
-  `cron_logs_v2`, `ats_submissions`, `salary_reports`, `tracker_entries`.
+- **Auth**: Supabase Auth (Google OAuth), enforced for all protected routes
+  via `middleware.ts`. Role (`user`/`admin`) is only ever set via direct
+  database access — no API surface can grant it.
+- **Backend**: Supabase Postgres. Key tables: `user_profiles`, `ats_companies`,
+  `raw_jobs`, `user_jobs_cache`, `user_settings`, `default_settings`,
+  `app_config`, `cron_logs_v2`, `ats_submissions`, `salary_reports`,
+  `tracker_entries`.
 - **AI**: Each user supplies their own Gemini API key (`user_profiles.gemini_api_key`).
 - **Email**: Nodemailer via SMTP.
 
@@ -123,5 +146,12 @@ and Workable rate-limit status (currently blocked slugs, configured budget).
 - **Cheap filters before expensive ones**: date → regex → Gemini, in that
   order, to keep Gemini token usage proportional to what's actually worth
   checking.
-- **Transparency**: every Gemini rejection includes a supporting quote from
-  the job description.
+- **Transparency**: every Gemini decision returns a reason alongside its
+  pass/fail; whether that reason includes a verbatim quote depends on how the
+  filter prompt is written, since the prompt itself is per-user/admin
+  configurable rather than fixed in code.
+
+---
+
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for request-flow diagrams, the
+full data model, and the security model behind all of the above.
