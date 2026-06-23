@@ -1,8 +1,7 @@
 // src/app/api/settings/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import { resolveUserSettings, saveUserSettings } from "@/lib/settings";
 
 // ── GET /api/settings ─────────────────────────────────────
@@ -11,7 +10,7 @@ export async function GET() {
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const [resolved, db] = [await resolveUserSettings(user.id), createAdminClient()];
+  const [resolved, db] = [await resolveUserSettings(user.id), createServerClient()];
 
   // Also return the raw user settings row (for the form's initial state)
   const { data: rawSettings } = await db
@@ -56,7 +55,7 @@ export async function PATCH(request: NextRequest) {
   // Strip any attempt to set role (security guard — role is immutable from app layer)
   delete body.role;
 
-  const db = createAdminClient();
+  const db = createServerClient();
 
   // Handle gemini_api_key separately (stored in user_profiles, not user_settings)
   if ("gemini_api_key" in body) {

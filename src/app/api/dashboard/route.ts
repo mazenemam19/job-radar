@@ -7,7 +7,7 @@
 // First load after a cron run takes 10-15s; all subsequent opens are instant.
 
 import { NextResponse } from "next/server";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveUserSettings } from "@/lib/settings";
 import { filterJobsWithGemini } from "@/lib/gemini";
@@ -25,7 +25,11 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = createAdminClient();
+  const db = createServerClient();
+  // raw_jobs and app_config are global, not user-owned — RLS wasn't
+  // checked/granted for them, so they stay on the service-role client.
+  // See docs/plans/2026-06-23-phase4-data-access-migration.md, task 8.
+  const adminDb = createAdminClient();
 
   // Update last_active_at (fire and forget)
   db.from("user_profiles")
@@ -93,7 +97,7 @@ export async function GET() {
   if (settings.pipeline_local) enabledModes.push("local");
   if (settings.pipeline_global) enabledModes.push("global");
 
-  const { data: rawJobsData, error: rawError } = await db
+  const { data: rawJobsData, error: rawError } = await adminDb
     .from("raw_jobs")
     .select("*")
     .in("mode", enabledModes)
@@ -142,7 +146,7 @@ export async function GET() {
   };
 
   // ── Step 7: Write cache ──────────────────────────────────────
-  const { data: appConfig } = await db
+  const { data: appConfig } = await adminDb
     .from("app_config")
     .select("last_cron_at")
     .eq("id", 1)

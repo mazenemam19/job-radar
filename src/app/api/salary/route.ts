@@ -1,8 +1,7 @@
 // src/app/api/salary/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import type {
   SalaryAggregate,
   SalaryCurrency,
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
   const roleFilter = url.searchParams.get("role");
   const pipelineFilter = url.searchParams.get("pipeline");
 
-  const db = createAdminClient();
+  const db = createServerClient();
 
   let query = db
     .from("salary_reports")
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid currency" }, { status: 400 });
   }
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const now = new Date().toISOString();
 
   const { data, error } = await db

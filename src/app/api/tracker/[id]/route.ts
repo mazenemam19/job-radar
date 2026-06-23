@@ -1,8 +1,7 @@
 // src/app/api/tracker/[id]/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import { VALID_STATUSES } from "@/lib/constants";
 import type { TrackerStatus } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
@@ -20,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const now = new Date().toISOString();
 
   const patch: Database["public"]["Tables"]["tracker_entries"]["Update"] = { updated_at: now };
@@ -52,7 +51,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const { error } = await db
     .from("tracker_entries")
     .delete()
