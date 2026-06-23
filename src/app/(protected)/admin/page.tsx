@@ -53,20 +53,11 @@ export default async function AdminIndexPage() {
   ];
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ margin: "0 0 28px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-        Admin Dashboard
-      </h1>
+    <div className="p-8">
+      <h1 className="m-0 mb-7 text-[22px] font-bold text-slate-200">Admin Dashboard</h1>
 
       {/* Stats grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 16,
-          marginBottom: 32,
-        }}
-      >
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
@@ -74,17 +65,9 @@ export default async function AdminIndexPage() {
 
       {/* Last cron run */}
       {lastCron && (
-        <div
-          style={{
-            background: "#0d0d1a",
-            border: "1px solid #1e1e30",
-            borderRadius: 12,
-            padding: 20,
-            marginBottom: 28,
-          }}
-        >
-          <h2 style={{ margin: "0 0 12px", fontSize: 14, color: "#94a3b8" }}>Last cron run</h2>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
+          <h2 className="m-0 mb-3 text-sm text-slate-400">Last cron run</h2>
+          <div className="flex flex-wrap gap-6">
             <Stat label="Ran at" value={new Date(lastCron.run_at).toLocaleString()} />
             <Stat label="Trigger" value={lastCron.trigger ?? "—"} />
             <Stat label="Jobs fetched" value={String(lastCron.total_fetched ?? 0)} />
@@ -94,54 +77,31 @@ export default async function AdminIndexPage() {
       )}
 
       {/* Workable rate-limit status */}
-      <div
-        style={{
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 28,
-        }}
-      >
-        <h2 style={{ margin: "0 0 12px", fontSize: 14, color: "#94a3b8" }}>
-          Workable rate-limit status
-        </h2>
+      <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
+        <h2 className="m-0 mb-3 text-sm text-slate-400">Workable rate-limit status</h2>
         {workableBudget && (
-          <div
-            style={{
-              display: "flex",
-              gap: 24,
-              flexWrap: "wrap",
-              marginBottom: activeBlocks.length ? 14 : 0,
-            }}
-          >
+          <div className={`flex flex-wrap gap-6 ${activeBlocks.length ? "mb-3.5" : ""}`}>
             <Stat label="Visa budget" value={String(workableBudget.visa)} />
             <Stat label="Local budget" value={String(workableBudget.local)} />
             <Stat label="Global budget" value={String(workableBudget.global)} />
           </div>
         )}
         {activeBlocks.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#64748b" }}>
+          <div className="text-[13px] text-slate-500">
             No companies currently blocked from rate limiting.
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+            <div className="mb-1.5 text-xs text-slate-500">
               {activeBlocks.length} compan{activeBlocks.length === 1 ? "y" : "ies"} blocked until
               429 cooldown clears:
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div className="flex flex-wrap gap-1.5">
               {activeBlocks.map((b) => (
                 <span
                   key={b.slug}
                   title={`Blocked until ${new Date(b.until).toLocaleString()}`}
-                  style={{
-                    padding: "3px 10px",
-                    borderRadius: 20,
-                    background: "rgba(251,113,133,0.12)",
-                    color: "#fb7185",
-                    fontSize: 12,
-                  }}
+                  className="rounded-full bg-rose-400/10 px-2.5 py-0.5 text-xs text-rose-400"
                 >
                   {b.slug}
                 </span>
@@ -152,13 +112,7 @@ export default async function AdminIndexPage() {
       </div>
 
       {/* Quick links */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {[
           {
             href: "/admin/users",
@@ -184,19 +138,10 @@ export default async function AdminIndexPage() {
           <Link
             key={link.href}
             href={link.href}
-            style={{
-              display: "block",
-              padding: "18px 20px",
-              background: "#0d0d1a",
-              border: "1px solid #1e1e30",
-              borderRadius: 10,
-              textDecoration: "none",
-            }}
+            className="block rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-5 py-4.5 no-underline"
           >
-            <div style={{ fontSize: 15, color: "#e2e8f0", fontWeight: 600, marginBottom: 4 }}>
-              {link.label}
-            </div>
-            <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{link.desc}</div>
+            <div className="mb-1 text-[15px] font-semibold text-slate-200">{link.label}</div>
+            <div className="text-xs leading-relaxed text-slate-500">{link.desc}</div>
           </Link>
         ))}
       </div>
@@ -216,24 +161,15 @@ function StatCard({
   href: string | null;
 }) {
   const inner = (
-    <div
-      style={{
-        background: "#0d0d1a",
-        border: "1px solid #1e1e30",
-        borderRadius: 12,
-        padding: "20px 24px",
-      }}
-    >
-      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: "#e2e8f0" }}>
-        {value.toLocaleString()}
-      </div>
-      <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{label}</div>
+    <div className="rounded-xl border border-[#1e1e30] bg-[#0d0d1a] px-6 py-5">
+      <div className="mb-2 text-2xl">{icon}</div>
+      <div className="text-[28px] font-bold text-slate-200">{value.toLocaleString()}</div>
+      <div className="mt-0.5 text-[13px] text-slate-500">{label}</div>
     </div>
   );
 
   return href ? (
-    <Link href={href} style={{ textDecoration: "none" }}>
+    <Link href={href} className="no-underline">
       {inner}
     </Link>
   ) : (
@@ -244,8 +180,8 @@ function StatCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "#64748b" }}>{label}</div>
-      <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 500, marginTop: 2 }}>{value}</div>
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="mt-0.5 text-sm font-medium text-slate-200">{value}</div>
     </div>
   );
 }

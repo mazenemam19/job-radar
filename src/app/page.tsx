@@ -202,76 +202,29 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div
-      style={{
-        background: "#08080f",
-        color: "#e2e8f0",
-        minHeight: "100vh",
-        fontFamily: "Inter, system-ui, sans-serif",
-        overflow: "hidden",
-      }}
-    >
+    <div className="min-h-screen overflow-hidden bg-[#08080f] font-sans text-slate-200">
       {/* Floating background blobs */}
       <div
-        className="blob-1"
+        className="blob-1 pointer-events-none fixed -left-[10%] -top-[20%] z-0 h-[500px] w-[500px] rounded-full"
         style={{
-          position: "fixed",
-          top: "-20%",
-          left: "-10%",
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
           background: "radial-gradient(circle, #6366f130 0%, transparent 70%)",
-          pointerEvents: "none",
           willChange: "transform",
-          zIndex: 0,
         }}
       />
       <div
-        className="blob-2"
+        className="blob-2 pointer-events-none fixed -right-[5%] -bottom-[15%] z-0 h-[400px] w-[400px] rounded-full"
         style={{
-          position: "fixed",
-          bottom: "-15%",
-          right: "-5%",
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
           background: "radial-gradient(circle, #818cf820 0%, transparent 70%)",
-          pointerEvents: "none",
           willChange: "transform",
-          zIndex: 0,
         }}
       />
 
       {/* Nav */}
-      <nav
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          background: "rgba(8,8,15,0.8)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          padding: "0 32px",
-          height: 64,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#818cf8" }}>🎯 Job Radar</div>
+      <nav className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-white/[0.06] bg-[#08080f]/80 px-8 backdrop-blur-xl">
+        <div className="text-lg font-bold text-indigo-400">🎯 Job Radar</div>
         <Link
           href={isLoggedIn ? "/dashboard" : "/login"}
-          style={{
-            padding: "9px 20px",
-            background: "#6366f1",
-            color: "#fff",
-            borderRadius: 8,
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
+          className="rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white no-underline"
         >
           {isLoggedIn ? "Dashboard →" : "Sign in with Google →"}
         </Link>
@@ -280,102 +233,38 @@ export default function LandingPage() {
       {/* Hero */}
       <section
         ref={heroRef}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "100px 32px 80px",
-          textAlign: "center",
-          maxWidth: 760,
-          margin: "0 auto",
-        }}
+        className="relative z-10 mx-auto max-w-[760px] px-8 pb-20 pt-24 text-center"
       >
-        <div
-          className="hero-element"
-          style={{
-            display: "inline-block",
-            padding: "4px 16px",
-            borderRadius: 20,
-            background: "#6366f115",
-            border: "1px solid #6366f140",
-            color: "#818cf8",
-            fontSize: 13,
-            fontWeight: 500,
-            marginBottom: 24,
-          }}
-        >
+        <div className="hero-element mb-6 inline-block rounded-full border border-indigo-500/25 bg-indigo-500/[0.08] px-4 py-1 text-[13px] font-medium text-indigo-400">
           Multi-tenant · Per-user AI · Fully configurable
         </div>
 
         <h1
-          className="hero-element"
-          style={{
-            margin: "0 0 20px",
-            fontSize: "clamp(36px, 6vw, 60px)",
-            fontWeight: 800,
-            lineHeight: 1.15,
-            color: "#f1f5f9",
-            letterSpacing: "-0.03em",
-          }}
+          className="hero-element m-0 mb-5 font-extrabold leading-[1.15] text-slate-100"
+          style={{ fontSize: "clamp(36px, 6vw, 60px)", letterSpacing: "-0.03em" }}
         >
           Your personalised
           <br />
-          <span
-            style={{
-              background: "linear-gradient(135deg, #6366f1, #a78bfa)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
+          <span className="bg-gradient-to-br from-indigo-500 to-violet-400 bg-clip-text text-transparent">
             AI job feed
           </span>
         </h1>
 
-        <p
-          className="hero-element"
-          style={{
-            margin: "0 auto 36px",
-            maxWidth: 520,
-            fontSize: 18,
-            color: "#94a3b8",
-            lineHeight: 1.6,
-          }}
-        >
+        <p className="hero-element mx-auto mb-9 max-w-[520px] text-lg leading-relaxed text-slate-400">
           Scrapes 800+ companies across Greenhouse, Lever, Ashby and 6 other ATS platforms. Filters
           with your own Gemini prompt. Scores by your skill list. Updates twice daily.
         </p>
 
-        <div
-          className="hero-element"
-          style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}
-        >
+        <div className="hero-element flex flex-wrap justify-center gap-3.5">
           <Link
             href={isLoggedIn ? "/dashboard" : "/login"}
-            style={{
-              padding: "14px 32px",
-              background: "#6366f1",
-              color: "#fff",
-              borderRadius: 10,
-              textDecoration: "none",
-              fontSize: 16,
-              fontWeight: 700,
-              boxShadow: "0 0 40px #6366f140",
-              transition: "transform 0.2s ease",
-            }}
+            className="rounded-[10px] bg-indigo-500 px-8 py-3.5 text-base font-bold text-white no-underline shadow-[0_0_40px_#6366f140] transition-transform duration-200"
           >
             {isLoggedIn ? "Go to dashboard →" : "Get started free →"}
           </Link>
           <Link
             href="/submit"
-            style={{
-              padding: "14px 32px",
-              background: "rgba(255,255,255,0.04)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "#94a3b8",
-              borderRadius: 10,
-              textDecoration: "none",
-              fontSize: 16,
-            }}
+            className="rounded-[10px] border border-white/10 bg-white/[0.04] px-8 py-3.5 text-base text-slate-400 no-underline backdrop-blur-sm"
           >
             🏢 Submit your company
           </Link>
@@ -383,26 +272,8 @@ export default function LandingPage() {
       </section>
 
       {/* Demo job cards */}
-      <section
-        ref={demoRef}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "0 32px 80px",
-          maxWidth: 800,
-          margin: "0 auto",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: 28,
-            fontSize: 12,
-            color: "#475569",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}
-        >
+      <section ref={demoRef} className="relative z-10 mx-auto max-w-[800px] px-8 pb-20">
+        <div className="mb-7 text-center text-xs uppercase tracking-widest text-slate-600">
           Sample from today&apos;s feed
         </div>
 
@@ -410,39 +281,20 @@ export default function LandingPage() {
           {DEMO_JOBS.map((job, i) => (
             <div
               key={i}
-              className="demo-card"
-              style={{
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                background: "rgba(13,13,26,0.7)",
-                border: `1px solid rgba(255,255,255,0.06)`,
-                borderLeft: `3px solid ${MODE_COLOR[job.mode]}`,
-                borderRadius: 12,
-                padding: "16px 20px",
-                marginBottom: 12,
-                willChange: "transform",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
-              }}
+              className="demo-card mb-3 rounded-xl border border-white/[0.06] bg-[#0d0d1a]/70 px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+              style={{ borderLeft: `3px solid ${MODE_COLOR[job.mode]}`, willChange: "transform" }}
             >
-              <div
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-              >
+              <div className="flex items-center justify-between">
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0" }}>{job.title}</div>
-                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 3 }}>
+                  <div className="text-[15px] font-semibold text-slate-200">{job.title}</div>
+                  <div className="mt-0.5 text-[13px] text-slate-500">
                     {job.company} · {job.flag} · {MODE_LABEL[job.mode]}
                   </div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {job.skills.map((s) => (
                       <span
                         key={s}
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: 20,
-                          background: "rgba(99,102,241,0.1)",
-                          color: "#818cf8",
-                          fontSize: 11,
-                        }}
+                        className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[11px] text-indigo-400"
                       >
                         {s}
                       </span>
@@ -450,31 +302,12 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div
+                  className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full"
                   style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: "50%",
-                    flexShrink: 0,
                     background: `conic-gradient(${MODE_COLOR[job.mode]} ${job.score * 3.6}deg, #1e1e30 0deg)`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      background: "#0d0d1a",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: "#e2e8f0",
-                    }}
-                  >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d0d1a] text-[13px] font-bold text-slate-200">
                     {job.score}
                   </div>
                 </div>
@@ -483,7 +316,7 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 8, fontSize: 12, color: "#475569" }}>
+        <div className="mt-2 text-center text-xs text-slate-600">
           Sign in to see real matches filtered for your own skills and preferences
         </div>
       </section>
@@ -491,93 +324,37 @@ export default function LandingPage() {
       {/* Pipeline funnel demo */}
       <section
         ref={funnelRef}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "60px 32px",
-          background: "rgba(13,13,26,0.6)",
-          backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
-          textAlign: "center",
-        }}
+        className="relative z-10 border-y border-white/[0.04] bg-[#0d0d1a]/60 px-8 py-16 text-center backdrop-blur-xl"
       >
-        <div
-          style={{
-            fontSize: 12,
-            color: "#475569",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginBottom: 8,
-          }}
-        >
+        <div className="mb-2 text-xs uppercase tracking-widest text-slate-600">
           Pipeline transparency
         </div>
         <h2
-          style={{
-            margin: "0 0 40px",
-            fontSize: "clamp(20px, 3vw, 28px)",
-            color: "#e2e8f0",
-            fontWeight: 700,
-          }}
+          className="m-0 mb-10 font-bold text-slate-200"
+          style={{ fontSize: "clamp(20px, 3vw, 28px)" }}
         >
           See exactly what happened to every job
         </h2>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexWrap: "wrap",
-            gap: 0,
-          }}
-        >
+        <div className="flex flex-wrap items-center justify-center gap-0">
           {PIPELINE_STAGES.map((stage, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center" }}>
-              {i > 0 && <div style={{ color: "#475569", fontSize: 24, padding: "0 8px" }}>→</div>}
+            <div key={i} className="flex items-center">
+              {i > 0 && <div className="px-2 text-2xl text-slate-600">→</div>}
               <div
-                className="funnel-node"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  padding: "20px 16px",
-                  backdropFilter: "blur(8px)",
-                  background: "rgba(13,13,26,0.8)",
-                  border: `1px solid ${stage.color}30`,
-                  borderRadius: 16,
-                  minWidth: 110,
-                  willChange: "transform",
-                }}
+                className="funnel-node flex min-w-[110px] flex-col items-center rounded-2xl bg-[#0d0d1a]/80 px-4 py-5 backdrop-blur-md"
+                style={{ border: `1px solid ${stage.color}30`, willChange: "transform" }}
               >
                 <div
+                  className="flex h-[72px] w-[72px] items-center justify-center rounded-full text-[22px] font-extrabold"
                   style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: "50%",
                     border: `2px solid ${stage.color}`,
                     background: `${stage.color}10`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    fontWeight: 800,
                     color: stage.color,
                   }}
                 >
                   {stage.label}
                 </div>
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 11,
-                    color: "#64748b",
-                    textAlign: "center",
-                    whiteSpace: "pre-line",
-                    lineHeight: 1.3,
-                  }}
-                >
+                <div className="mt-2.5 whitespace-pre-line text-center text-[11px] leading-tight text-slate-500">
                   {stage.sub}
                 </div>
               </div>
@@ -587,117 +364,56 @@ export default function LandingPage() {
       </section>
 
       {/* Feature grid */}
-      <section
-        ref={featRef}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "80px 32px",
-          maxWidth: 960,
-          margin: "0 auto",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
+      <section ref={featRef} className="relative z-10 mx-auto max-w-[960px] px-8 py-20">
+        <div className="mb-12 text-center">
           <h2
-            style={{
-              margin: 0,
-              fontSize: "clamp(22px, 3vw, 32px)",
-              color: "#e2e8f0",
-              fontWeight: 700,
-            }}
+            className="m-0 font-bold text-slate-200"
+            style={{ fontSize: "clamp(22px, 3vw, 32px)" }}
           >
             Everything you need. Nothing you don&apos;t.
           </h2>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 20,
-          }}
-        >
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-5">
           {FEATURES.map((f, i) => (
             <div
               key={i}
-              className="feat-card"
-              style={{
-                backdropFilter: "blur(12px)",
-                background: "rgba(13,13,26,0.6)",
-                border: "1px solid rgba(255,255,255,0.05)",
-                borderRadius: 14,
-                padding: 24,
-                willChange: "transform",
-                boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
-              }}
+              className="feat-card rounded-2xl border border-white/5 bg-[#0d0d1a]/60 p-6 shadow-[0_2px_16px_rgba(0,0,0,0.3)] backdrop-blur-xl"
+              style={{ willChange: "transform" }}
             >
-              <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
-              <h3 style={{ margin: "0 0 8px", fontSize: 16, color: "#e2e8f0", fontWeight: 600 }}>
-                {f.title}
-              </h3>
-              <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>{f.desc}</p>
+              <div className="mb-3 text-[28px]">{f.icon}</div>
+              <h3 className="m-0 mb-2 text-base font-semibold text-slate-200">{f.title}</h3>
+              <p className="m-0 text-[13px] leading-relaxed text-slate-500">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "80px 32px",
-          textAlign: "center",
-          background: "linear-gradient(to bottom, transparent, rgba(99,102,241,0.08))",
-        }}
-      >
+      <section className="relative z-10 bg-gradient-to-b from-transparent to-indigo-500/[0.08] px-8 py-20 text-center">
         <h2
-          style={{
-            margin: "0 0 16px",
-            fontSize: "clamp(24px, 4vw, 36px)",
-            color: "#e2e8f0",
-            fontWeight: 800,
-          }}
+          className="m-0 mb-4 font-extrabold text-slate-200"
+          style={{ fontSize: "clamp(24px, 4vw, 36px)" }}
         >
           Ready to find your next role?
         </h2>
-        <p style={{ margin: "0 auto 32px", maxWidth: 480, fontSize: 16, color: "#64748b" }}>
+        <p className="mx-auto mb-8 max-w-[480px] text-base text-slate-500">
           {isLoggedIn
             ? "Your personalised feed is waiting — head to your dashboard."
             : "Sign in with Google, add your Gemini API key, and your personalised feed is ready in 30 seconds."}
         </p>
         <Link
           href={isLoggedIn ? "/dashboard" : "/login"}
-          style={{
-            display: "inline-block",
-            padding: "16px 40px",
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            color: "#fff",
-            borderRadius: 12,
-            textDecoration: "none",
-            fontSize: 17,
-            fontWeight: 700,
-            boxShadow: "0 0 60px #6366f150",
-          }}
+          className="inline-block rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 px-10 py-4 text-[17px] font-bold text-white no-underline shadow-[0_0_60px_#6366f150]"
         >
           {isLoggedIn ? "Go to dashboard →" : "Sign in with Google — it's free →"}
         </Link>
       </section>
 
       {/* Footer */}
-      <footer
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "24px 32px",
-          textAlign: "center",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-          fontSize: 12,
-          color: "#475569",
-        }}
-      >
+      <footer className="relative z-10 border-t border-white/[0.04] px-8 py-6 text-center text-xs text-slate-600">
         Job Radar · Built on Next.js, Supabase, Google Gemini · No ads, no data selling ·{" "}
-        <Link href="/submit" style={{ color: "#64748b", textDecoration: "none" }}>
+        <Link href="/submit" className="text-slate-500 no-underline">
           Submit your company
         </Link>
       </footer>
