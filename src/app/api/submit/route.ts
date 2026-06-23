@@ -4,19 +4,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { VALID_ATS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
-
-const VALID_ATS: ATSType[] = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "workable",
-  "teamtailor",
-  "breezy",
-  "smartrecruiters",
-  "bamboohr",
-  "jazzhr",
-];
 
 const COUNTRY_FLAGS: Record<string, string> = {
   US: "🇺🇸",

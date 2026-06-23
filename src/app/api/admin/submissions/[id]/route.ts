@@ -1,18 +1,9 @@
 // src/app/api/admin/submissions/[id]/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
+import { requireAdmin } from "@/lib/auth";
 import type { Database } from "@/lib/database.types";
-
-async function requireAdmin() {
-  const user = await getUser();
-  if (!user) return null;
-  const db = createAdminClient();
-  const { data } = await db.from("user_profiles").select("role").eq("id", user.id).single();
-  return data?.role === "admin" ? user : null;
-}
 
 // ── PATCH — approve / reject / edit a submission ─────────────
 

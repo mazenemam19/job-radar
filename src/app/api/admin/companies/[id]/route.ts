@@ -1,31 +1,11 @@
 // src/app/api/admin/companies/[id]/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/auth";
+import { VALID_ATS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
-
 import type { Database } from "@/lib/database.types";
-
-const VALID_ATS: ATSType[] = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "workable",
-  "teamtailor",
-  "breezy",
-  "smartrecruiters",
-  "bamboohr",
-  "jazzhr",
-];
-
-async function requireAdmin() {
-  const user = await getUser();
-  if (!user) return null;
-  const db = createAdminClient();
-  const { data } = await db.from("user_profiles").select("role").eq("id", user.id).single();
-  return data?.role === "admin" ? user : null;
-}
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();

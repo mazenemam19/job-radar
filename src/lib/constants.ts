@@ -1,6 +1,29 @@
 // src/lib/constants.ts
 
+import type { ATSType, TrackerStatus } from "./types";
+
 // ── Shared Constants ─────────────────────────────────────────────────────
+
+export const VALID_ATS: ATSType[] = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "teamtailor",
+  "breezy",
+  "smartrecruiters",
+  "bamboohr",
+  "jazzhr",
+];
+
+export const VALID_STATUSES: TrackerStatus[] = [
+  "applied",
+  "interviewing",
+  "offer",
+  "rejected",
+  "ghosted",
+  "saved",
+];
 export const COUNTRY_MAP: Record<string, { name: string; flag: string }> = {
   ireland: { name: "Ireland", flag: "🇮🇪" },
   germany: { name: "Germany", flag: "🇩🇪" },
