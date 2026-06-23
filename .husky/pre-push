@@ -1,1 +1,2 @@
-npx vitest run --changed
+BASE=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo origin/main)
+npx vitest run --changed "$BASE"
