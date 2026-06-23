@@ -34,6 +34,10 @@ const ATS_TYPES = [
   { value: "jazzhr", label: "JazzHR", slug_hint: "Your JazzHR company subdomain" },
 ];
 
+const LABEL_CLASS = "mb-1.5 block text-[13px] font-medium text-[#94a3b8]";
+const INPUT_CLASS =
+  "w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2.5 text-sm text-[#e2e8f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]";
+
 export default function SubmitPage() {
   const [atsType, setAtsType] = useState("greenhouse");
   const [submitted, setSubmitted] = useState(false);
@@ -81,55 +85,30 @@ export default function SubmitPage() {
 
   return (
     <div
-      style={{
-        minHeight: "100vh",
-        background: "#08080f",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        fontFamily: "Inter, system-ui, sans-serif",
-        padding: "48px 16px",
-      }}
+      className="flex min-h-screen items-start justify-center px-4 py-12 font-sans"
+      style={{ background: "#08080f" }}
     >
-      <div style={{ maxWidth: 540, width: "100%" }}>
+      <div className="w-full max-w-[540px]">
         <Link
           href="/"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            color: "#64748b",
-            fontSize: 13,
-            textDecoration: "none",
-            marginBottom: 20,
-          }}
+          className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-[#64748b] no-underline"
         >
           ← Back
         </Link>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>🏢</div>
-          <h1 style={{ margin: "0 0 8px", fontSize: 24, color: "#e2e8f0", fontWeight: 700 }}>
-            Submit your company
-          </h1>
-          <p style={{ margin: 0, color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>
+        <div className="mb-9 text-center">
+          <div className="mb-2.5 text-4xl">🏢</div>
+          <h1 className="mb-2 text-2xl font-bold text-[#e2e8f0]">Submit your company</h1>
+          <p className="text-sm leading-relaxed text-[#64748b]">
             Help developers find open roles at your company by adding it to Job Radar&apos;s
             scraping list. Our team will review and test your submission within 48 hours.
           </p>
         </div>
 
         {submitted ? (
-          <div
-            style={{
-              background: "#0d2a18",
-              border: "1px solid #166534",
-              borderRadius: 16,
-              padding: 36,
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-            <h2 style={{ margin: "0 0 8px", fontSize: 18, color: "#4ade80" }}>Submitted!</h2>
-            <p style={{ margin: 0, color: "#86efac", fontSize: 14 }}>
+          <div className="rounded-2xl border border-[#166534] bg-[#0d2a18] p-9 text-center">
+            <div className="mb-3 text-4xl">✅</div>
+            <h2 className="mb-2 text-lg text-[#4ade80]">Submitted!</h2>
+            <p className="text-sm text-[#86efac]">
               Our team will review your submission and test the integration. If you included your
               email, we&apos;ll notify you when it&apos;s live.
             </p>
@@ -137,22 +116,20 @@ export default function SubmitPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            style={{
-              background: "#0d0d1a",
-              border: "1px solid #1e1e30",
-              borderRadius: 16,
-              padding: "32px 28px",
-            }}
+            className="rounded-2xl border border-[#1e1e30] bg-[#0d0d1a] px-7 py-8"
           >
             <Field label="Company name *" name="company_name" required />
 
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelSt}>ATS platform *</label>
+            <div className="mb-[18px]">
+              <label htmlFor="submit-ats-type" className={LABEL_CLASS}>
+                ATS platform *
+              </label>
               <select
+                id="submit-ats-type"
                 name="ats_type"
                 value={atsType}
                 onChange={(e) => setAtsType(e.target.value)}
-                style={inputSt}
+                className={INPUT_CLASS}
                 required
               >
                 {ATS_TYPES.map((a) => (
@@ -163,24 +140,28 @@ export default function SubmitPage() {
               </select>
             </div>
 
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelSt}>ATS slug / company ID *</label>
-              <input name="slug" required style={inputSt} placeholder={slugHint} />
-              <p style={{ margin: "4px 0 0", fontSize: 11, color: "#475569" }}>{slugHint}</p>
+            <div className="mb-[18px]">
+              <label htmlFor="submit-slug" className={LABEL_CLASS}>
+                ATS slug / company ID *
+              </label>
+              <input
+                id="submit-slug"
+                name="slug"
+                required
+                className={INPUT_CLASS}
+                placeholder={slugHint}
+              />
+              <p className="mt-1 text-[11px] text-[#475569]">{slugHint}</p>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <Field label="Country code *" name="country" placeholder="GB, DE, EG..." required />
-              </div>
-              <div>
-                <Field label="City (optional)" name="city" placeholder="London" />
-              </div>
+            <div className="grid grid-cols-2 gap-3.5">
+              <Field label="Country code *" name="country" placeholder="GB, DE, EG..." required />
+              <Field label="City (optional)" name="city" placeholder="London" />
             </div>
 
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelSt}>Which pipelines should this appear in?</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+            <fieldset className="mb-5 mt-[18px] border-0 p-0">
+              <legend className={LABEL_CLASS}>Which pipelines should this appear in?</legend>
+              <div className="mt-1.5 flex flex-col gap-2.5">
                 {[
                   [
                     "pipeline_visa",
@@ -190,28 +171,16 @@ export default function SubmitPage() {
                   ["pipeline_local", "🇪🇬 Local pipeline", "We're based in Egypt or hire locally"],
                   ["pipeline_global", "🌐 Remote pipeline", "We hire fully remote worldwide"],
                 ].map(([name, label, desc]) => (
-                  <label
-                    key={name}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 10,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      name={name}
-                      style={{ marginTop: 2, accentColor: "#6366f1" }}
-                    />
+                  <label key={name} className="flex cursor-pointer items-start gap-2.5">
+                    <input type="checkbox" name={name} className="mt-0.5 accent-[#6366f1]" />
                     <div>
-                      <div style={{ fontSize: 14, color: "#e2e8f0" }}>{label}</div>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>{desc}</div>
+                      <div className="text-sm text-[#e2e8f0]">{label}</div>
+                      <div className="text-xs text-[#64748b]">{desc}</div>
                     </div>
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             <Field
               label="Your email (optional — for follow-ups)"
@@ -220,25 +189,13 @@ export default function SubmitPage() {
               placeholder="hr@yourcompany.com"
             />
 
-            {error && (
-              <div style={{ color: "#f87171", fontSize: 13, marginBottom: 14 }}>{error}</div>
-            )}
+            {error && <div className="mb-3.5 text-[13px] text-[#f87171]">{error}</div>}
 
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: "100%",
-                padding: "13px 0",
-                background: "#6366f1",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-                opacity: loading ? 0.6 : 1,
-              }}
+              className="w-full cursor-pointer rounded-[10px] border-0 bg-[#6366f1] py-[13px] text-[15px] font-semibold text-white disabled:cursor-not-allowed"
+              style={{ opacity: loading ? 0.6 : 1 }}
             >
               {loading ? "Submitting..." : "Submit for review →"}
             </button>
@@ -248,25 +205,6 @@ export default function SubmitPage() {
     </div>
   );
 }
-
-const labelSt: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  color: "#94a3b8",
-  marginBottom: 6,
-  fontWeight: 500,
-};
-
-const inputSt: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  background: "#0a0a18",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  color: "#e2e8f0",
-  fontSize: 14,
-  boxSizing: "border-box",
-};
 
 function Field({
   label,
@@ -281,15 +219,19 @@ function Field({
   placeholder?: string;
   required?: boolean;
 }) {
+  const id = `submit-${name}`;
   return (
-    <div style={{ marginBottom: 18 }}>
-      <label style={labelSt}>{label}</label>
+    <div className="mb-[18px]">
+      <label htmlFor={id} className={LABEL_CLASS}>
+        {label}
+      </label>
       <input
+        id={id}
         name={name}
         type={type}
         placeholder={placeholder}
         required={required}
-        style={inputSt}
+        className={INPUT_CLASS}
       />
     </div>
   );

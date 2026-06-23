@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { ScoredJob } from "@/lib/types";
+import ModalShell from "@/components/ui/ModalShell";
 
 interface Props {
   job: ScoredJob | null;
@@ -44,157 +45,61 @@ export default function StrategyModal({ job, onClose }: Props) {
   if (!job) return null;
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.7)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 50,
-        padding: 16,
-      }}
+    <ModalShell
+      titleId="strategy-modal-title"
+      title="✨ Application Strategy"
+      subtitle={`${job.title} at ${job.company}`}
+      onClose={onClose}
+      panelClassName="max-w-[580px] max-h-[80vh] overflow-auto"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 12,
-          padding: 28,
-          maxWidth: 580,
-          width: "100%",
-          maxHeight: "80vh",
-          overflow: "auto",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 20,
-          }}
+      {strategies.length === 0 && !loading && !error && (
+        <button
+          onClick={generate}
+          className="w-full cursor-pointer rounded-lg border-0 bg-[#6366f1] py-3 text-sm font-semibold text-white"
         >
-          <div>
-            <h2 style={{ margin: 0, fontSize: 17, color: "#e2e8f0", fontWeight: 600 }}>
-              ✨ Application Strategy
-            </h2>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-              {job.title} at {job.company}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#64748b",
-              fontSize: 20,
-              cursor: "pointer",
-              padding: 4,
-            }}
-          >
-            ×
-          </button>
+          Generate strategy with Gemini
+        </button>
+      )}
+
+      {loading && (
+        <div className="py-8 text-center text-sm text-[#818cf8]">
+          <div className="mb-2 text-2xl">✨</div>
+          Thinking...
         </div>
+      )}
 
-        {strategies.length === 0 && !loading && !error && (
-          <button
-            onClick={generate}
-            style={{
-              width: "100%",
-              padding: "12px 0",
-              background: "#6366f1",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Generate strategy with Gemini
-          </button>
-        )}
+      {error && (
+        <div className="rounded-lg border border-[#5b1717] bg-[#1a0a0a] p-3.5 text-[13px] text-[#f87171]">
+          {error}
+        </div>
+      )}
 
-        {loading && (
-          <div style={{ textAlign: "center", padding: "32px 0", color: "#818cf8", fontSize: 14 }}>
-            <div style={{ marginBottom: 8, fontSize: 24 }}>✨</div>
-            Thinking...
-          </div>
-        )}
+      {strategies.length > 0 && (
+        <ul className="m-0 list-none p-0">
+          {strategies.map((s, i) => (
+            <li
+              key={i}
+              className={`flex gap-3 py-3 ${
+                i < strategies.length - 1 ? "border-b border-[#1e1e30]" : ""
+              }`}
+            >
+              <span className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full bg-[#1e1e30] text-[11px] font-bold text-[#818cf8]">
+                {i + 1}
+              </span>
+              <span className="text-sm leading-relaxed text-[#cbd5e1]">{s}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {error && (
-          <div
-            style={{
-              padding: 14,
-              background: "#1a0a0a",
-              border: "1px solid #5b1717",
-              borderRadius: 8,
-              color: "#f87171",
-              fontSize: 13,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {strategies.length > 0 && (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {strategies.map((s, i) => (
-              <li
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  padding: "12px 0",
-                  borderBottom: i < strategies.length - 1 ? "1px solid #1e1e30" : "none",
-                }}
-              >
-                <span
-                  style={{
-                    flexShrink: 0,
-                    width: 22,
-                    height: 22,
-                    borderRadius: "50%",
-                    background: "#1e1e30",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 11,
-                    color: "#818cf8",
-                    fontWeight: 700,
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.5 }}>{s}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {strategies.length > 0 && (
-          <button
-            onClick={generate}
-            style={{
-              marginTop: 16,
-              padding: "8px 16px",
-              background: "#1e1e30",
-              color: "#818cf8",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            Regenerate
-          </button>
-        )}
-      </div>
-    </div>
+      {strategies.length > 0 && (
+        <button
+          onClick={generate}
+          className="mt-4 cursor-pointer rounded-md border-0 bg-[#1e1e30] px-4 py-2 text-[13px] text-[#818cf8]"
+        >
+          Regenerate
+        </button>
+      )}
+    </ModalShell>
   );
 }

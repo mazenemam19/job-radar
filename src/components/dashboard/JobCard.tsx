@@ -20,6 +20,8 @@ interface Props {
   isTracked?: boolean;
 }
 
+const BTN_CLASS = "cursor-pointer rounded-md border-0 px-3.5 py-1.5 text-[13px] font-medium";
+
 export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) {
   const [expanded, setExpanded] = useState(false);
 
@@ -45,101 +47,47 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
 
   return (
     <article
-      style={{
-        background: "#0d0d1a",
-        border: `1px solid #1e1e30`,
-        borderLeft: `3px solid ${modeColor}`,
-        borderRadius: 10,
-        padding: "16px 20px",
-        marginBottom: 12,
-        transition: "border-color 0.15s ease",
-      }}
+      className="mb-3 rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-5 py-4 transition-[border-color] duration-150 ease-in-out"
+      style={{ borderLeft: `3px solid ${modeColor}` }}
     >
       {/* Header row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <Link
             href={`/job/${job.id}`}
-            style={{
-              color: "#e2e8f0",
-              fontWeight: 600,
-              fontSize: 15,
-              textDecoration: "none",
-              display: "block",
-            }}
+            className="block text-[15px] font-semibold text-[#e2e8f0] no-underline"
           >
             {job.title}
           </Link>
-          <div style={{ marginTop: 4, fontSize: 13, color: "#94a3b8" }}>
+          <div className="mt-1 text-[13px] text-[#94a3b8]">
             {job.company} · {job.country_flag} {job.location} · {postedLabel}
           </div>
         </div>
 
         {/* Score badge */}
         <div
+          className="relative flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-full"
           style={{
-            flexShrink: 0,
-            width: 52,
-            height: 52,
-            borderRadius: "50%",
             background: `conic-gradient(${modeColor} ${displayTotalScore * 3.6}deg, #1e1e30 0deg)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
           }}
         >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "#0d0d1a",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#e2e8f0",
-            }}
-          >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d0d1a] text-[13px] font-bold text-[#e2e8f0]">
             {displayTotalScore}
           </div>
         </div>
       </div>
 
       {/* Tags row */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
         <span
-          style={{
-            padding: "2px 8px",
-            borderRadius: 20,
-            background: `${modeColor}20`,
-            color: modeColor,
-            fontSize: 11,
-            fontWeight: 600,
-          }}
+          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+          style={{ background: `${modeColor}20`, color: modeColor }}
         >
           {MODE_LABELS[job.mode]}
         </span>
 
         {job.visa_sponsorship && (
-          <span
-            style={{
-              padding: "2px 8px",
-              borderRadius: 20,
-              background: "#0f172a",
-              color: "#818cf8",
-              fontSize: 11,
-            }}
-          >
+          <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#818cf8]">
             Visa sponsorship
           </span>
         )}
@@ -147,19 +95,13 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
         {job.matched_skills.slice(0, 5).map((s) => (
           <span
             key={s}
-            style={{
-              padding: "2px 8px",
-              borderRadius: 20,
-              background: "#0f172a",
-              color: "#64748b",
-              fontSize: 11,
-            }}
+            className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#64748b]"
           >
             {s}
           </span>
         ))}
         {job.matched_skills.length > 5 && (
-          <span style={{ padding: "2px 8px", fontSize: 11, color: "#475569" }}>
+          <span className="px-2 py-0.5 text-[11px] text-[#475569]">
             +{job.matched_skills.length - 5}
           </span>
         )}
@@ -168,13 +110,8 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
           <span
             key={s}
             title="Bonus skill — not part of your scoring, just nice to know it's there"
-            style={{
-              padding: "2px 8px",
-              borderRadius: 20,
-              background: "rgba(245,158,11,0.12)",
-              color: "#f59e0b",
-              fontSize: 11,
-            }}
+            className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
+            style={{ background: "rgba(245,158,11,0.12)" }}
           >
             +{s}
           </span>
@@ -183,35 +120,41 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
 
       {/* Score breakdown (expanded) */}
       {expanded && (
-        <div style={{ marginTop: 12, padding: "12px", background: "#0a0a18", borderRadius: 8 }}>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Skill match</div>
+        <div className="mt-3 rounded-lg bg-[#0a0a18] p-3">
+          <div className="mb-1.5">
+            <div className="mb-[3px] text-[11px] text-[#64748b]">Skill match</div>
             <ScoreBar value={job.skill_match_score} color="#6366f1" />
           </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Recency (live)</div>
+          <div className="mb-1.5">
+            <div className="mb-[3px] text-[11px] text-[#64748b]">Recency (live)</div>
             <ScoreBar value={liveRecencyScore} color="#22c55e" />
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Relocation</div>
+            <div className="mb-[3px] text-[11px] text-[#64748b]">Relocation</div>
             <ScoreBar value={job.relocation_bonus} color="#f59e0b" />
           </div>
           {job.gemini_reason && (
-            <div style={{ marginTop: 10, fontSize: 12, color: "#475569", fontStyle: "italic" }}>
-              Gemini: {job.gemini_reason}
-            </div>
+            <div className="mt-2.5 text-xs italic text-[#475569]">Gemini: {job.gemini_reason}</div>
           )}
         </div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-        <button onClick={() => setExpanded((p) => !p)} style={btnStyle("#1e1e30", "#94a3b8")}>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setExpanded((p) => !p)}
+          className={BTN_CLASS}
+          style={{ background: "#1e1e30", color: "#94a3b8" }}
+        >
           {expanded ? "Less" : "Details"}
         </button>
 
         {onStrategy && (
-          <button onClick={() => onStrategy(job)} style={btnStyle("#1e1e30", "#818cf8")}>
+          <button
+            onClick={() => onStrategy(job)}
+            className={BTN_CLASS}
+            style={{ background: "#1e1e30", color: "#818cf8" }}
+          >
             ✨ Strategy
           </button>
         )}
@@ -219,7 +162,11 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
         {onTrack && (
           <button
             onClick={() => onTrack(job)}
-            style={btnStyle(isTracked ? "#16213e" : "#1e1e30", isTracked ? "#6366f1" : "#94a3b8")}
+            className={BTN_CLASS}
+            style={{
+              background: isTracked ? "#16213e" : "#1e1e30",
+              color: isTracked ? "#6366f1" : "#94a3b8",
+            }}
           >
             {isTracked ? "✓ Tracked" : "+ Track"}
           </button>
@@ -229,26 +176,14 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
           href={job.url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ ...btnStyle("#6366f1", "#fff"), textDecoration: "none" }}
+          className={`${BTN_CLASS} no-underline`}
+          style={{ background: "#6366f1", color: "#fff" }}
         >
           Apply →
         </a>
       </div>
     </article>
   );
-}
-
-function btnStyle(bg: string, color: string): React.CSSProperties {
-  return {
-    padding: "6px 14px",
-    borderRadius: 6,
-    border: "none",
-    background: bg,
-    color,
-    fontSize: 13,
-    cursor: "pointer",
-    fontWeight: 500,
-  };
 }
 
 function formatRelativeDate(iso: string): string {

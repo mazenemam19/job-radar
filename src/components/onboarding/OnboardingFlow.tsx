@@ -68,36 +68,15 @@ export default function OnboardingFlow() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#08080f",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "Inter, system-ui, sans-serif",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 520,
-          width: "100%",
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 16,
-          padding: "40px 36px",
-        }}
-      >
+    <div className="flex min-h-screen items-center justify-center bg-[#08080f] p-4 font-sans">
+      <div className="w-full max-w-[520px] rounded-2xl border border-[#1e1e30] bg-[#0d0d1a] px-9 py-10">
         {/* Progress indicator */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 32 }}>
+        <div className="mb-8 flex gap-1.5">
           {(["gemini", "customize"] as Step[]).map((s) => (
             <div
               key={s}
+              className="h-[3px] flex-1 rounded-sm"
               style={{
-                height: 3,
-                flex: 1,
-                borderRadius: 2,
                 background:
                   step === s || (step === "customize" && s === "gemini") ? "#6366f1" : "#1e1e30",
               }}
@@ -106,66 +85,50 @@ export default function OnboardingFlow() {
         </div>
 
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🎯</div>
-          <h1 style={{ margin: 0, fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-            Welcome to Job Radar
-          </h1>
-          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 14 }}>
-            Your personal AI-powered job feed
-          </p>
+        <div className="mb-7 text-center">
+          <div className="mb-2 text-4xl">🎯</div>
+          <h1 className="text-[22px] font-bold text-[#e2e8f0]">Welcome to Job Radar</h1>
+          <p className="mt-2 text-sm text-[#64748b]">Your personal AI-powered job feed</p>
         </div>
 
         {/* Step 1: Gemini Key */}
         {step === "gemini" && (
           <>
-            <div
-              style={{
-                padding: 16,
-                background: "#0a0a18",
-                border: "1px solid #1e1e30",
-                borderRadius: 10,
-                marginBottom: 24,
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>
-                Job Radar uses your own <strong style={{ color: "#818cf8" }}>Gemini API key</strong>{" "}
+            <div className="mb-6 rounded-[10px] border border-[#1e1e30] bg-[#0a0a18] p-4">
+              <p className="text-[13px] leading-relaxed text-[#94a3b8]">
+                Job Radar uses your own <strong className="text-[#818cf8]">Gemini API key</strong>{" "}
                 to filter jobs with your custom prompt. This keeps your filtering private and
                 prevents shared rate limits.
               </p>
             </div>
 
-            <label style={{ display: "block", fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>
-              Gemini API key <span style={{ color: "#ef4444" }}>*</span>
+            <label
+              htmlFor="onboarding-gemini-key"
+              className="mb-2 block text-[13px] text-[#94a3b8]"
+            >
+              Gemini API key <span className="text-[#ef4444]">*</span>
             </label>
             <input
+              id="onboarding-gemini-key"
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="AIza..."
+              className="w-full rounded-lg border bg-[#0a0a18] px-3.5 py-3 text-sm text-[#e2e8f0]"
               style={{
-                width: "100%",
-                padding: "12px 14px",
-                background: "#0a0a18",
-                border: `1px solid ${keyError ? "#ef4444" : "#1e1e30"}`,
-                borderRadius: 8,
-                color: "#e2e8f0",
-                fontSize: 14,
+                borderColor: keyError ? "#ef4444" : "#1e1e30",
                 marginBottom: keyError ? 8 : 20,
-                boxSizing: "border-box",
               }}
             />
-            {keyError && (
-              <p style={{ color: "#f87171", fontSize: 12, margin: "0 0 16px" }}>{keyError}</p>
-            )}
+            {keyError && <p className="mb-4 text-xs text-[#f87171]">{keyError}</p>}
 
-            <p style={{ fontSize: 12, color: "#475569", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p className="mb-5 text-xs leading-normal text-[#475569]">
               Get a free API key at{" "}
               <a
                 href="https://aistudio.google.com/apikey"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "#818cf8" }}
+                className="text-[#818cf8]"
               >
                 aistudio.google.com/apikey
               </a>
@@ -176,18 +139,8 @@ export default function OnboardingFlow() {
             <button
               onClick={saveKeyAndContinue}
               disabled={loading}
-              style={{
-                width: "100%",
-                padding: "13px 0",
-                background: "#6366f1",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-              }}
+              className="w-full cursor-pointer rounded-lg border-0 bg-[#6366f1] py-[13px] text-[15px] font-semibold text-white disabled:cursor-not-allowed"
+              style={{ opacity: loading ? 0.7 : 1 }}
             >
               {loading ? "Saving..." : "Continue →"}
             </button>
@@ -197,29 +150,19 @@ export default function OnboardingFlow() {
         {/* Step 2: Skip or Customise */}
         {step === "customize" && (
           <>
-            <p style={{ fontSize: 15, color: "#94a3b8", marginBottom: 28, lineHeight: 1.6 }}>
+            <p className="mb-7 text-[15px] leading-relaxed text-[#94a3b8]">
               Your API key is saved. Now choose how you want your feed configured:
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-3.5">
               <button
                 onClick={skipCustomisation}
                 disabled={loading}
-                style={{
-                  padding: "20px 24px",
-                  background: "#0a0a18",
-                  border: "1px solid #1e1e30",
-                  borderRadius: 10,
-                  color: "#e2e8f0",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  opacity: loading ? 0.6 : 1,
-                }}
+                className="cursor-pointer rounded-[10px] border border-[#1e1e30] bg-[#0a0a18] px-6 py-5 text-left text-[#e2e8f0] disabled:cursor-not-allowed"
+                style={{ opacity: loading ? 0.6 : 1 }}
               >
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                  ⚡ Use platform defaults
-                </div>
-                <div style={{ fontSize: 13, color: "#64748b" }}>
+                <div className="mb-1 text-[15px] font-semibold">⚡ Use platform defaults</div>
+                <div className="text-[13px] text-[#64748b]">
                   Immediately see jobs matched against the default Senior React/Next.js profile. You
                   can always customise later.
                 </div>
@@ -228,21 +171,13 @@ export default function OnboardingFlow() {
               <button
                 onClick={goCustomise}
                 disabled={loading}
-                style={{
-                  padding: "20px 24px",
-                  background: "#0f0f20",
-                  border: "1px solid #6366f1",
-                  borderRadius: 10,
-                  color: "#e2e8f0",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  opacity: loading ? 0.6 : 1,
-                }}
+                className="cursor-pointer rounded-[10px] border border-[#6366f1] bg-[#0f0f20] px-6 py-5 text-left text-[#e2e8f0] disabled:cursor-not-allowed"
+                style={{ opacity: loading ? 0.6 : 1 }}
               >
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: "#818cf8" }}>
+                <div className="mb-1 text-[15px] font-semibold text-[#818cf8]">
                   🎛️ Customise my profile
                 </div>
-                <div style={{ fontSize: 13, color: "#64748b" }}>
+                <div className="text-[13px] text-[#64748b]">
                   Set your own skills, pipelines, seniority preferences, and Gemini filter prompt.
                 </div>
               </button>

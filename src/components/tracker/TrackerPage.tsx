@@ -71,11 +71,9 @@ export default function TrackerPage() {
   if (error) return <ErrorState message={error} />;
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-        Application Tracker
-      </h1>
-      <p style={{ margin: "0 0 28px", color: "#64748b", fontSize: 14 }}>
+    <div className="p-8">
+      <h1 className="m-0 mb-2 text-[22px] font-bold text-slate-200">Application Tracker</h1>
+      <p className="m-0 mb-7 text-sm text-slate-500">
         {entries.length} job{entries.length !== 1 ? "s" : ""} tracked
       </p>
 
@@ -85,18 +83,8 @@ export default function TrackerPage() {
         <>
           {/* Pie chart */}
           {entries.length >= 2 && (
-            <div
-              style={{
-                background: "#0d0d1a",
-                border: "1px solid #1e1e30",
-                borderRadius: 12,
-                padding: 20,
-                marginBottom: 28,
-              }}
-            >
-              <h2 style={{ margin: "0 0 16px", fontSize: 14, color: "#94a3b8", fontWeight: 600 }}>
-                Status breakdown
-              </h2>
+            <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
+              <h2 className="m-0 mb-4 text-sm font-semibold text-slate-400">Status breakdown</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -124,7 +112,7 @@ export default function TrackerPage() {
           )}
 
           {/* Entries list */}
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="grid gap-2.5">
             {entries.map((entry) => (
               <TrackerCard
                 key={entry.id}
@@ -153,55 +141,38 @@ function TrackerCard({
   const snap = entry.job_snapshot;
 
   return (
-    <div
-      style={{
-        background: "#0d0d1a",
-        border: "1px solid #1e1e30",
-        borderRadius: 10,
-        padding: "14px 18px",
-        display: "grid",
-        gridTemplateColumns: "1fr auto",
-        gap: 12,
-        alignItems: "start",
-      }}
-    >
+    <div className="grid grid-cols-[1fr_auto] items-start gap-3 rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-4.5 py-3.5">
       <div>
         <a
           href={snap.url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
+          className="text-sm font-semibold text-slate-200 no-underline"
         >
           {snap.title}
         </a>
-        <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
+        <div className="mt-0.5 text-xs text-slate-500">
           {snap.company} · {snap.country_flag} {snap.location} · Score: {snap.total_score}%
         </div>
-        {entry.notes && (
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6, fontStyle: "italic" }}>
-            {entry.notes}
-          </div>
-        )}
+        {entry.notes && <div className="mt-1.5 text-xs italic text-slate-400">{entry.notes}</div>}
         {entry.applied_at && (
-          <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+          <div className="mt-1 text-[11px] text-slate-600">
             Applied {new Date(entry.applied_at).toLocaleDateString()}
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+      <div className="flex flex-col items-end gap-2">
         {/* Status dropdown */}
         <select
           value={entry.status}
           onChange={(e) => onStatusChange(e.target.value as TrackerStatus)}
+          aria-label={`Update status for ${snap.title}`}
+          className="rounded-full px-2.5 py-1 text-xs cursor-pointer"
           style={{
-            padding: "4px 10px",
-            borderRadius: 20,
-            fontSize: 12,
             border: `1px solid ${meta.color}`,
             background: `${meta.color}15`,
             color: meta.color,
-            cursor: "pointer",
           }}
         >
           {Object.entries(STATUS_META).map(([k, v]) => (
@@ -213,14 +184,8 @@ function TrackerCard({
 
         <button
           onClick={onDelete}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#475569",
-            fontSize: 12,
-            cursor: "pointer",
-            padding: 0,
-          }}
+          aria-label={`Remove ${snap.title} from tracker`}
+          className="border-none bg-transparent p-0 text-xs text-slate-600 cursor-pointer"
         >
           Remove
         </button>
@@ -230,29 +195,19 @@ function TrackerCard({
 }
 
 function LoadingState() {
-  return (
-    <div style={{ padding: 32, color: "#64748b", textAlign: "center" }}>Loading tracker...</div>
-  );
+  return <div className="p-8 text-center text-slate-500">Loading tracker...</div>;
 }
 
 function ErrorState({ message }: { message: string }) {
-  return <div style={{ padding: 32, color: "#f87171", textAlign: "center" }}>Error: {message}</div>;
+  return <div className="p-8 text-center text-red-400">Error: {message}</div>;
 }
 
 function EmptyState() {
   return (
-    <div
-      style={{
-        padding: 48,
-        textAlign: "center",
-        background: "#0d0d1a",
-        border: "1px dashed #1e1e30",
-        borderRadius: 12,
-      }}
-    >
-      <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-      <p style={{ color: "#64748b", fontSize: 15, margin: 0 }}>No tracked jobs yet</p>
-      <p style={{ color: "#475569", fontSize: 13, marginTop: 8 }}>
+    <div className="rounded-xl border border-dashed border-[#1e1e30] bg-[#0d0d1a] p-12 text-center">
+      <div className="mb-3 text-3xl">📋</div>
+      <p className="m-0 text-[15px] text-slate-500">No tracked jobs yet</p>
+      <p className="mt-2 text-[13px] text-slate-600">
         Hit &quot;Track&quot; on any job card to start tracking applications
       </p>
     </div>

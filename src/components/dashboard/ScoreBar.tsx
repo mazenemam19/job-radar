@@ -3,29 +3,14 @@
 
 export default function ScoreBar({ value, color }: { value: number; color: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div
-        style={{
-          flex: 1,
-          height: 4,
-          background: "#1e1e30",
-          borderRadius: 2,
-          overflow: "hidden",
-        }}
-      >
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1 overflow-hidden rounded-sm bg-[#1e1e30]">
         <div
-          style={{
-            width: `${value}%`,
-            height: "100%",
-            background: color,
-            borderRadius: 2,
-            transition: "width 0.3s ease",
-          }}
+          className="h-full rounded-sm transition-[width] duration-300 ease-in-out"
+          style={{ width: `${value}%`, background: color }}
         />
       </div>
-      <span style={{ fontSize: 11, color: "#64748b", minWidth: 28, textAlign: "right" }}>
-        {value}%
-      </span>
+      <span className="min-w-[28px] text-right text-[11px] text-[#64748b]">{value}%</span>
     </div>
   );
 }

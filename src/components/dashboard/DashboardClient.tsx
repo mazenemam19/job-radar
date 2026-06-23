@@ -68,12 +68,12 @@ export default function DashboardClient() {
 
   if (loading) {
     return (
-      <div style={{ padding: 48, textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 16 }}>🔄</div>
-        <div style={{ color: "#818cf8", fontSize: 16, fontWeight: 600 }}>
+      <div className="p-12 text-center">
+        <div className="mb-4 text-3xl">🔄</div>
+        <div className="text-base font-semibold text-indigo-400">
           {rebuilding ? "Running your Gemini filter…" : "Loading your job feed…"}
         </div>
-        <div style={{ color: "#475569", fontSize: 13, marginTop: 8 }}>
+        <div className="mt-2 text-[13px] text-slate-600">
           {rebuilding
             ? "This takes 10–15 seconds on first load after a cron run. Subsequent opens are instant."
             : "Checking your cached results…"}
@@ -84,20 +84,12 @@ export default function DashboardClient() {
 
   if (error) {
     return (
-      <div style={{ padding: 48, textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
-        <div style={{ color: "#f87171", fontSize: 15, marginBottom: 16 }}>{error}</div>
+      <div className="p-12 text-center">
+        <div className="mb-3 text-3xl">⚠️</div>
+        <div className="mb-4 text-[15px] text-red-400">{error}</div>
         <button
           onClick={load}
-          style={{
-            padding: "10px 24px",
-            background: "#6366f1",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 14,
-          }}
+          className="rounded-lg border-none bg-indigo-500 px-6 py-2.5 text-sm text-white cursor-pointer"
         >
           Retry
         </button>
@@ -106,27 +98,18 @@ export default function DashboardClient() {
   }
 
   return (
-    <div style={{ padding: "28px 32px" }}>
+    <div className="px-8 py-7">
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 24,
-        }}
-      >
+      <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 style={{ margin: "0 0 4px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-            Your Job Feed
-          </h1>
-          <div style={{ fontSize: 13, color: "#64748b" }}>
+          <h1 className="m-0 mb-1 text-[22px] font-bold text-slate-200">Your Job Feed</h1>
+          <div className="text-[13px] text-slate-500">
             {jobs.length} match{jobs.length !== 1 ? "es" : ""} ·{" "}
-            <span style={{ color: fromCache ? "#22c55e" : "#818cf8" }}>
+            <span className={fromCache ? "text-green-500" : "text-indigo-400"}>
               {fromCache ? "⚡ from cache" : "✨ freshly filtered"}
             </span>
             {pipelineLog && (
-              <span style={{ marginLeft: 8, color: "#475569" }}>
+              <span className="ml-2 text-slate-600">
                 · {pipelineLog.total_fetched} fetched → {pipelineLog.after_gemini} after your Gemini
                 filter
               </span>
@@ -139,22 +122,14 @@ export default function DashboardClient() {
             setRebuilding(true);
             load();
           }}
-          style={{
-            padding: "8px 16px",
-            background: "#1e1e30",
-            color: "#818cf8",
-            border: "1px solid #1e1e30",
-            borderRadius: 8,
-            fontSize: 13,
-            cursor: "pointer",
-          }}
+          className="rounded-lg border border-[#1e1e30] bg-[#1e1e30] px-4 py-2 text-[13px] text-indigo-400 cursor-pointer"
         >
           ↺ Rebuild cache
         </button>
       </div>
 
       {/* Pipeline filter tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      <div className="mb-5 flex gap-2" role="tablist" aria-label="Filter jobs by pipeline">
         {(
           [
             ["all", `All (${jobs.length})`, ""],
@@ -162,39 +137,33 @@ export default function DashboardClient() {
             ["local", `🇪🇬 Local (${modeCounts.local ?? 0})`, "#22c55e"],
             ["global", `🌐 Remote (${modeCounts.global ?? 0})`, "#f59e0b"],
           ] as [FilterMode, string, string][]
-        ).map(([mode, label, color]) => (
-          <button
-            key={mode}
-            onClick={() => setFilter(mode)}
-            style={{
-              padding: "7px 16px",
-              borderRadius: 20,
-              fontSize: 13,
-              cursor: "pointer",
-              border: `1px solid ${filter === mode && color ? color : "#1e1e30"}`,
-              background: filter === mode && color ? `${color}20` : "transparent",
-              color: filter === mode ? color || "#e2e8f0" : "#64748b",
-              fontWeight: filter === mode ? 600 : 400,
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        ).map(([mode, label, color]) => {
+          const active = filter === mode;
+          return (
+            <button
+              key={mode}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setFilter(mode)}
+              className="rounded-full px-4 py-1.5 text-[13px] cursor-pointer"
+              style={{
+                border: `1px solid ${active && color ? color : "#1e1e30"}`,
+                background: active && color ? `${color}20` : "transparent",
+                color: active ? color || "#e2e8f0" : "#64748b",
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Job list */}
       {filtered.length === 0 ? (
-        <div
-          style={{
-            padding: 48,
-            textAlign: "center",
-            background: "#0d0d1a",
-            border: "1px dashed #1e1e30",
-            borderRadius: 12,
-          }}
-        >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-          <p style={{ color: "#64748b", fontSize: 15, margin: 0 }}>
+        <div className="rounded-xl border border-dashed border-[#1e1e30] bg-[#0d0d1a] p-12 text-center">
+          <div className="mb-3 text-3xl">🔍</div>
+          <p className="m-0 text-[15px] text-slate-500">
             {jobs.length === 0
               ? "No jobs matched your filter settings. Try widening your Gemini prompt or enabling more pipelines."
               : 'No jobs in this pipeline. Switch to "All" or enable this pipeline in Settings.'}

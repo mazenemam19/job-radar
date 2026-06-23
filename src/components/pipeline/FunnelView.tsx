@@ -44,27 +44,15 @@ const STAGES: Stage[] = [
 
 export default function FunnelView({ log, loading }: Props) {
   if (loading) {
-    return (
-      <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>
-        Loading pipeline data...
-      </div>
-    );
+    return <div className="p-12 text-center text-slate-500">Loading pipeline data...</div>;
   }
 
   if (!log) {
     return (
-      <div
-        style={{
-          padding: 48,
-          textAlign: "center",
-          background: "#0d0d1a",
-          border: "1px dashed #1e1e30",
-          borderRadius: 12,
-        }}
-      >
-        <div style={{ fontSize: 32, marginBottom: 12 }}>🔭</div>
-        <p style={{ color: "#64748b", fontSize: 15, margin: 0 }}>No pipeline data yet</p>
-        <p style={{ color: "#475569", fontSize: 13, marginTop: 8 }}>
+      <div className="rounded-xl border border-dashed border-[#1e1e30] bg-[#0d0d1a] p-12 text-center">
+        <div className="mb-3 text-3xl">🔭</div>
+        <p className="m-0 text-[15px] text-slate-500">No pipeline data yet</p>
+        <p className="mt-2 text-[13px] text-slate-600">
           Open your dashboard to trigger a cache build
         </p>
       </div>
@@ -74,52 +62,28 @@ export default function FunnelView({ log, loading }: Props) {
   const total = log.total_fetched || 1;
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-        Pipeline View
-      </h1>
-      <p style={{ margin: "0 0 32px", color: "#64748b", fontSize: 14 }}>
+    <div className="p-8">
+      <h1 className="m-0 mb-2 text-[22px] font-bold text-slate-200">Pipeline View</h1>
+      <p className="m-0 mb-8 text-sm text-slate-500">
         Last built: {new Date(log.cached_at).toLocaleString()}
       </p>
 
       {/* Funnel nodes */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          overflowX: "auto",
-          gap: 0,
-          paddingBottom: 16,
-        }}
-      >
+      <div className="flex items-center gap-0 overflow-x-auto pb-4">
         {STAGES.map((stage, i) => {
           const count = log[stage.key];
           const widthPct = Math.max(12, (count / total) * 100);
           const dropped = i > 0 ? log[STAGES[i - 1].key] - count : 0;
+          const circleSize = `${Math.min(100, Math.max(56, widthPct * 0.8))}px`;
 
           return (
-            <div key={stage.key} style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+            <div key={stage.key} className="flex shrink-0 items-center">
               {/* Arrow between nodes */}
               {i > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "0 8px",
-                  }}
-                >
-                  <div style={{ color: "#475569", fontSize: 20 }}>→</div>
+                <div className="flex flex-col items-center px-2">
+                  <div className="text-xl text-slate-600">→</div>
                   {dropped > 0 && (
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#ef4444",
-                        textAlign: "center",
-                        maxWidth: 60,
-                        lineHeight: 1.3,
-                      }}
-                    >
+                    <div className="max-w-[60px] text-center text-[10px] leading-tight text-red-500">
                       −{dropped}
                     </div>
                   )}
@@ -129,50 +93,29 @@ export default function FunnelView({ log, loading }: Props) {
               {/* Node */}
               <div
                 title={stage.filterLabel}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  padding: "20px 12px",
-                  background: "#0d0d1a",
-                  border: `1px solid ${stage.color}40`,
-                  borderRadius: 12,
-                  minWidth: 100,
-                  cursor: "help",
-                }}
+                className="flex min-w-[100px] flex-col items-center rounded-xl border bg-[#0d0d1a] px-3 py-5 cursor-help"
+                style={{ borderColor: `${stage.color}40` }}
               >
                 {/* Circle with count */}
                 <div
+                  className="flex items-center justify-center rounded-full border-2 transition-all duration-300 ease-in-out"
                   style={{
-                    width: `${Math.min(100, Math.max(56, widthPct * 0.8))}px`,
-                    height: `${Math.min(100, Math.max(56, widthPct * 0.8))}px`,
-                    borderRadius: "50%",
+                    width: circleSize,
+                    height: circleSize,
                     background: `${stage.color}15`,
-                    border: `2px solid ${stage.color}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.3s ease",
+                    borderColor: stage.color,
                   }}
                 >
-                  <span style={{ fontSize: 18, fontWeight: 700, color: stage.color }}>
+                  <span className="text-lg font-bold" style={{ color: stage.color }}>
                     {count.toLocaleString()}
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 12,
-                    color: "#94a3b8",
-                    textAlign: "center",
-                    fontWeight: 500,
-                  }}
-                >
+                <div className="mt-2.5 text-center text-xs font-medium text-slate-400">
                   {stage.label}
                 </div>
 
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>
+                <div className="mt-0.5 text-[10px] text-slate-600">
                   {Math.round((count / total) * 100)}% of total
                 </div>
               </div>
@@ -182,24 +125,8 @@ export default function FunnelView({ log, loading }: Props) {
       </div>
 
       {/* Explanatory table */}
-      <div
-        style={{
-          marginTop: 32,
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "14px 20px",
-            borderBottom: "1px solid #1e1e30",
-            fontSize: 13,
-            color: "#64748b",
-            fontWeight: 600,
-          }}
-        >
+      <div className="mt-8 overflow-hidden rounded-xl border border-[#1e1e30] bg-[#0d0d1a]">
+        <div className="border-b border-[#1e1e30] px-5 py-3.5 text-[13px] font-semibold text-slate-500">
           What was filtered at each stage
         </div>
         {STAGES.slice(1).map((stage, i) => {
@@ -210,16 +137,10 @@ export default function FunnelView({ log, loading }: Props) {
           return (
             <div
               key={stage.key}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "12px 20px",
-                borderBottom: "1px solid #0d0d1a",
-                fontSize: 13,
-              }}
+              className="flex items-center border-b border-[#0d0d1a] px-5 py-3 text-[13px]"
             >
-              <span style={{ color: "#94a3b8", flex: 1 }}>{stage.label}</span>
-              <span style={{ color: diff > 0 ? "#ef4444" : "#64748b", fontWeight: 600 }}>
+              <span className="flex-1 text-slate-400">{stage.label}</span>
+              <span className={`font-semibold ${diff > 0 ? "text-red-500" : "text-slate-500"}`}>
                 {diff > 0 ? `−${diff}` : "none"} removed
               </span>
             </div>
@@ -227,7 +148,7 @@ export default function FunnelView({ log, loading }: Props) {
         })}
       </div>
 
-      <p style={{ marginTop: 16, fontSize: 12, color: "#475569" }}>
+      <p className="mt-4 text-xs text-slate-600">
         Hover any circle for a description of what was filtered. To see more jobs, try widening your
         age limit, enabling more pipelines, or softening your Gemini prompt in Settings.
       </p>

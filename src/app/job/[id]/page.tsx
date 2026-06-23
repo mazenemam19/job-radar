@@ -4,7 +4,7 @@
 // API route that no longer exists, used the pre-multi-tenant Job type, and
 // styled itself with CSS classes from the old (non-existent) stylesheet.
 // This version reads from the user's own cached scored jobs (same data their
-// dashboard shows) and matches the rest of the v2 dark-theme inline-style system.
+// dashboard shows) and matches the rest of the v2 dark-theme styling system.
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -24,6 +24,10 @@ function formatRelativeDate(iso: string): string {
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
 }
+
+const PAGE_SHELL_CLASS = "mx-auto min-h-screen max-w-[760px] bg-[#08080f] px-6 py-8 font-sans";
+const BACK_BTN_CLASS =
+  "mb-5 rounded-md border border-[#1e1e30] bg-transparent px-3.5 py-1.5 text-[13px] text-slate-400 cursor-pointer";
 
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
@@ -58,19 +62,19 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div style={pageShellStyle}>
-        <div style={{ color: "#64748b", padding: 40 }}>Loading…</div>
+      <div className={PAGE_SHELL_CLASS}>
+        <div className="p-10 text-slate-500">Loading…</div>
       </div>
     );
   }
 
   if (notFound || !job) {
     return (
-      <div style={pageShellStyle}>
-        <button onClick={() => router.back()} style={backBtnStyle}>
+      <div className={PAGE_SHELL_CLASS}>
+        <button onClick={() => router.back()} className={BACK_BTN_CLASS}>
           ← Back
         </button>
-        <div style={{ color: "#64748b", padding: "40px 0" }}>
+        <div className="py-10 text-slate-500">
           Job not found — it may have aged out of your dashboard, or your settings changed since you
           last saw it.
         </div>
@@ -123,95 +127,47 @@ export default function JobDetailPage() {
     : "";
 
   return (
-    <div style={pageShellStyle}>
-      <button onClick={() => router.back()} style={backBtnStyle}>
+    <div className={PAGE_SHELL_CLASS}>
+      <button onClick={() => router.back()} className={BACK_BTN_CLASS}>
         ← Back
       </button>
 
       {/* Header card */}
       <div
-        style={{
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderLeft: `3px solid ${modeColor}`,
-          borderRadius: 10,
-          padding: "24px 28px",
-          marginBottom: 16,
-        }}
+        className="mb-4 rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-7 py-6"
+        style={{ borderLeft: `3px solid ${modeColor}` }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ margin: "0 0 6px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-              {job.title}
-            </h1>
-            <div style={{ fontSize: 14, color: "#94a3b8" }}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="m-0 mb-1.5 text-[22px] font-bold text-slate-200">{job.title}</h1>
+            <div className="text-sm text-slate-400">
               {job.company} · {job.country_flag} {job.location} · {postedLabel}
             </div>
           </div>
 
           <div
+            className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full"
             style={{
-              flexShrink: 0,
-              width: 60,
-              height: 60,
-              borderRadius: "50%",
               background: `conic-gradient(${modeColor} ${displayTotalScore * 3.6}deg, #1e1e30 0deg)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                background: "#0d0d1a",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 15,
-                fontWeight: 700,
-                color: "#e2e8f0",
-              }}
-            >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0d0d1a] text-[15px] font-bold text-slate-200">
               {displayTotalScore}
             </div>
           </div>
         </div>
 
         {/* Tags row */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
+        <div className="mt-3.5 flex flex-wrap gap-1.5">
           <span
-            style={{
-              padding: "2px 8px",
-              borderRadius: 20,
-              background: `${modeColor}20`,
-              color: modeColor,
-              fontSize: 11,
-              fontWeight: 600,
-            }}
+            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+            style={{ background: `${modeColor}20`, color: modeColor }}
           >
             {MODE_LABELS[job.mode]}
           </span>
 
           {job.visa_sponsorship && (
-            <span
-              style={{
-                padding: "2px 8px",
-                borderRadius: 20,
-                background: "#0f172a",
-                color: "#818cf8",
-                fontSize: 11,
-              }}
-            >
+            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] text-indigo-400">
               Visa sponsorship
             </span>
           )}
@@ -219,13 +175,7 @@ export default function JobDetailPage() {
           {job.matched_skills.map((s) => (
             <span
               key={s}
-              style={{
-                padding: "2px 8px",
-                borderRadius: 20,
-                background: "#0f172a",
-                color: "#64748b",
-                fontSize: 11,
-              }}
+              className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] text-slate-500"
             >
               {s}
             </span>
@@ -235,13 +185,7 @@ export default function JobDetailPage() {
             <span
               key={s}
               title="Bonus skill — not part of your scoring, just nice to know it's there"
-              style={{
-                padding: "2px 8px",
-                borderRadius: 20,
-                background: "rgba(245,158,11,0.12)",
-                color: "#f59e0b",
-                fontSize: 11,
-              }}
+              className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-500"
             >
               +{s}
             </span>
@@ -249,33 +193,23 @@ export default function JobDetailPage() {
         </div>
 
         {/* Score breakdown */}
-        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="mt-4.5 flex flex-col gap-2">
           <div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Skill match</div>
+            <div className="mb-0.5 text-[11px] text-slate-500">Skill match</div>
             <ScoreBar value={job.skill_match_score} color="#6366f1" />
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Recency (live)</div>
+            <div className="mb-0.5 text-[11px] text-slate-500">Recency (live)</div>
             <ScoreBar value={liveRecencyScore} color="#22c55e" />
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>Relocation</div>
+            <div className="mb-0.5 text-[11px] text-slate-500">Relocation</div>
             <ScoreBar value={job.relocation_bonus} color="#f59e0b" />
           </div>
         </div>
 
         {job.gemini_reason && (
-          <div
-            style={{
-              marginTop: 16,
-              padding: "10px 14px",
-              background: "#0a0a18",
-              borderRadius: 8,
-              fontSize: 13,
-              color: "#94a3b8",
-              fontStyle: "italic",
-            }}
-          >
+          <div className="mt-4 rounded-lg bg-[#0a0a18] px-3.5 py-2.5 text-[13px] italic text-slate-400">
             Gemini: {job.gemini_reason}
           </div>
         )}
@@ -284,17 +218,7 @@ export default function JobDetailPage() {
           href={job.url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            display: "inline-block",
-            marginTop: 18,
-            padding: "10px 20px",
-            borderRadius: 8,
-            background: "#6366f1",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
+          className="mt-4.5 inline-block rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white no-underline"
         >
           Apply →
         </a>
@@ -303,38 +227,10 @@ export default function JobDetailPage() {
       {/* Description */}
       {cleanDescription && (
         <div
-          style={{
-            background: "#0d0d1a",
-            border: "1px solid #1e1e30",
-            borderRadius: 10,
-            padding: "24px 28px",
-            color: "#cbd5e1",
-            fontSize: 14,
-            lineHeight: 1.7,
-          }}
+          className="rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-7 py-6 text-sm leading-relaxed text-slate-300"
           dangerouslySetInnerHTML={{ __html: cleanDescription }}
         />
       )}
     </div>
   );
 }
-
-const pageShellStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#08080f",
-  fontFamily: "Inter, system-ui, sans-serif",
-  padding: "32px 24px",
-  maxWidth: 760,
-  margin: "0 auto",
-};
-
-const backBtnStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid #1e1e30",
-  borderRadius: 6,
-  color: "#94a3b8",
-  fontSize: 13,
-  padding: "6px 14px",
-  cursor: "pointer",
-  marginBottom: 20,
-};

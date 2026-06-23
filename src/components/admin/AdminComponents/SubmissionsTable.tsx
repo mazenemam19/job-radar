@@ -45,14 +45,14 @@ export function SubmissionsTable() {
     if (d.ok) setSubmissions((p) => p.map((s) => (s.id === id ? { ...s, status } : s)));
   }
 
-  if (loading) return <div style={{ padding: 32, color: "#64748b" }}>Loading...</div>;
+  if (loading) return <div className="p-8 text-[#64748b]">Loading...</div>;
 
   const pending = submissions.filter((s) => s.status === "pending");
   const reviewed = submissions.filter((s) => s.status !== "pending");
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ margin: "0 0 24px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
+    <div className="p-8">
+      <h1 className="mb-6 text-[22px] font-bold text-[#e2e8f0]">
         ATS Submissions ({pending.length} pending)
       </h1>
 
@@ -62,39 +62,22 @@ export function SubmissionsTable() {
       ].map(
         ({ label, rows }) =>
           rows.length > 0 && (
-            <div key={label} style={{ marginBottom: 32 }}>
-              <h2 style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 12px" }}>{label}</h2>
-              <div
-                style={{
-                  background: "#0d0d1a",
-                  border: "1px solid #1e1e30",
-                  borderRadius: 12,
-                  overflow: "hidden",
-                }}
-              >
+            <div key={label} className="mb-8">
+              <h2 className="mb-3 text-sm text-[#94a3b8]">{label}</h2>
+              <div className="overflow-hidden rounded-xl border border-[#1e1e30] bg-[#0d0d1a]">
                 {rows.map((sub) => (
-                  <div
-                    key={sub.id}
-                    style={{ padding: "16px 20px", borderBottom: "1px solid #0d0d1a" }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                      }}
-                    >
+                  <div key={sub.id} className="border-b border-[#0d0d1a] px-5 py-4">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0" }}>
+                        <div className="text-[15px] font-semibold text-[#e2e8f0]">
                           {sub.company_name}
                         </div>
-                        <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
-                          {sub.ats_type} · slug:{" "}
-                          <code style={{ color: "#818cf8" }}>{sub.slug}</code> · {sub.country_flag}{" "}
-                          {sub.country}
+                        <div className="mt-[3px] text-xs text-[#64748b]">
+                          {sub.ats_type} · slug: <code className="text-[#818cf8]">{sub.slug}</code>{" "}
+                          · {sub.country_flag} {sub.country}
                           {sub.submitter_email && ` · ${sub.submitter_email}`}
                         </div>
-                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
+                        <div className="mt-0.5 text-[11px] text-[#475569]">
                           {new Date(sub.submitted_at).toLocaleString()}
                           {sub.pipeline_visa && " · ✈️ Visa"}
                           {sub.pipeline_local && " · 🇪🇬 Local"}
@@ -102,15 +85,11 @@ export function SubmissionsTable() {
                         </div>
                         {sub.test_result && (
                           <div
+                            className="mt-2 inline-block rounded-md border px-2.5 py-1.5 text-xs"
                             style={{
-                              marginTop: 8,
-                              padding: "6px 10px",
-                              borderRadius: 6,
-                              fontSize: 12,
                               background: sub.test_result.ok ? "#0d2a18" : "#2a0d0d",
                               color: sub.test_result.ok ? "#4ade80" : "#f87171",
-                              border: `1px solid ${sub.test_result.ok ? "#166534" : "#991b1b"}`,
-                              display: "inline-block",
+                              borderColor: sub.test_result.ok ? "#166534" : "#991b1b",
                             }}
                           >
                             {sub.test_result.ok
@@ -121,7 +100,7 @@ export function SubmissionsTable() {
                       </div>
 
                       {sub.status === "pending" && (
-                        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                        <div className="flex flex-shrink-0 gap-2">
                           <ActionBtn
                             onClick={() => runTest(sub.id)}
                             label={testing === sub.id ? "Testing..." : "🧪 Test"}
@@ -141,10 +120,8 @@ export function SubmissionsTable() {
                       )}
                       {sub.status !== "pending" && (
                         <span
+                          className="rounded-full px-3 py-1 text-xs"
                           style={{
-                            padding: "4px 12px",
-                            borderRadius: 20,
-                            fontSize: 12,
                             background: sub.status === "approved" ? "#0d2a18" : "#2a0d0d",
                             color: sub.status === "approved" ? "#4ade80" : "#f87171",
                           }}
@@ -161,7 +138,7 @@ export function SubmissionsTable() {
       )}
 
       {submissions.length === 0 && (
-        <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>No submissions yet</div>
+        <div className="p-12 text-center text-[#64748b]">No submissions yet</div>
       )}
     </div>
   );
