@@ -268,7 +268,9 @@ export interface AdminUserListItem {
   is_active: boolean;
   created_at: string;
   last_active_at: string | null;
-  user_settings: { uses_defaults: boolean } | null;
+  // Supabase returns the joined embed as an array (no unique FK hint on
+  // user_id), even though it's one row per user in practice.
+  user_settings: { uses_defaults: boolean }[] | null;
 }
 
 // ── Cron ────────────────────────────────────────────────────
