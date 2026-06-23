@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_ATS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
 
@@ -16,7 +17,7 @@ export async function GET() {
     .select("*")
     .order("name", { ascending: true });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/companies:GET", error);
   return NextResponse.json({ ok: true, data });
 }
 
@@ -60,6 +61,6 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/companies:POST", error);
   return NextResponse.json({ ok: true, data }, { status: 201 });
 }

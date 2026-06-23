@@ -4,6 +4,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_ATS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
 
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("submit:POST", error);
 
   return NextResponse.json({ ok: true, data: { id: data.id } }, { status: 201 });
 }

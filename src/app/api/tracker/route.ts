@@ -2,6 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_STATUSES } from "@/lib/constants";
 import type { TrackerStatus, TrackerJobSnapshot } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
@@ -19,7 +20,7 @@ export async function GET() {
     .eq("user_id", user.id)
     .order("last_status_change", { ascending: false });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("tracker:GET", error);
 
   return NextResponse.json({ ok: true, data });
 }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("tracker:POST", error);
 
   return NextResponse.json({ ok: true, data });
 }

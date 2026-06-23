@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
 import { filterJobsWithGemini } from "@/lib/gemini";
 import { scoreJob, mergeJobs, passesDateGate, passesSettingsGate } from "@/lib/scoring";
@@ -105,7 +106,7 @@ export async function GET() {
     .limit(2000); // hard cap to keep Gemini context manageable
 
   if (rawError) {
-    return NextResponse.json({ ok: false, error: rawError.message }, { status: 500 });
+    return dbErrorResponse("dashboard:GET", rawError);
   }
 
   const rawJobs = (rawJobsData ?? []) as RawJob[];

@@ -2,6 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
+import { dbErrorResponse } from "@/lib/api-errors";
 import type {
   SalaryAggregate,
   SalaryCurrency,
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (pipelineFilter) query = query.eq("pipeline", pipelineFilter);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("salary:GET", error);
 
   // Aggregate by role_title × years_experience × currency
   const aggregates = aggregateSalaries(data ?? []);
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("salary:POST", error);
 
   return NextResponse.json({ ok: true, data }, { status: 201 });
 }

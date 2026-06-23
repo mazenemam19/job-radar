@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
+import { dbErrorResponse } from "@/lib/api-errors";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -21,7 +22,7 @@ export async function GET() {
     )
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/users:GET", error);
 
   return NextResponse.json({ ok: true, data });
 }
