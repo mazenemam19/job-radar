@@ -3,19 +3,11 @@
 // No jobs are stored. Result is written back to ats_submissions.test_result.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/auth";
 import { fetchCompany } from "@/lib/ats-bridge";
 import type { ATSCompanyRow, ATSTestResult, ATSType } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
-
-async function requireAdmin() {
-  const user = await getUser();
-  if (!user) return null;
-  const db = createAdminClient();
-  const { data } = await db.from("user_profiles").select("role").eq("id", user.id).single();
-  return data?.role === "admin" ? user : null;
-}
 
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin();

@@ -235,6 +235,42 @@ export interface ATSTestResult {
   tested_at: string;
 }
 
+export type ATSSubmissionStatus = "pending" | "approved" | "rejected";
+
+/** Row from public.ats_submissions */
+export interface ATSSubmission {
+  id: string;
+  company_name: string;
+  ats_type: ATSType;
+  slug: string;
+  country: string;
+  country_flag: string;
+  city: string | null;
+  pipeline_visa: boolean;
+  pipeline_local: boolean;
+  pipeline_global: boolean;
+  submitter_email: string | null;
+  status: ATSSubmissionStatus;
+  test_result: ATSTestResult | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+// ── Admin ────────────────────────────────────────────────────
+
+/** Shape returned by GET /api/admin/users — user_profiles joined with user_settings */
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+  onboarding_complete: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_active_at: string | null;
+  user_settings: { uses_defaults: boolean } | null;
+}
+
 // ── Cron ────────────────────────────────────────────────────
 
 export interface CronRunResult {

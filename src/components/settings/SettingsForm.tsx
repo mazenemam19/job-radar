@@ -2,10 +2,11 @@
 // src/components/settings/SettingsForm.tsx
 
 import { useState, useEffect } from "react";
+import type { ResolvedSettings, UserSettingsRow } from "@/lib/types";
 
 interface SettingsData {
-  resolved: Record<string, unknown>;
-  raw: Record<string, unknown> | null;
+  resolved: ResolvedSettings;
+  raw: UserSettingsRow | null;
   profile: { email: string; has_gemini_key: boolean; onboarding_complete: boolean };
 }
 
@@ -41,25 +42,23 @@ export default function SettingsForm() {
       if (json.ok) {
         const d: SettingsData = json.data;
         setData(d);
-        const r = d.resolved as Record<string, unknown>;
-        const raw = d.raw as Record<string, unknown> | null;
-        setUsesDefaults((raw?.uses_defaults as boolean) ?? true);
-        setExpertSkills(((r.expert_skills ?? []) as string[]).join(", "));
-        setSecSkills(((r.secondary_skills ?? []) as string[]).join(", "));
-        setJobAgeDays((r.job_age_days as number) ?? 7);
-        setVisa((r.pipeline_visa as boolean) ?? true);
-        setLocal((r.pipeline_local as boolean) ?? true);
-        setGlobal((r.pipeline_global as boolean) ?? true);
-        setAllowMid((r.seniority_allow_mid as boolean) ?? false);
-        setEmailAlerts((r.email_alerts_enabled as boolean) ?? true);
-        setPrompt((r.gemini_filter_prompt as string) ?? "");
-        setExcludedKeywords(((r.excluded_keywords ?? []) as string[]).join(", "));
-        setBlacklistedLocations(((r.blacklisted_locations ?? []) as string[]).join(", "));
-        setRequiredKeywords(((r.required_keywords ?? []) as string[]).join(", "));
-        const w = r.scoring_weights as { skill: number; recency: number } | undefined;
-        if (w) {
-          setSkillWeight(Math.round(w.skill * 100));
-          setRecencyWeight(Math.round(w.recency * 100));
+        const r = d.resolved;
+        setUsesDefaults(d.raw?.uses_defaults ?? true);
+        setExpertSkills((r.expert_skills ?? []).join(", "));
+        setSecSkills((r.secondary_skills ?? []).join(", "));
+        setJobAgeDays(r.job_age_days ?? 7);
+        setVisa(r.pipeline_visa ?? true);
+        setLocal(r.pipeline_local ?? true);
+        setGlobal(r.pipeline_global ?? true);
+        setAllowMid(r.seniority_allow_mid ?? false);
+        setEmailAlerts(r.email_alerts_enabled ?? true);
+        setPrompt(r.gemini_filter_prompt ?? "");
+        setExcludedKeywords((r.excluded_keywords ?? []).join(", "));
+        setBlacklistedLocations((r.blacklisted_locations ?? []).join(", "));
+        setRequiredKeywords((r.required_keywords ?? []).join(", "));
+        if (r.scoring_weights) {
+          setSkillWeight(Math.round(r.scoring_weights.skill * 100));
+          setRecencyWeight(Math.round(r.scoring_weights.recency * 100));
         }
       }
       setLoading(false);

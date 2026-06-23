@@ -3,18 +3,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { VALID_STATUSES } from "@/lib/constants";
 import type { TrackerStatus } from "@/lib/types";
-
 import type { Database } from "@/lib/database.types";
-
-const VALID_STATUSES: TrackerStatus[] = [
-  "applied",
-  "interviewing",
-  "offer",
-  "rejected",
-  "ghosted",
-  "saved",
-];
 
 // ── PATCH /api/tracker/[id] ───────────────────────────────
 
