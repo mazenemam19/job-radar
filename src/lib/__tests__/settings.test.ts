@@ -2,19 +2,35 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // We test the private mergeWithDefaults logic by testing resolveUserSettings
-// with a mocked admin client. The key behaviour to verify:
+// with mocked Supabase clients. The key behaviour to verify:
 //   1. uses_defaults = true  → all fields come from defaults
 //   2. uses_defaults = false → per-field: user value if non-null, else default
 //   3. Weights are normalised if they don't sum to 1
 
-// ── Mock Supabase admin client ────────────────────────────────
+// ── Mock Supabase clients ──────────────────────────────────────
+// getDefaultSettings() reads default_settings via the service-role client
+// (global config, not user-owned). getUserSettingsRow()/saveUserSettings()
+// read/write user_settings via the auth-aware client (RLS own-row policy).
+// See docs/plans/2026-06-23-phase4-data-access-migration.md, task 7.
 
 const mockAdminDb = {
   from: vi.fn(),
 };
 
+const mockServerDb = {
+  from: vi.fn(),
+};
+
 vi.mock("../supabase/admin", () => ({
   createAdminClient: () => mockAdminDb,
+}));
+
+vi.mock("../supabase/server", () => ({
+  createServerClient: () => mockServerDb,
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: () => ({ getAll: () => [], set: () => {} }),
 }));
 
 // Helper to create a mock Supabase query chain
@@ -63,11 +79,12 @@ describe("resolveUserSettings", () => {
     // User settings query — row says uses_defaults = true
     const userQuery = mockQuery({ user_id: "u1", uses_defaults: true, expert_skills: null });
 
-    mockAdminDb.from.mockImplementation((table: string) => {
-      if (table === "default_settings") return defaultQuery;
-      if (table === "user_settings") return userQuery;
-      return mockQuery(null, { message: "unknown table" });
-    });
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null, { message: "unknown table" }),
+    );
+    mockServerDb.from.mockImplementation((table: string) =>
+      table === "user_settings" ? userQuery : mockQuery(null, { message: "unknown table" }),
+    );
 
     const { resolveUserSettings } = await import("../settings");
     const result = await resolveUserSettings("u1");
@@ -97,11 +114,12 @@ describe("resolveUserSettings", () => {
     const defaultQuery = mockQuery(DEFAULT_ROW);
     const userQuery = mockQuery(userSettingsRow);
 
-    mockAdminDb.from.mockImplementation((table: string) => {
-      if (table === "default_settings") return defaultQuery;
-      if (table === "user_settings") return userQuery;
-      return mockQuery(null);
-    });
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null),
+    );
+    mockServerDb.from.mockImplementation((table: string) =>
+      table === "user_settings" ? userQuery : mockQuery(null),
+    );
 
     const { resolveUserSettings } = await import("../settings");
     const result = await resolveUserSettings("u2");
@@ -138,11 +156,12 @@ describe("resolveUserSettings", () => {
     const defaultQuery = mockQuery(DEFAULT_ROW);
     const userQuery = mockQuery(userWithBadWeights);
 
-    mockAdminDb.from.mockImplementation((table: string) => {
-      if (table === "default_settings") return defaultQuery;
-      if (table === "user_settings") return userQuery;
-      return mockQuery(null);
-    });
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null),
+    );
+    mockServerDb.from.mockImplementation((table: string) =>
+      table === "user_settings" ? userQuery : mockQuery(null),
+    );
 
     const { resolveUserSettings } = await import("../settings");
     const result = await resolveUserSettings("u3");
@@ -158,11 +177,12 @@ describe("resolveUserSettings", () => {
     const defaultQuery = mockQuery(null, { message: "no row" });
     const userQuery = mockQuery(null, { message: "no row" });
 
-    mockAdminDb.from.mockImplementation((table: string) => {
-      if (table === "default_settings") return defaultQuery;
-      if (table === "user_settings") return userQuery;
-      return mockQuery(null);
-    });
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null),
+    );
+    mockServerDb.from.mockImplementation((table: string) =>
+      table === "user_settings" ? userQuery : mockQuery(null),
+    );
 
     const { resolveUserSettings } = await import("../settings");
     const result = await resolveUserSettings("u4");
@@ -180,7 +200,7 @@ describe("resolveUserSettings", () => {
       upsert: upsertMock,
     };
 
-    mockAdminDb.from.mockReturnValue(upsertChain);
+    mockServerDb.from.mockReturnValue(upsertChain);
 
     const { saveUserSettings } = await import("../settings");
     await saveUserSettings("u5", {

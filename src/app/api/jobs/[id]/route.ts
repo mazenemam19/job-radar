@@ -6,8 +6,7 @@
 // settings that may have changed since.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import type { ScoredJob } from "@/lib/types";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -16,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = createAdminClient();
+  const db = createServerClient();
 
   const { data: cache } = await db
     .from("user_jobs_cache")

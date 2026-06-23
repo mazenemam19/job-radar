@@ -1,8 +1,7 @@
 // src/app/api/tracker/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import { VALID_STATUSES } from "@/lib/constants";
 import type { TrackerStatus, TrackerJobSnapshot } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
@@ -13,7 +12,7 @@ export async function GET() {
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const { data, error } = await db
     .from("tracker_entries")
     .select("*")
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
     ? (body.status as TrackerStatus)
     : "saved";
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const now = new Date().toISOString();
 
   const { data, error } = await db

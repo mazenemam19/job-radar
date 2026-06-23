@@ -1,8 +1,7 @@
 // src/app/api/strategy/route.ts
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getUser, createServerClient } from "@/lib/supabase/server";
 import { generateApplicationStrategy } from "@/lib/gemini";
 import { resolveUserSettings } from "@/lib/settings";
 
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const db = createAdminClient();
+  const db = createServerClient();
   const { data: profile } = await db
     .from("user_profiles")
     .select("gemini_api_key")

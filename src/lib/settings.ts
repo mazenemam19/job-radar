@@ -4,6 +4,7 @@
 // If uses_defaults = true, returns defaults directly (fast path).
 
 import { createAdminClient } from "./supabase/admin";
+import { createServerClient } from "./supabase/server";
 import type { DefaultSettings, UserSettingsRow, ResolvedSettings, ScoringWeights } from "./types";
 
 const FALLBACK_PROMPT = `You are a job filter for a Senior React/Next.js engineer.
@@ -162,7 +163,7 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
 
 /** Fetch user_settings row. Returns null if the row doesn't exist. */
 async function getUserSettingsRow(userId: string): Promise<UserSettingsRow | null> {
-  const db = createAdminClient();
+  const db = createServerClient();
   const { data, error } = await db.from("user_settings").select("*").eq("user_id", userId).single();
 
   if (error) return null;
@@ -267,7 +268,7 @@ export async function saveUserSettings(
   userId: string,
   patch: Partial<Omit<UserSettingsRow, "user_id" | "updated_at">>,
 ): Promise<void> {
-  const db = createAdminClient();
+  const db = createServerClient();
 
   // Strip anything that isn't a settings field
   const safe: Record<string, unknown> = { updated_at: new Date().toISOString() };
