@@ -3,42 +3,15 @@
 // Style constants and tiny presentational components shared across the admin
 // panel files in this folder. Not exported from index.ts — internal only.
 
-export const inputStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  background: "#0a0a18",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  color: "#e2e8f0",
-  fontSize: 13,
-  width: "100%",
-  boxSizing: "border-box",
-};
+export const INPUT_CLASS =
+  "w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2 text-[13px] text-[#e2e8f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]";
 
-export const thStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  textAlign: "left",
-  fontSize: 11,
-  color: "#64748b",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  borderBottom: "1px solid #1e1e30",
-};
+export const TH_CLASS =
+  "border-b border-[#1e1e30] px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b]";
 
-export const tdStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  fontSize: 13,
-  color: "#e2e8f0",
-  borderBottom: "1px solid #0d0d1a",
-};
+export const TD_CLASS = "border-b border-[#0d0d1a] px-3.5 py-3 text-[13px] text-[#e2e8f0]";
 
-export const labelSt: React.CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  color: "#64748b",
-  marginBottom: 5,
-  fontWeight: 500,
-};
+export const LABEL_CLASS = "mb-1.5 block text-[11px] font-medium text-[#64748b]";
 
 export function ActionBtn({
   onClick,
@@ -52,16 +25,8 @@ export function ActionBtn({
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: "4px 12px",
-        background: "transparent",
-        border: `1px solid ${color}`,
-        borderRadius: 6,
-        color,
-        fontSize: 12,
-        cursor: "pointer",
-        marginRight: 6,
-      }}
+      className="mr-1.5 cursor-pointer rounded-md border bg-transparent px-3 py-1 text-xs"
+      style={{ borderColor: color, color }}
     >
       {label}
     </button>
@@ -69,37 +34,52 @@ export function ActionBtn({
 }
 
 export function FormField({
+  id,
   label,
   value,
   onChange,
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
     <div>
-      <label style={labelSt}>{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} />
+      <label htmlFor={id} className={LABEL_CLASS}>
+        {label}
+      </label>
+      <input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={INPUT_CLASS}
+      />
     </div>
   );
 }
 
-export function Section2({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section2({
+  title,
+  children,
+  htmlFor,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** When the section wraps exactly one form control, pass its id to render
+   *  an associated <label> instead of a plain heading. */
+  htmlFor?: string;
+}) {
+  const headingClass = "mb-2.5 block text-xs font-semibold uppercase tracking-wide text-[#94a3b8]";
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h3
-        style={{
-          margin: "0 0 10px",
-          fontSize: 12,
-          color: "#94a3b8",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {title}
-      </h3>
+    <div className="mb-6">
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={headingClass}>
+          {title}
+        </label>
+      ) : (
+        <h3 className={headingClass}>{title}</h3>
+      )}
       {children}
     </div>
   );

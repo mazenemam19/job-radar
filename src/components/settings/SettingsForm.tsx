@@ -1,7 +1,7 @@
 "use client";
 // src/components/settings/SettingsForm.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import type { ResolvedSettings, UserSettingsRow } from "@/lib/types";
 
 interface SettingsData {
@@ -9,6 +9,9 @@ interface SettingsData {
   raw: UserSettingsRow | null;
   profile: { email: string; has_gemini_key: boolean; onboarding_complete: boolean };
 }
+
+const INPUT_CLASS =
+  "w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2.5 text-sm text-[#e2e8f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]";
 
 export default function SettingsForm() {
   const [data, setData] = useState<SettingsData | null>(null);
@@ -138,30 +141,29 @@ export default function SettingsForm() {
     }
   }
 
-  if (loading) return <div style={{ padding: 32, color: "#64748b" }}>Loading settings...</div>;
+  if (loading) return <div className="p-8 text-[#64748b]">Loading settings...</div>;
 
   const relocationWeight = 100 - skillWeight - recencyWeight;
 
   return (
-    <div style={{ padding: 32, maxWidth: 640 }}>
-      <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-        Settings
-      </h1>
-      <p style={{ margin: "0 0 28px", fontSize: 14, color: "#64748b" }}>{data?.profile.email}</p>
+    <div className="max-w-[640px] p-8">
+      <h1 className="mb-2 text-[22px] font-bold text-[#e2e8f0]">Settings</h1>
+      <p className="mb-7 text-sm text-[#64748b]">{data?.profile.email}</p>
 
       {/* Gemini API Key */}
-      <Section title="Gemini API Key">
-        <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 12px" }}>
+      <Section title="Gemini API Key" htmlFor="gemini-key">
+        <p className="mb-3 text-[13px] text-[#64748b]">
           {data?.profile.has_gemini_key
             ? "✓ API key configured."
             : "⚠️ No key set. Required for filtering and strategy."}
         </p>
         <input
+          id="gemini-key"
           type="password"
           value={geminiKey}
           onChange={(e) => setGeminiKey(e.target.value)}
           placeholder="Enter new key to replace (leave blank to keep current)"
-          style={inputStyle}
+          className={INPUT_CLASS}
         />
       </Section>
 
@@ -178,34 +180,37 @@ export default function SettingsForm() {
       {/* Skills — only shown when not using defaults */}
       {!usesDefaults && (
         <>
-          <Section title="Expert skills (×3 weight)">
+          <Section title="Expert skills (×3 weight)" htmlFor="expert-skills">
             <textarea
+              id="expert-skills"
               value={expertSkills}
               onChange={(e) => setExpertSkills(e.target.value)}
               rows={3}
               placeholder="React, TypeScript, Next.js, Tailwind..."
-              style={{ ...inputStyle, resize: "vertical" }}
+              className={`${INPUT_CLASS} resize-y`}
             />
-            <p style={{ fontSize: 11, color: "#475569", margin: "4px 0 0" }}>Comma-separated</p>
+            <p className="mt-1 text-[11px] text-[#475569]">Comma-separated</p>
           </Section>
 
-          <Section title="Secondary skills (×1 weight)">
+          <Section title="Secondary skills (×1 weight)" htmlFor="secondary-skills">
             <textarea
+              id="secondary-skills"
               value={secSkills}
               onChange={(e) => setSecSkills(e.target.value)}
               rows={2}
               placeholder="Jest, Vitest, GraphQL..."
-              style={{ ...inputStyle, resize: "vertical" }}
+              className={`${INPUT_CLASS} resize-y`}
             />
           </Section>
 
-          <Section title="Gemini filter prompt">
+          <Section title="Gemini filter prompt" htmlFor="gemini-prompt">
             <textarea
+              id="gemini-prompt"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={8}
               placeholder="You are a job filter for..."
-              style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+              className={`${INPUT_CLASS} resize-y font-mono text-xs`}
             />
           </Section>
         </>
@@ -254,98 +259,96 @@ export default function SettingsForm() {
       </Section>
 
       {/* Job age */}
-      <Section title={`Job age limit — ${jobAgeDays} days`}>
+      <Section title={`Job age limit — ${jobAgeDays} days`} htmlFor="job-age-days">
         <input
+          id="job-age-days"
           type="range"
           min={1}
           max={60}
           value={jobAgeDays}
           onChange={(e) => setJobAgeDays(parseInt(e.target.value, 10))}
-          style={{ width: "100%", accentColor: "#6366f1" }}
+          className="w-full accent-[#6366f1]"
         />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            fontSize: 11,
-            color: "#475569",
-            marginTop: 4,
-          }}
-        >
+        <div className="mt-1 flex justify-between text-[11px] text-[#475569]">
           <span>1 day</span>
           <span>60 days</span>
         </div>
       </Section>
 
       {/* Excluded keywords */}
-      <Section title="Excluded keywords (Title blacklist)">
+      <Section title="Excluded keywords (Title blacklist)" htmlFor="excluded-keywords">
         <textarea
+          id="excluded-keywords"
           value={excludedKeywords}
           onChange={(e) => setExcludedKeywords(e.target.value)}
           rows={2}
           placeholder="backend, fullstack, devops..."
-          style={{ ...inputStyle, resize: "vertical" }}
+          className={`${INPUT_CLASS} resize-y`}
         />
-        <p style={{ fontSize: 11, color: "#475569", margin: "4px 0 0" }}>
+        <p className="mt-1 text-[11px] text-[#475569]">
           Comma-separated. Auto-rejects if matched in title.
         </p>
       </Section>
 
       {/* Required keywords */}
-      <Section title="Required keywords (Tech stack check)">
+      <Section title="Required keywords (Tech stack check)" htmlFor="required-keywords">
         <textarea
+          id="required-keywords"
           value={requiredKeywords}
           onChange={(e) => setRequiredKeywords(e.target.value)}
           rows={2}
           placeholder="react, next.js..."
-          style={{ ...inputStyle, resize: "vertical" }}
+          className={`${INPUT_CLASS} resize-y`}
         />
-        <p style={{ fontSize: 11, color: "#475569", margin: "4px 0 0" }}>
+        <p className="mt-1 text-[11px] text-[#475569]">
           Comma-separated. The job must match at least one (falls back to Expert Skills if empty).
         </p>
       </Section>
 
       {/* Blacklisted locations */}
-      <Section title="Location / Citizenship blacklist">
+      <Section title="Location / Citizenship blacklist" htmlFor="blacklisted-locations">
         <textarea
+          id="blacklisted-locations"
           value={blacklistedLocations}
           onChange={(e) => setBlacklistedLocations(e.target.value)}
           rows={2}
           placeholder="israel, us only, security clearance required..."
-          style={{ ...inputStyle, resize: "vertical" }}
+          className={`${INPUT_CLASS} resize-y`}
         />
-        <p style={{ fontSize: 11, color: "#475569", margin: "4px 0 0" }}>
+        <p className="mt-1 text-[11px] text-[#475569]">
           Comma-separated. Auto-rejects if matched anywhere in job details.
         </p>
       </Section>
 
       {/* Scoring weights */}
       <Section title="Scoring weights">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           <WeightSlider
+            id="weight-skill"
             label="Skill match"
             value={skillWeight}
             onChange={setSkillWeight}
             color="#6366f1"
           />
           <WeightSlider
+            id="weight-recency"
             label="Recency"
             value={recencyWeight}
             onChange={setRecencyWeight}
             color="#22c55e"
           />
-          <div style={{ fontSize: 13, color: "#64748b" }}>
-            Relocation bonus: <strong style={{ color: "#f59e0b" }}>{relocationWeight}%</strong>
+          <div className="text-[13px] text-[#64748b]">
+            Relocation bonus: <strong className="text-[#f59e0b]">{relocationWeight}%</strong>
             {relocationWeight < 0 && (
-              <span style={{ color: "#ef4444" }}> (invalid — reduce above)</span>
+              <span className="text-[#ef4444]"> (invalid — reduce above)</span>
             )}
           </div>
         </div>
       </Section>
 
-      {error && <div style={{ color: "#f87171", fontSize: 13, margin: "0 0 16px" }}>{error}</div>}
+      {error && <div className="mb-4 text-[13px] text-[#f87171]">{error}</div>}
       {saved && (
-        <div style={{ color: "#4ade80", fontSize: 13, margin: "0 0 16px" }}>
+        <div className="mb-4 text-[13px] text-[#4ade80]">
           ✓ Settings saved. Your next dashboard load will rebuild your cache.
         </div>
       )}
@@ -353,17 +356,8 @@ export default function SettingsForm() {
       <button
         onClick={handleSave}
         disabled={saving || relocationWeight < 0}
-        style={{
-          padding: "12px 28px",
-          background: "#6366f1",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: "pointer",
-          opacity: saving ? 0.6 : 1,
-        }}
+        className="cursor-pointer rounded-lg border-0 bg-[#6366f1] px-7 py-3 text-[15px] font-semibold text-white disabled:cursor-not-allowed"
+        style={{ opacity: saving ? 0.6 : 1 }}
       >
         {saving ? "Saving..." : "Save settings"}
       </button>
@@ -371,21 +365,26 @@ export default function SettingsForm() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  htmlFor,
+}: {
+  title: ReactNode;
+  children: ReactNode;
+  htmlFor?: string;
+}) {
+  const headingClass =
+    "mb-3 block text-[13px] font-semibold uppercase tracking-wide text-[#94a3b8]";
   return (
-    <div style={{ marginBottom: 28 }}>
-      <h3
-        style={{
-          margin: "0 0 12px",
-          fontSize: 13,
-          color: "#94a3b8",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {title}
-      </h3>
+    <div className="mb-7">
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={headingClass}>
+          {title}
+        </label>
+      ) : (
+        <h3 className={headingClass}>{title}</h3>
+      )}
       {children}
     </div>
   );
@@ -403,54 +402,39 @@ function Toggle({
   description?: string;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 10,
-        cursor: "pointer",
-      }}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={description ? `${label}. ${description}` : label}
       onClick={() => onChange(!checked)}
+      className="mb-2.5 flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]"
     >
-      <div
-        style={{
-          width: 38,
-          height: 20,
-          borderRadius: 10,
-          background: checked ? "#6366f1" : "#1e1e30",
-          position: "relative",
-          transition: "background 0.2s",
-          flexShrink: 0,
-        }}
+      <span
+        className="relative h-5 w-[38px] flex-shrink-0 rounded-full transition-colors"
+        style={{ background: checked ? "#6366f1" : "#1e1e30" }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: 3,
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            background: "#fff",
-            transition: "left 0.2s",
-            left: checked ? 20 : 3,
-          }}
+        <span
+          className="absolute top-[3px] h-3.5 w-3.5 rounded-full bg-white transition-[left]"
+          style={{ left: checked ? 20 : 3 }}
         />
-      </div>
-      <div>
-        <div style={{ fontSize: 14, color: "#e2e8f0" }}>{label}</div>
-        {description && <div style={{ fontSize: 12, color: "#64748b" }}>{description}</div>}
-      </div>
-    </div>
+      </span>
+      <span>
+        <span className="block text-sm text-[#e2e8f0]">{label}</span>
+        {description && <span className="block text-xs text-[#64748b]">{description}</span>}
+      </span>
+    </button>
   );
 }
 
 function WeightSlider({
+  id,
   label,
   value,
   onChange,
   color,
 }: {
+  id: string;
   label: string;
   value: number;
   onChange: (v: number) => void;
@@ -458,31 +442,22 @@ function WeightSlider({
 }) {
   return (
     <div>
-      <div
-        style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 13 }}
-      >
-        <span style={{ color: "#94a3b8" }}>{label}</span>
+      <div className="mb-1 flex justify-between text-[13px]">
+        <label htmlFor={id} className="text-[#94a3b8]">
+          {label}
+        </label>
         <span style={{ color }}>{value}%</span>
       </div>
       <input
+        id={id}
         type="range"
         min={0}
         max={100}
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value, 10))}
-        style={{ width: "100%", accentColor: color }}
+        className="w-full"
+        style={{ accentColor: color }}
       />
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  background: "#0a0a18",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  color: "#e2e8f0",
-  fontSize: 14,
-  boxSizing: "border-box",
-};

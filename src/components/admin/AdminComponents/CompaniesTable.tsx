@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ATSCompanyRow } from "@/lib/types";
 import { VALID_ATS } from "@/lib/constants";
-import { ActionBtn, FormField, inputStyle, thStyle, tdStyle, labelSt } from "./_shared";
+import { ActionBtn, FormField, INPUT_CLASS, TH_CLASS, TD_CLASS, LABEL_CLASS } from "./_shared";
 
 type CompanyForm = Omit<ATSCompanyRow, "id" | "created_at" | "updated_at">;
 
@@ -100,34 +100,16 @@ export function CompaniesTable() {
   );
 
   return (
-    <div style={{ padding: 32 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-          ATS Companies ({companies.length})
-        </h1>
+    <div className="p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-[22px] font-bold text-[#e2e8f0]">ATS Companies ({companies.length})</h1>
         <button
           onClick={() => {
             setShowNew(true);
             setEditId(null);
             setForm(EMPTY_FORM);
           }}
-          style={{
-            padding: "9px 18px",
-            background: "#6366f1",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
+          className="cursor-pointer rounded-lg border-0 bg-[#6366f1] px-[18px] py-2.5 text-[13px] font-semibold text-white"
         >
           + Add company
         </button>
@@ -137,7 +119,7 @@ export function CompaniesTable() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by name, country, ATS..."
-        style={{ ...inputStyle, marginBottom: 16 }}
+        className={`${INPUT_CLASS} mb-4`}
       />
 
       {(showNew || editId) && (
@@ -155,21 +137,14 @@ export function CompaniesTable() {
       )}
 
       {loading ? (
-        <div style={{ color: "#64748b", padding: 16 }}>Loading...</div>
+        <div className="p-4 text-[#64748b]">Loading...</div>
       ) : (
-        <div
-          style={{
-            background: "#0d0d1a",
-            border: "1px solid #1e1e30",
-            borderRadius: 12,
-            overflow: "auto",
-          }}
-        >
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+        <div className="overflow-auto rounded-xl border border-[#1e1e30] bg-[#0d0d1a]">
+          <table className="w-full min-w-[700px] border-collapse">
             <thead>
               <tr>
                 {["Company", "ATS", "Country", "Pipelines", "Active", "Actions"].map((h) => (
-                  <th key={h} style={thStyle}>
+                  <th key={h} className={TH_CLASS}>
                     {h}
                   </th>
                 ))}
@@ -178,37 +153,31 @@ export function CompaniesTable() {
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.id}>
-                  <td style={tdStyle}>
+                  <td className={TD_CLASS}>
                     <strong>{c.name}</strong>
-                    <div style={{ fontSize: 11, color: "#64748b" }}>{c.slug}</div>
+                    <div className="text-[11px] text-[#64748b]">{c.slug}</div>
                   </td>
-                  <td
-                    style={{ ...tdStyle, fontFamily: "monospace", fontSize: 12, color: "#818cf8" }}
-                  >
-                    {c.ats}
-                  </td>
-                  <td style={tdStyle}>
+                  <td className={`${TD_CLASS} font-mono text-xs text-[#818cf8]`}>{c.ats}</td>
+                  <td className={TD_CLASS}>
                     {c.country_flag} {c.country}
                   </td>
-                  <td style={tdStyle}>
+                  <td className={TD_CLASS}>
                     {c.pipeline_visa && (
-                      <span style={{ fontSize: 10, marginRight: 4, color: "#818cf8" }}>✈️Visa</span>
+                      <span className="mr-1 text-[10px] text-[#818cf8]">✈️Visa</span>
                     )}
                     {c.pipeline_local && (
-                      <span style={{ fontSize: 10, marginRight: 4, color: "#22c55e" }}>
-                        🇪🇬Local
-                      </span>
+                      <span className="mr-1 text-[10px] text-[#22c55e]">🇪🇬Local</span>
                     )}
                     {c.pipeline_global && (
-                      <span style={{ fontSize: 10, color: "#f59e0b" }}>🌐Global</span>
+                      <span className="text-[10px] text-[#f59e0b]">🌐Global</span>
                     )}
                   </td>
-                  <td style={tdStyle}>
+                  <td className={TD_CLASS}>
                     <span style={{ color: c.is_active ? "#4ade80" : "#ef4444" }}>
                       {c.is_active ? "✓" : "✗"}
                     </span>
                   </td>
-                  <td style={tdStyle}>
+                  <td className={TD_CLASS}>
                     <ActionBtn onClick={() => startEdit(c)} label="Edit" />
                     <ActionBtn onClick={() => deleteCompany(c.id)} label="Delete" color="#ef4444" />
                   </td>
@@ -237,23 +206,25 @@ function CompanyFormPanel({
 }) {
   const set = (key: keyof CompanyForm, val: unknown) => setForm({ ...form, [key]: val });
   return (
-    <div
-      style={{
-        background: "#0a0a18",
-        border: "1px solid #1e1e30",
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-      }}
-    >
-      <h3 style={{ margin: "0 0 16px", fontSize: 14, color: "#e2e8f0" }}>
-        {isEdit ? "Edit" : "New"} company
-      </h3>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <FormField label="Company name" value={form.name} onChange={(v) => set("name", v)} />
+    <div className="mb-5 rounded-xl border border-[#1e1e30] bg-[#0a0a18] p-5">
+      <h3 className="mb-4 text-sm text-[#e2e8f0]">{isEdit ? "Edit" : "New"} company</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField
+          id="company-name"
+          label="Company name"
+          value={form.name}
+          onChange={(v) => set("name", v)}
+        />
         <div>
-          <label style={labelSt}>ATS type</label>
-          <select value={form.ats} onChange={(e) => set("ats", e.target.value)} style={inputStyle}>
+          <label htmlFor="company-ats" className={LABEL_CLASS}>
+            ATS type
+          </label>
+          <select
+            id="company-ats"
+            value={form.ats}
+            onChange={(e) => set("ats", e.target.value)}
+            className={INPUT_CLASS}
+          >
             {VALID_ATS.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -262,23 +233,26 @@ function CompanyFormPanel({
           </select>
         </div>
         <FormField
+          id="company-slug"
           label="Slug (ATS company ID)"
           value={form.slug}
           onChange={(v) => set("slug", v)}
         />
         <FormField
+          id="company-country"
           label="Country code (e.g. GB)"
           value={form.country}
           onChange={(v) => set("country", v.toUpperCase())}
         />
         <FormField
+          id="company-city"
           label="City (optional)"
           value={form.city ?? ""}
           onChange={(v) => set("city", v)}
         />
-        <div>
-          <label style={labelSt}>Pipelines</label>
-          <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+        <fieldset className="border-0 p-0">
+          <legend className={LABEL_CLASS}>Pipelines</legend>
+          <div className="mt-1 flex gap-3">
             {(
               [
                 ["pipeline_visa", "✈️ Visa"],
@@ -288,14 +262,7 @@ function CompanyFormPanel({
             ).map(([k, l]) => (
               <label
                 key={k}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 13,
-                  color: "#94a3b8",
-                  cursor: "pointer",
-                }}
+                className="flex cursor-pointer items-center gap-1.5 text-[13px] text-[#94a3b8]"
               >
                 <input
                   type="checkbox"
@@ -306,35 +273,18 @@ function CompanyFormPanel({
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+      <div className="mt-4 flex gap-2.5">
         <button
           onClick={onCancel}
-          style={{
-            padding: "8px 16px",
-            background: "#1e1e30",
-            color: "#94a3b8",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
+          className="cursor-pointer rounded-lg border-0 bg-[#1e1e30] px-4 py-2 text-[13px] text-[#94a3b8]"
         >
           Cancel
         </button>
         <button
           onClick={onSave}
-          style={{
-            padding: "8px 20px",
-            background: "#6366f1",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
+          className="cursor-pointer rounded-lg border-0 bg-[#6366f1] px-5 py-2 text-[13px] font-semibold text-white"
         >
           {isEdit ? "Save changes" : "Add company"}
         </button>

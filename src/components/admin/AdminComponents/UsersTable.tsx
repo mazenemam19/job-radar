@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import type { AdminUserListItem } from "@/lib/types";
-import { ActionBtn, thStyle, tdStyle } from "./_shared";
+import { ActionBtn, TH_CLASS, TD_CLASS } from "./_shared";
 
 export function UsersTable() {
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
@@ -31,27 +31,18 @@ export function UsersTable() {
       );
   }
 
-  if (loading) return <div style={{ padding: 32, color: "#64748b" }}>Loading users...</div>;
+  if (loading) return <div className="p-8 text-[#64748b]">Loading users...</div>;
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ margin: "0 0 24px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-        Users ({users.length})
-      </h1>
-      <div
-        style={{
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+    <div className="p-8">
+      <h1 className="mb-6 text-[22px] font-bold text-[#e2e8f0]">Users ({users.length})</h1>
+      <div className="overflow-hidden rounded-xl border border-[#1e1e30] bg-[#0d0d1a]">
+        <table className="w-full border-collapse">
           <thead>
             <tr>
               {["Email", "Role", "Active", "Onboarded", "Profile", "Last active", "Actions"].map(
                 (h) => (
-                  <th key={h} style={thStyle}>
+                  <th key={h} className={TH_CLASS}>
                     {h}
                   </th>
                 ),
@@ -61,13 +52,11 @@ export function UsersTable() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td style={tdStyle}>{u.email}</td>
-                <td style={tdStyle}>
+                <td className={TD_CLASS}>{u.email}</td>
+                <td className={TD_CLASS}>
                   <span
+                    className="rounded-xl px-2 py-0.5 text-[11px]"
                     style={{
-                      padding: "2px 8px",
-                      borderRadius: 12,
-                      fontSize: 11,
                       background: u.role === "admin" ? "#6366f120" : "#1e1e30",
                       color: u.role === "admin" ? "#818cf8" : "#64748b",
                     }}
@@ -75,27 +64,27 @@ export function UsersTable() {
                     {u.role}
                   </span>
                 </td>
-                <td style={tdStyle}>
+                <td className={TD_CLASS}>
                   <span style={{ color: u.is_active ? "#4ade80" : "#ef4444" }}>
                     {u.is_active ? "✓" : "✗"}
                   </span>
                 </td>
-                <td style={tdStyle}>
+                <td className={TD_CLASS}>
                   <span style={{ color: u.onboarding_complete ? "#4ade80" : "#64748b" }}>
                     {u.onboarding_complete ? "✓" : "—"}
                   </span>
                 </td>
-                <td style={tdStyle}>
+                <td className={TD_CLASS}>
                   {u.user_settings?.[0]?.uses_defaults ? (
-                    <span style={{ color: "#64748b", fontSize: 11 }}>Default</span>
+                    <span className="text-[11px] text-[#64748b]">Default</span>
                   ) : (
-                    <span style={{ color: "#818cf8", fontSize: 11 }}>Custom</span>
+                    <span className="text-[11px] text-[#818cf8]">Custom</span>
                   )}
                 </td>
-                <td style={{ ...tdStyle, fontSize: 11, color: "#64748b" }}>
+                <td className={`${TD_CLASS} text-[11px] text-[#64748b]`}>
                   {u.last_active_at ? new Date(u.last_active_at).toLocaleDateString() : "—"}
                 </td>
-                <td style={tdStyle}>
+                <td className={TD_CLASS}>
                   <ActionBtn
                     onClick={() => toggleActive(u)}
                     label={u.is_active ? "Block" : "Activate"}

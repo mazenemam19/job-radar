@@ -8,6 +8,10 @@ import type { SalaryAggregate, SalaryCurrency, Pipeline } from "@/lib/types";
 const CURRENCIES: SalaryCurrency[] = ["EGP", "USD", "EUR", "GBP"];
 const PIPELINES: Pipeline[] = ["local", "global", "visa"];
 
+const FIELD_LABEL_CLASS = "mb-1.5 block text-xs text-[#64748b]";
+const FIELD_INPUT_CLASS =
+  "w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2.5 text-[13px] text-[#e2e8f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]";
+
 export default function SalaryPage() {
   const [aggregates, setAggregates] = useState<SalaryAggregate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,52 +76,24 @@ export default function SalaryPage() {
   }
 
   return (
-    <div style={{ padding: 32 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 28,
-        }}
-      >
+    <div className="p-8">
+      <div className="mb-7 flex items-start justify-between">
         <div>
-          <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#e2e8f0", fontWeight: 700 }}>
-            Salary Reports
-          </h1>
-          <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>
+          <h1 className="mb-2 text-[22px] font-bold text-[#e2e8f0]">Salary Reports</h1>
+          <p className="m-0 text-sm text-[#64748b]">
             Anonymised community salary data. Only shown when 2+ reports exist for a band.
           </p>
         </div>
         <button
           onClick={() => setShowForm((p) => !p)}
-          style={{
-            padding: "10px 18px",
-            background: "#6366f1",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
+          className="cursor-pointer rounded-lg border-0 bg-[#6366f1] px-[18px] py-2.5 text-sm font-semibold text-white"
         >
           {showForm ? "Cancel" : "+ Submit yours"}
         </button>
       </div>
 
       {successMsg && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "#0d2a18",
-            border: "1px solid #166534",
-            borderRadius: 8,
-            color: "#4ade80",
-            fontSize: 13,
-            marginBottom: 20,
-          }}
-        >
+        <div className="mb-5 rounded-lg border border-[#166534] bg-[#0d2a18] px-4 py-3 text-[13px] text-[#4ade80]">
           {successMsg}
         </div>
       )}
@@ -126,19 +102,11 @@ export default function SalaryPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          style={{
-            background: "#0d0d1a",
-            border: "1px solid #1e1e30",
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 28,
-          }}
+          className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-6"
         >
-          <h3 style={{ margin: "0 0 20px", fontSize: 15, color: "#e2e8f0" }}>
-            Submit a salary report
-          </h3>
+          <h3 className="mb-5 text-[15px] text-[#e2e8f0]">Submit a salary report</h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="grid grid-cols-2 gap-3.5">
             <Field
               label="Role title"
               name="role_title"
@@ -191,23 +159,13 @@ export default function SalaryPage() {
             />
           </div>
 
-          {error && <div style={{ color: "#f87171", fontSize: 13, marginTop: 10 }}>{error}</div>}
+          {error && <div className="mt-2.5 text-[13px] text-[#f87171]">{error}</div>}
 
           <button
             type="submit"
             disabled={submitting}
-            style={{
-              marginTop: 20,
-              padding: "10px 24px",
-              background: "#6366f1",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              opacity: submitting ? 0.6 : 1,
-            }}
+            className="mt-5 cursor-pointer rounded-lg border-0 bg-[#6366f1] px-6 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed"
+            style={{ opacity: submitting ? 0.6 : 1 }}
           >
             {submitting ? "Submitting..." : "Submit anonymously"}
           </button>
@@ -215,19 +173,16 @@ export default function SalaryPage() {
       )}
 
       {/* Filter */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      <div className="mb-5 flex gap-2">
         {["", ...PIPELINES].map((p) => (
           <button
             key={p}
             onClick={() => setFilterPipeline(p)}
+            className="cursor-pointer rounded-full border px-4 py-1.5 text-[13px]"
             style={{
-              padding: "6px 16px",
-              borderRadius: 20,
-              fontSize: 13,
-              border: `1px solid ${filterPipeline === p ? "#6366f1" : "#1e1e30"}`,
+              borderColor: filterPipeline === p ? "#6366f1" : "#1e1e30",
               background: filterPipeline === p ? "#6366f1" : "transparent",
               color: filterPipeline === p ? "#fff" : "#94a3b8",
-              cursor: "pointer",
             }}
           >
             {p === "" ? "All" : p.charAt(0).toUpperCase() + p.slice(1)}
@@ -237,9 +192,7 @@ export default function SalaryPage() {
 
       {/* Charts */}
       {loading ? (
-        <div style={{ color: "#64748b", padding: 32, textAlign: "center" }}>
-          Loading salary data...
-        </div>
+        <div className="p-8 text-center text-[#64748b]">Loading salary data...</div>
       ) : aggregates.length === 0 ? (
         <EmptyState />
       ) : (
@@ -260,12 +213,8 @@ function SalaryChart({ data }: { data: SalaryAggregate[] }) {
   }));
 
   return (
-    <div
-      style={{ background: "#0d0d1a", border: "1px solid #1e1e30", borderRadius: 12, padding: 24 }}
-    >
-      <h2 style={{ margin: "0 0 20px", fontSize: 15, color: "#94a3b8" }}>
-        Salary ranges by role & experience
-      </h2>
+    <div className="rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-6">
+      <h2 className="mb-5 text-[15px] text-[#94a3b8]">Salary ranges by role & experience</h2>
       <ResponsiveContainer width="100%" height={340}>
         <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 80 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e1e30" />
@@ -292,10 +241,10 @@ function SalaryChart({ data }: { data: SalaryAggregate[] }) {
         </BarChart>
       </ResponsiveContainer>
 
-      <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div className="mt-4 flex flex-wrap gap-2.5">
         {data.slice(0, 20).map((d, i) => (
-          <div key={i} style={{ fontSize: 11, color: "#64748b" }}>
-            <strong style={{ color: "#94a3b8" }}>{d.role_title}</strong> ({d.years_experience}yr+):{" "}
+          <div key={i} className="text-[11px] text-[#64748b]">
+            <strong className="text-[#94a3b8]">{d.role_title}</strong> ({d.years_experience}yr+):{" "}
             {d.currency} {d.min.toLocaleString()}–{d.max.toLocaleString()}/mo · {d.count} report
             {d.count !== 1 ? "s" : ""}
           </div>
@@ -320,24 +269,16 @@ function Field({
 }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 5 }}>
+      <label htmlFor={`salary-${name}`} className={FIELD_LABEL_CLASS}>
         {label}
       </label>
       <input
+        id={`salary-${name}`}
         name={name}
         type={type}
         placeholder={placeholder}
         required={required}
-        style={{
-          width: "100%",
-          padding: "9px 12px",
-          background: "#0a0a18",
-          border: "1px solid #1e1e30",
-          borderRadius: 8,
-          color: "#e2e8f0",
-          fontSize: 13,
-          boxSizing: "border-box",
-        }}
+        className={FIELD_INPUT_CLASS}
       />
     </div>
   );
@@ -354,22 +295,10 @@ function SelectField({
 }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 5 }}>
+      <label htmlFor={`salary-${name}`} className={FIELD_LABEL_CLASS}>
         {label}
       </label>
-      <select
-        name={name}
-        style={{
-          width: "100%",
-          padding: "9px 12px",
-          background: "#0a0a18",
-          border: "1px solid #1e1e30",
-          borderRadius: 8,
-          color: "#e2e8f0",
-          fontSize: 13,
-          boxSizing: "border-box",
-        }}
-      >
+      <select id={`salary-${name}`} name={name} className={FIELD_INPUT_CLASS}>
         {options.map((o) => (
           <option key={o.v} value={o.v}>
             {o.l}
@@ -382,18 +311,10 @@ function SelectField({
 
 function EmptyState() {
   return (
-    <div
-      style={{
-        padding: 48,
-        textAlign: "center",
-        background: "#0d0d1a",
-        border: "1px dashed #1e1e30",
-        borderRadius: 12,
-      }}
-    >
-      <div style={{ fontSize: 32, marginBottom: 12 }}>💼</div>
-      <p style={{ color: "#64748b", fontSize: 15, margin: 0 }}>No salary data yet</p>
-      <p style={{ color: "#475569", fontSize: 13, marginTop: 8 }}>
+    <div className="rounded-xl border border-dashed border-[#1e1e30] bg-[#0d0d1a] p-12 text-center">
+      <div className="mb-3 text-[32px]">💼</div>
+      <p className="m-0 text-[15px] text-[#64748b]">No salary data yet</p>
+      <p className="mt-2 text-[13px] text-[#475569]">
         Be the first to contribute — it helps everyone get compensated fairly
       </p>
     </div>

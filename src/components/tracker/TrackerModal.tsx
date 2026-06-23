@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { ScoredJob, TrackerStatus, TrackerJobSnapshot } from "@/lib/types";
+import ModalShell from "@/components/ui/ModalShell";
 
 interface Props {
   job: ScoredJob | null;
@@ -18,6 +19,11 @@ const STATUSES: { value: TrackerStatus; label: string; color: string }[] = [
   { value: "rejected", label: "Rejected", color: "#ef4444" },
   { value: "ghosted", label: "Ghosted", color: "#475569" },
 ];
+
+const LABEL_CLASS = "mb-1.5 block text-xs font-medium text-[#64748b]";
+const INPUT_CLASS =
+  "mb-4 w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2.5 text-sm text-[#e2e8f0]";
+const BTN_CLASS = "cursor-pointer rounded-lg border-0 px-5 py-2.5 text-sm font-semibold";
 
 export default function TrackerModal({ job, onClose, onSaved }: Props) {
   const [status, setStatus] = useState<TrackerStatus>("applied");
@@ -73,144 +79,81 @@ export default function TrackerModal({ job, onClose, onSaved }: Props) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.7)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 50,
-        padding: 16,
-      }}
+    <ModalShell
+      titleId="tracker-modal-title"
+      title="Track this job"
+      subtitle={`${job.title} · ${job.company}`}
+      onClose={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#0d0d1a",
-          border: "1px solid #1e1e30",
-          borderRadius: 12,
-          padding: 28,
-          maxWidth: 480,
-          width: "100%",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 16, color: "#e2e8f0" }}>Track this job</h2>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-              {job.title} · {job.company}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#64748b",
-              fontSize: 20,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Status */}
-        <label style={labelStyle}>Status</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+      {/* Status */}
+      <fieldset className="mb-4 border-0 p-0">
+        <legend className="mb-1.5 text-xs font-medium text-[#64748b]">Status</legend>
+        <div className="flex flex-wrap gap-2">
           {STATUSES.map((s) => (
             <button
               key={s.value}
               onClick={() => setStatus(s.value)}
+              className="cursor-pointer rounded-full border px-3.5 py-1.5 text-[13px]"
               style={{
-                padding: "6px 14px",
-                borderRadius: 20,
-                fontSize: 13,
-                border: `1px solid ${status === s.value ? s.color : "#1e1e30"}`,
+                borderColor: status === s.value ? s.color : "#1e1e30",
                 background: status === s.value ? `${s.color}20` : "transparent",
                 color: status === s.value ? s.color : "#64748b",
-                cursor: "pointer",
               }}
             >
               {s.label}
             </button>
           ))}
         </div>
+      </fieldset>
 
-        {/* Applied date (optional) */}
-        {(status === "applied" || status === "interviewing" || status === "offer") && (
-          <>
-            <label style={labelStyle}>Applied date (optional)</label>
-            <input
-              type="date"
-              value={appliedAt}
-              onChange={(e) => setAppliedAt(e.target.value)}
-              style={inputStyle}
-            />
-          </>
-        )}
+      {/* Applied date (optional) */}
+      {(status === "applied" || status === "interviewing" || status === "offer") && (
+        <>
+          <label htmlFor="tracker-applied-at" className={LABEL_CLASS}>
+            Applied date (optional)
+          </label>
+          <input
+            id="tracker-applied-at"
+            type="date"
+            value={appliedAt}
+            onChange={(e) => setAppliedAt(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </>
+      )}
 
-        {/* Notes */}
-        <label style={labelStyle}>Notes (optional)</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Recruiter name, interview steps, salary discussed..."
-          rows={3}
-          style={{ ...inputStyle, resize: "vertical" }}
-        />
+      {/* Notes */}
+      <label htmlFor="tracker-notes" className={LABEL_CLASS}>
+        Notes (optional)
+      </label>
+      <textarea
+        id="tracker-notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Recruiter name, interview steps, salary discussed..."
+        rows={3}
+        className={`${INPUT_CLASS} resize-y`}
+      />
 
-        {error && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+      {error && <div className="mb-3 text-[13px] text-[#f87171]">{error}</div>}
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={btnStyle("#1e1e30", "#94a3b8")}>
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            style={{ ...btnStyle("#6366f1", "#fff"), flex: 1, opacity: loading ? 0.6 : 1 }}
-          >
-            {loading ? "Saving..." : "Save"}
-          </button>
-        </div>
+      <div className="flex gap-2.5">
+        <button
+          onClick={onClose}
+          className={BTN_CLASS}
+          style={{ background: "#1e1e30", color: "#94a3b8" }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={loading}
+          className={`${BTN_CLASS} flex-1`}
+          style={{ background: "#6366f1", color: "#fff", opacity: loading ? 0.6 : 1 }}
+        >
+          {loading ? "Saving..." : "Save"}
+        </button>
       </div>
-    </div>
+    </ModalShell>
   );
-}
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  color: "#64748b",
-  marginBottom: 6,
-  fontWeight: 500,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  background: "#0a0a18",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  color: "#e2e8f0",
-  fontSize: 14,
-  marginBottom: 16,
-  boxSizing: "border-box",
-};
-
-function btnStyle(bg: string, color: string): React.CSSProperties {
-  return {
-    padding: "10px 20px",
-    borderRadius: 8,
-    border: "none",
-    background: bg,
-    color,
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-  };
 }
