@@ -92,14 +92,24 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
           </span>
         )}
 
-        {!job.gemini_reviewed && (
+        {job.gemini_quota_exhausted ? (
           <span
-            title="Gemini didn't return a decision for this job, so it's shown by default rather than filtered out."
+            title="Gemini's quota was exhausted, so this job is shown by default rather than filtered out."
             className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
             style={{ background: "rgba(245,158,11,0.12)" }}
           >
-            ⚠ Not AI-reviewed (showing anyway)
+            ⚠ Gemini quota exhausted
           </span>
+        ) : (
+          !job.gemini_reviewed && (
+            <span
+              title="Gemini didn't return a decision for this job, so it's shown by default rather than filtered out."
+              className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
+              style={{ background: "rgba(245,158,11,0.12)" }}
+            >
+              ⚠ Not AI-reviewed
+            </span>
+          )
         )}
 
         {job.matched_skills.slice(0, 5).map((s) => (

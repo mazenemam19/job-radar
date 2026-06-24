@@ -118,6 +118,37 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("gemini-unavailable");
     expect(result[0].gemini_reviewed).toBe(false);
+    expect(result[0].gemini_quota_exhausted).toBe(false);
+  });
+
+  it("flags gemini_quota_exhausted when every model in the queue hits a 429/quota error", async () => {
+    const jobs = [makeJob({ id: "a" })];
+    generateContentMock.mockRejectedValue(new Error("429 RESOURCE_EXHAUSTED: quota exceeded"));
+
+    const result = await filterJobsWithGemini("key", jobs, settings);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].gemini_pass).toBe(true);
+    expect(result[0].gemini_reason).toBe("gemini-quota-exhausted");
+    expect(result[0].gemini_reviewed).toBe(false);
+    expect(result[0].gemini_quota_exhausted).toBe(true);
+  });
+
+  it("does NOT flag gemini_quota_exhausted when failures are a mix of quota and other errors", async () => {
+    const jobs = [makeJob({ id: "a" })];
+    // Some models hit quota, but not all — the overall failure isn't purely quota-caused.
+    generateContentMock
+      .mockRejectedValueOnce(new Error("429 quota exceeded"))
+      .mockRejectedValueOnce(new Error("500 internal server error"))
+      .mockRejectedValueOnce(new Error("429 quota exceeded"))
+      .mockRejectedValueOnce(new Error("500 internal server error"))
+      .mockRejectedValueOnce(new Error("429 quota exceeded"));
+
+    const result = await filterJobsWithGemini("key", jobs, settings);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].gemini_reason).toBe("gemini-unavailable");
+    expect(result[0].gemini_quota_exhausted).toBe(false);
   });
 
   it("handles malformed/non-JSON responses without crashing", async () => {

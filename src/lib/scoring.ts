@@ -267,6 +267,7 @@ export function scoreJob(
   geminiPass = false,
   geminiReason: string | null = null,
   geminiReviewed = false,
+  geminiQuotaExhausted = false,
 ): ScoredJob | null {
   // Seniority hard gate – null means "do not store at all"
   if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
@@ -306,6 +307,7 @@ export function scoreJob(
     gemini_pass: geminiPass,
     gemini_reason: geminiReason,
     gemini_reviewed: geminiReviewed,
+    gemini_quota_exhausted: geminiQuotaExhausted,
   };
 }
 

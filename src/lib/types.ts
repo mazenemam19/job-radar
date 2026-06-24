@@ -78,6 +78,11 @@ export interface ScoredJob extends RawJob {
    *  failure) — see Feature Request 1 in
    *  docs/plans/2026-06-24-gemini-reviewed-indicator.md. */
   gemini_reviewed: boolean;
+  /** true only when gemini_reviewed is false specifically because every
+   *  model in the queue was quota-exhausted, not some other failure mode.
+   *  Drives a distinct "quota exhausted" badge instead of the generic
+   *  "not AI-reviewed" one. */
+  gemini_quota_exhausted?: boolean;
   scoring_weights?: ScoringWeights;
 }
 
