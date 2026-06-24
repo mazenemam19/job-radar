@@ -19,7 +19,7 @@ data, mobile, or any other role, and the same scoring/Gemini pipeline applies.
 
 > 📐 For the full system breakdown — data model, request flows (auth, cron
 > ingestion, per-user dashboard rebuild), the ATS ingestion layer, and the
-> security model — see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+> security model — see **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)**.
 
 ---
 
@@ -160,5 +160,5 @@ and Workable rate-limit status (currently blocked slugs, configured budget).
 
 ---
 
-See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for request-flow diagrams, the
+See **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** for request-flow diagrams, the
 full data model, and the security model behind all of the above.
