@@ -7,9 +7,11 @@ import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
 import type { DefaultSettings, UserSettingsRow, ResolvedSettings, ScoringWeights } from "./types";
 
-const FALLBACK_PROMPT = `You are a job filter for a Senior React/Next.js engineer.
-Return a JSON array where each element is { "id": "<job_id>", "pass": true/false, "reason": "<sentence>" }.
-No markdown, no preamble.`;
+// Pure evaluation criteria only — no response-format instructions here.
+// The JSON contract is owned by code (see RESPONSE_FORMAT_INSTRUCTIONS in
+// gemini.ts) precisely so a user editing this field can never again break
+// the parser. See docs/plans/2026-06-24-gemini-index-based-matching.md.
+const FALLBACK_PROMPT = `You are a job filter for a Senior React/Next.js engineer. Evaluate each job listing on whether it's a genuine fit for this profile, based on seniority, relevant tech stack, and role type.`;
 
 const FALLBACK_DEFAULTS: ResolvedSettings = {
   expert_skills: [

@@ -17,8 +17,19 @@ const MODEL_QUEUE = [
 
 const BATCH_SIZE = 30; // jobs per Gemini call (avoids exceeding context window)
 
+// Fixed, code-owned response-format contract. Deliberately NOT part of
+// gemini_filter_prompt (which is user-editable) — see Bug 1 in
+// docs/plans/2026-06-24-gemini-index-based-matching.md for why a stored,
+// user-editable JSON contract is how this broke in the first place.
+// Index-based (not job.id) because asking a model to echo back long,
+// opaque composite ID strings character-for-character is fragile; a short
+// integer it can't mangle is not.
+const RESPONSE_FORMAT_INSTRUCTIONS = `Respond with ONLY a JSON array, no markdown, no preamble. Each element must be:
+{ "idx": <number>, "pass": true/false, "reason": "<one short sentence>" }
+"idx" must exactly match the "idx" field given for that job below. Include a decision for every job listed — do not skip any.`;
+
 interface GeminiDecision {
-  id: string;
+  idx: number;
   pass: boolean;
   reason: string;
 }
@@ -95,8 +106,8 @@ async function filterBatch(
   jobs: RawJob[],
   promptTemplate: string,
 ): Promise<Map<string, FilterResult>> {
-  const jobSummaries = jobs.map((j) => ({
-    id: j.id,
+  const jobSummaries = jobs.map((j, idx) => ({
+    idx,
     title: j.title,
     company: j.company,
     location: j.location,
@@ -104,6 +115,8 @@ async function filterBatch(
   }));
 
   const prompt = `${promptTemplate}
+
+${RESPONSE_FORMAT_INSTRUCTIONS}
 
 Jobs to evaluate:
 ${JSON.stringify(jobSummaries, null, 2)}`;
@@ -113,15 +126,45 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
   try {
     const raw = await callGemini(apiKey, prompt);
     const decisions = parseDecisions(raw);
+    const seenIdx = new Set<number>();
 
     for (const d of decisions) {
-      if (d.id) {
-        resultMap.set(d.id, {
-          id: d.id,
-          pass: Boolean(d.pass),
-          reason: d.reason ?? null,
-        });
+      const idx = d.idx;
+      const isValidIdx =
+        typeof idx === "number" && Number.isInteger(idx) && idx >= 0 && idx < jobs.length;
+
+      if (!isValidIdx) {
+        console.error(
+          `[gemini] Decision with invalid/out-of-range idx (${JSON.stringify(idx)}) for a batch of ${jobs.length}. Raw response:`,
+          raw,
+        );
+        continue;
       }
+      if (seenIdx.has(idx)) {
+        console.error(
+          `[gemini] Duplicate idx ${idx} in response, ignoring repeat. Raw response:`,
+          raw,
+        );
+        continue;
+      }
+      seenIdx.add(idx);
+
+      const job = jobs[idx];
+      resultMap.set(job.id, {
+        id: job.id,
+        pass: Boolean(d.pass),
+        reason: d.reason ?? null,
+      });
+    }
+
+    // Any job whose idx never appeared in a valid decision → fail open,
+    // but loudly. This used to be silent — that silence is Bug 1.
+    const missing = jobs.filter((j) => !resultMap.has(j.id));
+    if (missing.length > 0) {
+      console.error(
+        `[gemini] ${missing.length}/${jobs.length} jobs had no matching decision in Gemini's response (failing open). Raw response:`,
+        raw,
+      );
     }
   } catch (err) {
     // If Gemini fails for this batch, pass all jobs through (fail-open)
