@@ -5,38 +5,41 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { VALID_ATS } from "@/lib/constants";
+import { VALID_ATS, COUNTRY_FLAGS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  US: "🇺🇸",
-  UK: "🇬🇧",
-  GB: "🇬🇧",
-  DE: "🇩🇪",
-  FR: "🇫🇷",
-  EG: "🇪🇬",
-  NL: "🇳🇱",
-  ES: "🇪🇸",
-  IT: "🇮🇹",
-  PL: "🇵🇱",
-  CA: "🇨🇦",
-  AU: "🇦🇺",
-  SE: "🇸🇪",
-  NO: "🇳🇴",
-  DK: "🇩🇰",
-  FI: "🇫🇮",
-  PT: "🇵🇹",
-  CZ: "🇨🇿",
-  RO: "🇷🇴",
-  HU: "🇭🇺",
-  AT: "🇦🇹",
-  CH: "🇨🇭",
-  BE: "🇧🇪",
-  IE: "🇮🇪",
-  SG: "🇸🇬",
-};
+// ---------------------------------------------------------------------------
+// Rate limiting — module-level, in-memory.
+// Not persistent across cold starts (serverless constraint — no Redis in this
+// stack). Provides real protection against burst submissions from a single IP
+// within a warm instance lifetime. Window: 5 submissions per 10 minutes.
+// ---------------------------------------------------------------------------
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 5;
+const ipLog = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - RATE_WINDOW_MS;
+  const recent = (ipLog.get(ip) ?? []).filter((t) => t > cutoff);
+  if (recent.length >= RATE_MAX) return true;
+  ipLog.set(ip, [...recent, now]);
+  return false;
+}
 
 export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { ok: false, error: "Too many submissions. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   let body: {
     company_name?: string;
     ats_type?: string;

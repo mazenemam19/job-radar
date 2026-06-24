@@ -647,10 +647,6 @@ export async function fetchWorkable(
     );
     const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
 
-    console.log(
-      `[workable] ${c.name.padEnd(20)} | Raw: ${String(rawCount).padStart(3)} | Matched: ${String(processed.length).padStart(2)}`,
-    );
-
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
