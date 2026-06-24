@@ -25,6 +25,61 @@ const SENIOR_KEYWORDS = /\b(senior|sr\.?|principal|staff|lead)\b/i;
 const MID_KEYWORDS = /\b(mid[-\s]?level|mid[-\s]?senior|intermediate)\b/i;
 const JUNIOR_KEYWORDS = /\b(junior|jr\.?|entry[\s-]?level|intern|graduate)\b/i;
 
+// ── Boilerplate-aware keyword matching (Bug 2, gemini-filter-audit.md) ──
+
+/**
+ * Many ATS postings open with a long "About [Company]" boilerplate
+ * paragraph that mentions the company's own product/stack regardless of
+ * the specific role — e.g. every Vercel posting (Account Executive,
+ * Senior HRBP, Partner Operations Lead, ...) opens with "the team behind
+ * Next.js". A naive "does this keyword appear anywhere" check treats that
+ * boilerplate identically to a real requirements section, which produced
+ * a 100% false-positive rate for non-engineering Vercel roles — confirmed
+ * against live raw_jobs data. See
+ * docs/plans/2026-06-24-bug2-boilerplate-keyword-gate.md.
+ *
+ * 600 chars comfortably covers the confirmed Vercel intro (~788 chars,
+ * only match at ~190).
+ */
+const BOILERPLATE_WINDOW_CHARS = 600;
+
+function wordBoundaryPattern(word: string): string {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return `\\b${escaped}\\b`;
+}
+
+/**
+ * Returns true if `keywords` has a "meaningful" match in `text`: either a
+ * match past the boilerplate-prone opening window, or two or more distinct
+ * keywords matched anywhere (breadth). Texts at or under the window size
+ * are exempt from the position check — too short for a real "intro vs.
+ * body" split, so a single early match is trusted as before.
+ */
+export function hasMeaningfulKeywordMatch(text: string, keywords: string[]): boolean {
+  if (text.length <= BOILERPLATE_WINDOW_CHARS) {
+    return keywords.some((word) => new RegExp(wordBoundaryPattern(word), "i").test(text));
+  }
+
+  let distinctMatchCount = 0;
+  let matchOutsideWindow = false;
+
+  for (const word of keywords) {
+    const regex = new RegExp(wordBoundaryPattern(word), "gi");
+    let matchedThisWord = false;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(text)) !== null) {
+      matchedThisWord = true;
+      if (m.index >= BOILERPLATE_WINDOW_CHARS) {
+        matchOutsideWindow = true;
+      }
+      if (m.index === regex.lastIndex) regex.lastIndex++; // guard against zero-length matches
+    }
+    if (matchedThisWord) distinctMatchCount++;
+  }
+
+  return matchOutsideWindow || distinctMatchCount >= 2;
+}
+
 // ── Recency ──────────────────────────────────────────────────
 
 /**
@@ -149,12 +204,7 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
       : settings.expert_skills;
 
   if (techKeywords && techKeywords.length > 0) {
-    const hasRequired = techKeywords.some((word) => {
-      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      const regex = new RegExp(`\\b${escaped}\\b`, "i");
-      return regex.test(textCombined);
-    });
-    if (!hasRequired) {
+    if (!hasMeaningfulKeywordMatch(textCombined, techKeywords)) {
       return false;
     }
   }
@@ -171,10 +221,15 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
     }
   }
 
-  // 5. Skill Match Check: Ensure there is at least one skill match from the user's stack to keep relevancy high
-  const expertMatched = matchSkills(job.description, settings.expert_skills);
-  const secondaryMatched = matchSkills(job.description, settings.secondary_skills);
-  if (expertMatched.length === 0 && secondaryMatched.length === 0) {
+  // 5. Skill Match Check: Ensure there is at least one *meaningful* skill
+  // match from the user's stack to keep relevancy high (Bug 2: boilerplate-
+  // aware — see hasMeaningfulKeywordMatch above).
+  if (
+    !hasMeaningfulKeywordMatch(job.description, [
+      ...settings.expert_skills,
+      ...settings.secondary_skills,
+    ])
+  ) {
     return false;
   }
 
@@ -211,6 +266,7 @@ export function scoreJob(
   settings: ResolvedSettings,
   geminiPass = false,
   geminiReason: string | null = null,
+  geminiReviewed = false,
 ): ScoredJob | null {
   // Seniority hard gate – null means "do not store at all"
   if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
@@ -249,6 +305,7 @@ export function scoreJob(
     bonus_skills,
     gemini_pass: geminiPass,
     gemini_reason: geminiReason,
+    gemini_reviewed: geminiReviewed,
   };
 }
 

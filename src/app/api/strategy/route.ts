@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { generateApplicationStrategy } from "@/lib/gemini";
 import { resolveUserSettings } from "@/lib/settings";
+import { catchErrorResponse } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   const user = await getUser();
@@ -43,7 +44,6 @@ export async function POST(request: NextRequest) {
     const result = await generateApplicationStrategy(profile.gemini_api_key, body.job, userSkills);
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return catchErrorResponse("strategy:POST", err);
   }
 }

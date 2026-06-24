@@ -73,6 +73,11 @@ export interface ScoredJob extends RawJob {
   bonus_skills: string[]; // nice-to-have skills found, informational only — never scored
   gemini_pass: boolean;
   gemini_reason: string | null;
+  /** true only when Gemini returned a real, matched decision for this job;
+   *  false when it fell through a fail-open path (missing idx or batch
+   *  failure) — see Feature Request 1 in
+   *  docs/plans/2026-06-24-gemini-reviewed-indicator.md. */
+  gemini_reviewed: boolean;
   scoring_weights?: ScoringWeights;
 }
 

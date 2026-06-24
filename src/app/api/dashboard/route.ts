@@ -85,12 +85,8 @@ export async function GET() {
     db.from("user_profiles").select("gemini_api_key").eq("id", user.id).single(),
   ]);
 
-  if (!profile?.gemini_api_key) {
-    return NextResponse.json(
-      { ok: false, error: "No Gemini API key configured. Please add one in Settings." },
-      { status: 422 },
-    );
-  }
+  // Feature Request 2 (gemini-filter-audit.md): the Gemini key is now
+  // optional — see the Step 4 branch below for what happens without one.
 
   // ── Step 1: Fetch raw jobs for enabled pipelines ─────────────
   const enabledModes: string[] = [];
@@ -119,16 +115,26 @@ export async function GET() {
   const afterSettingsFilter = afterDateFilter.filter((j) => passesSettingsGate(j, settings));
 
   // ── Step 4: Gemini filter ────────────────────────────────────
-  const geminiFiltered = await filterJobsWithGemini(
-    profile.gemini_api_key,
-    afterSettingsFilter,
-    settings,
-  );
+  // No key -> skip Gemini entirely rather than hard-blocking the whole
+  // dashboard (the old behavior). An invalid/exhausted key already failed
+  // open silently and showed everything anyway, so the strictest outcome
+  // was backwards: reserved for the one case where the user did
+  // everything right. Missing-key jobs get the same fail-open shape Bug
+  // 1's matching already produces, so Feature Request 1's "Not
+  // AI-reviewed" badge covers this for free.
+  const geminiFiltered = profile?.gemini_api_key
+    ? await filterJobsWithGemini(profile.gemini_api_key, afterSettingsFilter, settings)
+    : afterSettingsFilter.map((j) => ({
+        ...j,
+        gemini_pass: true,
+        gemini_reason: null,
+        gemini_reviewed: false,
+      }));
 
   // ── Step 5: Score ────────────────────────────────────────────
   const scoredJobs: ScoredJob[] = [];
   for (const job of geminiFiltered) {
-    const scored = scoreJob(job, settings, job.gemini_pass, job.gemini_reason);
+    const scored = scoreJob(job, settings, job.gemini_pass, job.gemini_reason, job.gemini_reviewed);
     if (scored && scored.total_score > 0) {
       scoredJobs.push(scored);
     }

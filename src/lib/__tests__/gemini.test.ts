@@ -71,6 +71,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("visa_gh_acme_1");
     expect(result[0].gemini_reason).toBe("Strong React match");
+    expect(result[0].gemini_reviewed).toBe(true);
   });
 
   it("fails open and logs loudly when some idx are missing from the response", async () => {
@@ -86,6 +87,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result.map((j) => j.id).sort()).toEqual(["a", "b"]);
     const bResult = result.find((j) => j.id === "b");
     expect(bResult?.gemini_reason).toBeNull();
+    expect(bResult?.gemini_reviewed).toBe(false);
     expect(errorSpy).toHaveBeenCalled();
   });
 
@@ -103,6 +105,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("real decision");
+    expect(result[0].gemini_reviewed).toBe(true);
     expect(errorSpy).toHaveBeenCalled();
   });
 
@@ -114,6 +117,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("gemini-unavailable");
+    expect(result[0].gemini_reviewed).toBe(false);
   });
 
   it("handles malformed/non-JSON responses without crashing", async () => {
@@ -126,5 +130,6 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result).toHaveLength(1);
     expect(result[0].gemini_pass).toBe(true);
     expect(result[0].gemini_reason).toBeNull();
+    expect(result[0].gemini_reviewed).toBe(false);
   });
 });

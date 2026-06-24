@@ -2,7 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
-import { dbErrorResponse } from "@/lib/api-errors";
+import { dbErrorResponse, catchErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings, saveUserSettings } from "@/lib/settings";
 
 // ── GET /api/settings ─────────────────────────────────────
@@ -86,8 +86,7 @@ export async function PATCH(request: NextRequest) {
     try {
       await saveUserSettings(user.id, body as Parameters<typeof saveUserSettings>[1]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+      return catchErrorResponse("settings:PATCH", err);
     }
   }
 
