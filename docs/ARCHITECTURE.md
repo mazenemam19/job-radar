@@ -314,9 +314,14 @@ survived the free stages:
    - **Skill match floor** — reject if zero expert _or_ secondary skills are found in
      the description at all.
 3. **Gemini gate** (`filterJobsWithGemini`) — batches of 30 jobs sent to the user's own
-   Gemini key with their custom `gemini_filter_prompt`. **Fails open**: if a batch errors,
-   every job in it passes rather than being silently dropped; any job Gemini's response
-   doesn't explicitly address also defaults to pass.
+   Gemini key with their custom evaluation criteria (`gemini_filter_prompt` — criteria
+   only; the JSON response contract is fixed and code-owned, appended at call time, not
+   stored in user-editable text). Each job is identified to Gemini by its position in
+   the batch (`idx`), not its database id — short integers round-trip reliably, long
+   composite ID strings don't. **Fails open**: if a batch errors, every job in it passes
+   rather than being silently dropped; any job whose `idx` Gemini's response doesn't
+   address, or returns invalid/duplicate, also defaults to pass — but this is now logged
+   loudly (`console.error` with the raw response attached), not silent.
    - Model fallback queue: `gemini-3.1-pro-preview` → `gemini-3.1-flash-lite-preview` →
      `gemini-2.5-pro` → `gemini-2.5-flash` → `gemini-2.5-flash-lite`. Auth errors
      (invalid key) abort immediately rather than cycling models; other errors (429,

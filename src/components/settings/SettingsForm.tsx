@@ -203,7 +203,7 @@ export default function SettingsForm() {
             />
           </Section>
 
-          <Section title="Gemini filter prompt" htmlFor="gemini-prompt">
+          <Section title="Gemini evaluation criteria" htmlFor="gemini-prompt">
             <textarea
               id="gemini-prompt"
               value={prompt}
@@ -212,6 +212,10 @@ export default function SettingsForm() {
               placeholder="You are a job filter for..."
               className={`${INPUT_CLASS} resize-y font-mono text-xs`}
             />
+            <p className="mt-1.5 text-xs text-[#94a3b8]">
+              Describe what makes a job a good fit. Response formatting is handled automatically —
+              no need to specify JSON shape here.
+            </p>
           </Section>
         </>
       )}

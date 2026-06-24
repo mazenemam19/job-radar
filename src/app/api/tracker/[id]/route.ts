@@ -2,6 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_STATUSES } from "@/lib/constants";
 import type { TrackerStatus } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
@@ -39,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("tracker/[id]:PATCH", error);
   if (!data) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
 
   return NextResponse.json({ ok: true, data });
@@ -58,7 +59,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     .eq("id", params.id)
     .eq("user_id", user.id);
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("tracker/[id]:DELETE", error);
 
   return NextResponse.json({ ok: true });
 }

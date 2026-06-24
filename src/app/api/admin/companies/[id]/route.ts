@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_ATS } from "@/lib/constants";
 import type { ATSType } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
@@ -50,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/companies/[id]:PUT", error);
   if (!data) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
 
   return NextResponse.json({ ok: true, data });
@@ -63,6 +64,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   const db = createAdminClient();
   const { error } = await db.from("ats_companies").delete().eq("id", params.id);
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/companies/[id]:DELETE", error);
   return NextResponse.json({ ok: true });
 }

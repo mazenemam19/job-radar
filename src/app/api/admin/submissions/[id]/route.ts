@@ -3,6 +3,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
+import { dbErrorResponse } from "@/lib/api-errors";
 import type { Database } from "@/lib/database.types";
 
 // ── PATCH — approve / reject / edit a submission ─────────────
@@ -67,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/submissions/[id]:PATCH", error);
   return NextResponse.json({ ok: true, data });
 }
 
@@ -79,6 +80,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
 
   const db = createAdminClient();
   const { error } = await db.from("ats_submissions").delete().eq("id", params.id);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/submissions/[id]:DELETE", error);
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
+import { dbErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings, saveUserSettings } from "@/lib/settings";
 
 // ── GET /api/settings ─────────────────────────────────────
@@ -67,7 +68,7 @@ export async function PATCH(request: NextRequest) {
       .eq("id", user.id);
 
     if (keyError) {
-      return NextResponse.json({ ok: false, error: keyError.message }, { status: 500 });
+      return dbErrorResponse("settings:PATCH", keyError);
     }
 
     delete body.gemini_api_key;

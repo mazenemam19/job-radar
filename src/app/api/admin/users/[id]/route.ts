@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
+import { dbErrorResponse } from "@/lib/api-errors";
 import type { Database } from "@/lib/database.types";
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
@@ -48,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .select()
     .single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbErrorResponse("admin/users/[id]:PATCH", error);
   if (!data) return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
 
   return NextResponse.json({ ok: true, data });
