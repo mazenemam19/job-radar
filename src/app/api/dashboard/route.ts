@@ -129,12 +129,20 @@ export async function GET() {
         gemini_pass: true,
         gemini_reason: null,
         gemini_reviewed: false,
+        gemini_quota_exhausted: false,
       }));
 
   // ── Step 5: Score ────────────────────────────────────────────
   const scoredJobs: ScoredJob[] = [];
   for (const job of geminiFiltered) {
-    const scored = scoreJob(job, settings, job.gemini_pass, job.gemini_reason, job.gemini_reviewed);
+    const scored = scoreJob(
+      job,
+      settings,
+      job.gemini_pass,
+      job.gemini_reason,
+      job.gemini_reviewed,
+      job.gemini_quota_exhausted,
+    );
     if (scored && scored.total_score > 0) {
       scoredJobs.push(scored);
     }

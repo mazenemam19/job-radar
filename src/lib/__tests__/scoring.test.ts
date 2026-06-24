@@ -366,6 +366,15 @@ describe("scoreJob", () => {
     const result = scoreJob(job, DEFAULT_SETTINGS);
     expect(result!.gemini_reviewed).toBe(false);
   });
+
+  it("passes gemini_quota_exhausted through, defaulting to false", () => {
+    const job = makeJob({ title: "Senior React Dev", description: "React TypeScript" });
+    expect(scoreJob(job, DEFAULT_SETTINGS)!.gemini_quota_exhausted).toBe(false);
+    expect(
+      scoreJob(job, DEFAULT_SETTINGS, true, "gemini-quota-exhausted", false, true)!
+        .gemini_quota_exhausted,
+    ).toBe(true);
+  });
 });
 
 // ── mergeJobs (FIX #6) ───────────────────────────────────────

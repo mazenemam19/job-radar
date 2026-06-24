@@ -15,7 +15,7 @@ const MODEL_QUEUE = [
   "gemini-2.5-flash-lite",
 ];
 
-const BATCH_SIZE = 30; // jobs per Gemini call (avoids exceeding context window)
+const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the larger per-job char window below)
 
 // Fixed, code-owned response-format contract. Deliberately NOT part of
 // gemini_filter_prompt (which is user-editable) — see Bug 1 in
@@ -34,6 +34,24 @@ interface GeminiDecision {
   reason: string;
 }
 
+// Recognizable shape of a Gemini quota/rate-limit error — shared by callGemini's
+// quota tracking and generateApplicationStrategy's retry logic below.
+function isQuotaError(msg: string): boolean {
+  return msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+}
+
+// Thrown by callGemini only when every model in MODEL_QUEUE failed and every
+// one of those failures was specifically a quota/rate-limit error — as
+// opposed to a network error, bad response, or other transient failure.
+// Lets filterBatch's catch block surface a distinct "quota exhausted" badge
+// instead of the generic "not AI-reviewed" one.
+class GeminiQuotaExhaustedError extends Error {
+  constructor() {
+    super("All Gemini models exhausted their quota");
+    this.name = "GeminiQuotaExhaustedError";
+  }
+}
+
 interface FilterResult {
   id: string;
   pass: boolean;
@@ -43,12 +61,17 @@ interface FilterResult {
   // response, or total batch failure). See Feature Request 1 in
   // docs/plans/2026-06-24-gemini-reviewed-indicator.md.
   reviewed: boolean;
+  // true only when the batch failed open specifically because every model
+  // was quota-exhausted (see GeminiQuotaExhaustedError). Optional because
+  // most FilterResult constructions never hit that path.
+  quotaExhausted?: boolean;
 }
 
 // ── Core call with model fallback ────────────────────────────
 
 async function callGemini(apiKey: string, prompt: string): Promise<string> {
   const genAI = new GoogleGenAI({ apiKey });
+  let allFailuresWereQuota = true;
 
   for (const model of MODEL_QUEUE) {
     try {
@@ -59,6 +82,7 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
       });
       const text = response.text ?? "";
       if (text.trim()) return text;
+      allFailuresWereQuota = false; // an empty response isn't a quota issue
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -71,13 +95,17 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
         throw err;
       }
 
+      if (!isQuotaError(msg)) allFailuresWereQuota = false;
+
       // For any other errors (429 rate limit, 404 model unsupported, server error), try the next model
       console.warn(`[gemini] Model ${model} failed, trying next... Error:`, msg);
       continue;
     }
   }
 
-  throw new Error("All Gemini models exhausted");
+  throw allFailuresWereQuota
+    ? new GeminiQuotaExhaustedError()
+    : new Error("All Gemini models exhausted");
 }
 
 // ── Parse Gemini JSON response ────────────────────────────────
@@ -116,13 +144,14 @@ async function filterBatch(
     title: j.title,
     company: j.company,
     location: j.location,
-    // 3000 chars (Bug 3, gemini-filter-audit.md — raised from 1200, to
-    // match the old ingestion ceiling). Deliberately less than the new
-    // 6000-char ingestion ceiling in ats-utils.ts's processJobs — Gemini's
-    // cost scales with tokens sent (BATCH_SIZE=30 jobs/call), while the
-    // free settings-gate pre-filter gets the full benefit of the larger
-    // window. See processJobs's comment for the full tradeoff.
-    description: j.description.slice(0, 3000),
+    // 10,000 chars (data-driven — see docs/plans/2026-06-25-jd-truncation-resolution.md).
+    // Real raw_jobs distribution showed 91% of jobs fully covered at 10k vs.
+    // 48.8% at the old 6000-char ingestion ceiling; pushing past 10k buys only
+    // 8.2% more coverage (up to 15k) for a disproportionate token-cost increase.
+    // There is no longer an ingestion ceiling to stay under (ats-utils.ts's
+    // processJobs stores the full description) — this number is now set by
+    // Gemini coverage/cost tradeoff alone, not by matching a storage limit.
+    description: j.description.slice(0, 10000),
   }));
 
   const prompt = `${promptTemplate}
@@ -181,8 +210,15 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
   } catch (err) {
     // If Gemini fails for this batch, pass all jobs through (fail-open)
     console.error("[gemini] Batch filter failed:", err);
+    const quotaExhausted = err instanceof GeminiQuotaExhaustedError;
     for (const j of jobs) {
-      resultMap.set(j.id, { id: j.id, pass: true, reason: "gemini-unavailable", reviewed: false });
+      resultMap.set(j.id, {
+        id: j.id,
+        pass: true,
+        reason: quotaExhausted ? "gemini-quota-exhausted" : "gemini-unavailable",
+        reviewed: false,
+        quotaExhausted,
+      });
     }
   }
 
@@ -209,12 +245,24 @@ export async function filterJobsWithGemini(
   jobs: RawJob[],
   settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
 ): Promise<
-  Array<RawJob & { gemini_pass: boolean; gemini_reason: string | null; gemini_reviewed: boolean }>
+  Array<
+    RawJob & {
+      gemini_pass: boolean;
+      gemini_reason: string | null;
+      gemini_reviewed: boolean;
+      gemini_quota_exhausted: boolean;
+    }
+  >
 > {
   if (!apiKey || !jobs.length) return [];
 
   const results: Array<
-    RawJob & { gemini_pass: boolean; gemini_reason: string | null; gemini_reviewed: boolean }
+    RawJob & {
+      gemini_pass: boolean;
+      gemini_reason: string | null;
+      gemini_reviewed: boolean;
+      gemini_quota_exhausted: boolean;
+    }
   > = [];
   const prompt = settings.gemini_filter_prompt;
 
@@ -231,6 +279,7 @@ export async function filterJobsWithGemini(
           gemini_pass: true,
           gemini_reason: d.reason,
           gemini_reviewed: d.reviewed,
+          gemini_quota_exhausted: d.quotaExhausted ?? false,
         });
       }
     }
@@ -284,7 +333,7 @@ Return ONLY a JSON array of strings (the bullet points). No markdown, no preambl
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+      if (isQuotaError(msg)) {
         continue;
       }
       throw err;

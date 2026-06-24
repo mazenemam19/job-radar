@@ -322,16 +322,10 @@ export function processJobs(
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      // Flat truncation for all jobs now — the old "shrink non-matches" policy
-      // existed because everything was pre-filtered by skill match at ingestion.
-      // That gate is gone; storage policy shouldn't reintroduce the same bias.
-      // 6000 chars (Bug 3, gemini-filter-audit.md — raised from 3000 after
-      // confirming live raw_jobs data was hitting the old ceiling on every
-      // one of its 20 longest descriptions). This is the absolute ceiling
-      // on what's ever stored, and what passesSettingsGate searches against;
-      // see gemini.ts's filterBatch for the separate, smaller Gemini-call
-      // truncation and why the two are deliberately not equal.
-      description: r.description.slice(0, 6000),
+      // Full description stored — no ceiling. The old 6000-char slice (Bug 3,
+      // raised from 3000) was still truncating a significant portion of live jobs.
+      // Real ceiling determined by Gemini window in gemini.ts's filterBatch.
+      description: r.description,
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
