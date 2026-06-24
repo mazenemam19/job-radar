@@ -172,6 +172,15 @@ export default function JobDetailPage() {
             </span>
           )}
 
+          {!job.gemini_reviewed && (
+            <span
+              title="Gemini didn't return a decision for this job, so it's shown by default rather than filtered out."
+              className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-500"
+            >
+              ⚠ Not AI-reviewed (showing anyway)
+            </span>
+          )}
+
           {job.matched_skills.map((s) => (
             <span
               key={s}

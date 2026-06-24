@@ -355,9 +355,16 @@ describe("scoreJob", () => {
 
   it("passes gemini_pass and gemini_reason through", () => {
     const job = makeJob({ title: "Senior React Dev", description: "React TypeScript" });
-    const result = scoreJob(job, DEFAULT_SETTINGS, true, "Matches senior React profile");
+    const result = scoreJob(job, DEFAULT_SETTINGS, true, "Matches senior React profile", true);
     expect(result!.gemini_pass).toBe(true);
     expect(result!.gemini_reason).toBe("Matches senior React profile");
+    expect(result!.gemini_reviewed).toBe(true);
+  });
+
+  it("defaults gemini_reviewed to false when not passed", () => {
+    const job = makeJob({ title: "Senior React Dev", description: "React TypeScript" });
+    const result = scoreJob(job, DEFAULT_SETTINGS);
+    expect(result!.gemini_reviewed).toBe(false);
   });
 });
 
@@ -375,6 +382,7 @@ describe("mergeJobs", () => {
       bonus_skills: [],
       gemini_pass: true,
       gemini_reason: null,
+      gemini_reviewed: true,
     };
   }
 
@@ -475,5 +483,58 @@ describe("passesSettingsGate", () => {
       secondary_skills: ["Vue"],
     };
     expect(passesSettingsGate(job, settings)).toBe(false);
+  });
+
+  // ── Bug 2: boilerplate-aware matching ──────────────────────
+  // Confirmed against live raw_jobs: every Vercel posting (engineering or
+  // not) opens with an identical ~788-char "About Vercel: ... the team
+  // behind Next.js" intro. Non-engineering roles never mention React/
+  // Next.js again anywhere else in the posting.
+
+  function makeBoilerplateDescription(roleSection: string): string {
+    const intro =
+      "About Vercel: Vercel is the agentic infrastructure company. We free people and agents " +
+      "to ship what's next. For more than a decade, Vercel has shaped how the web is built. As " +
+      "the team behind Next.js, v0, and AI SDK, we create products that help builders move from " +
+      "idea to production with speed, security, and exceptional developer experience. Now, " +
+      "software is entering a new era, and the next generation of products will not just be " +
+      "used by people."; // ~430 chars on its own; padded below to clear the 600-char window
+    const padding = "Filler company-mission copy padding this intro out further. ".repeat(4); // ~250 chars
+    return `${intro} ${padding}${roleSection}`;
+  }
+
+  it("rejects a non-engineering role whose only keyword match is the company-intro boilerplate", () => {
+    const job = makeJob({
+      title: "Account Executive- Startups, Greenfield",
+      description: makeBoilerplateDescription(
+        "About the Role: You'll build relationships with founders and close new business. " +
+          "5+ years of SaaS sales experience required. No frontend or engineering skills needed.",
+      ),
+    });
+    expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("accepts an engineering role that mentions the keyword again past the intro", () => {
+    const job = makeJob({
+      title: "Software Engineer, eve",
+      description: makeBoilerplateDescription(
+        "About the role: We are looking for a Software Engineer to help build eve, Vercel's " +
+          "framework for production-ready AI agents. Eve is to agents what Next.js is to web apps. " +
+          "Drive DX quality so TypeScript/Next.js developers can ship their first agent in minutes.",
+      ),
+    });
+    expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("accepts a long posting with two distinct keyword matches even when both sit inside the window", () => {
+    const job = makeJob({
+      title: "Frontend Engineer",
+      description:
+        "React and TypeScript experience required. React Native is a plus. " +
+        "Padding text with no relevant keywords to push total length well past six hundred characters total. ".repeat(
+          8,
+        ),
+    });
+    expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(true);
   });
 });

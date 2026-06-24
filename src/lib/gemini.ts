@@ -38,6 +38,11 @@ interface FilterResult {
   id: string;
   pass: boolean;
   reason: string | null;
+  // true only when Gemini returned a real, matched decision for this job's
+  // idx. false for both fail-open paths (missing idx in an otherwise-valid
+  // response, or total batch failure). See Feature Request 1 in
+  // docs/plans/2026-06-24-gemini-reviewed-indicator.md.
+  reviewed: boolean;
 }
 
 // ── Core call with model fallback ────────────────────────────
@@ -111,7 +116,13 @@ async function filterBatch(
     title: j.title,
     company: j.company,
     location: j.location,
-    description: j.description.slice(0, 1200), // truncate for token limit
+    // 3000 chars (Bug 3, gemini-filter-audit.md — raised from 1200, to
+    // match the old ingestion ceiling). Deliberately less than the new
+    // 6000-char ingestion ceiling in ats-utils.ts's processJobs — Gemini's
+    // cost scales with tokens sent (BATCH_SIZE=30 jobs/call), while the
+    // free settings-gate pre-filter gets the full benefit of the larger
+    // window. See processJobs's comment for the full tradeoff.
+    description: j.description.slice(0, 3000),
   }));
 
   const prompt = `${promptTemplate}
@@ -154,6 +165,7 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
         id: job.id,
         pass: Boolean(d.pass),
         reason: d.reason ?? null,
+        reviewed: true,
       });
     }
 
@@ -170,14 +182,14 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
     // If Gemini fails for this batch, pass all jobs through (fail-open)
     console.error("[gemini] Batch filter failed:", err);
     for (const j of jobs) {
-      resultMap.set(j.id, { id: j.id, pass: true, reason: "gemini-unavailable" });
+      resultMap.set(j.id, { id: j.id, pass: true, reason: "gemini-unavailable", reviewed: false });
     }
   }
 
   // Any job not in Gemini's response → default to pass (fail-open)
   for (const j of jobs) {
     if (!resultMap.has(j.id)) {
-      resultMap.set(j.id, { id: j.id, pass: true, reason: null });
+      resultMap.set(j.id, { id: j.id, pass: true, reason: null, reviewed: false });
     }
   }
 
@@ -196,10 +208,14 @@ export async function filterJobsWithGemini(
   apiKey: string,
   jobs: RawJob[],
   settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
-): Promise<Array<RawJob & { gemini_pass: boolean; gemini_reason: string | null }>> {
+): Promise<
+  Array<RawJob & { gemini_pass: boolean; gemini_reason: string | null; gemini_reviewed: boolean }>
+> {
   if (!apiKey || !jobs.length) return [];
 
-  const results: Array<RawJob & { gemini_pass: boolean; gemini_reason: string | null }> = [];
+  const results: Array<
+    RawJob & { gemini_pass: boolean; gemini_reason: string | null; gemini_reviewed: boolean }
+  > = [];
   const prompt = settings.gemini_filter_prompt;
 
   // Process in batches
@@ -210,7 +226,12 @@ export async function filterJobsWithGemini(
     for (const job of batch) {
       const d = decisions.get(job.id);
       if (d?.pass) {
-        results.push({ ...job, gemini_pass: true, gemini_reason: d.reason });
+        results.push({
+          ...job,
+          gemini_pass: true,
+          gemini_reason: d.reason,
+          gemini_reviewed: d.reviewed,
+        });
       }
     }
   }

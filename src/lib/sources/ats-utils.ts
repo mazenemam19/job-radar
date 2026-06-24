@@ -16,6 +16,7 @@ import type {
   SRJob,
   SRDetail,
   BambooJob,
+  BambooDetail,
   JazzJob,
   DomainCounts,
   WorkableCooldownEntry,
@@ -324,7 +325,13 @@ export function processJobs(
       // Flat truncation for all jobs now — the old "shrink non-matches" policy
       // existed because everything was pre-filtered by skill match at ingestion.
       // That gate is gone; storage policy shouldn't reintroduce the same bias.
-      description: r.description.slice(0, 3000),
+      // 6000 chars (Bug 3, gemini-filter-audit.md — raised from 3000 after
+      // confirming live raw_jobs data was hitting the old ceiling on every
+      // one of its 20 longest descriptions). This is the absolute ceiling
+      // on what's ever stored, and what passesSettingsGate searches against;
+      // see gemini.ts's filterBatch for the separate, smaller Gemini-call
+      // truncation and why the two are deliberately not equal.
+      description: r.description.slice(0, 6000),
       isRemote,
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
@@ -873,19 +880,32 @@ export async function fetchBambooHR(
     const data = (await res.json()) as { result?: BambooJob[] };
     const jobs = data.result ?? [];
     const rawCount = jobs.length;
-    const processed = processJobs(
-      jobs.map((r) => ({
-        id: `${mode}_bamboohr_${c.slug}_${r.id}`,
-        title: r.jobOpeningName,
-        location: r.city ? `${r.city}, ${r.country}` : (c.city ?? c.country),
-        url: `https://${c.slug}.bamboohr.com/careers/${r.id}`,
-        postedAt: r.datePosted,
-        description: "",
-      })),
-      c,
-      mode,
-      visaSponsorship,
+    // BambooHR's list endpoint never includes a description (Bug 4,
+    // gemini-filter-audit.md) — fetch each job's detail page for the real
+    // description, mirroring fetchWorkable's detail-fetch pattern.
+    const withDesc = await pLimit(
+      jobs.map((r) => async () => {
+        let description = "";
+        const detailUrl = `https://${c.slug}.bamboohr.com/careers/${r.id}/detail`;
+        const dr = await safeFetch(detailUrl);
+        if (dr && dr.ok) {
+          try {
+            const detail = (await dr.json()) as BambooDetail;
+            description = stripHtml(detail.result?.jobOpening?.description ?? "");
+          } catch {}
+        }
+        return {
+          id: `${mode}_bamboohr_${c.slug}_${r.id}`,
+          title: r.jobOpeningName,
+          location: r.city ? `${r.city}, ${r.country}` : (c.city ?? c.country),
+          url: `https://${c.slug}.bamboohr.com/careers/${r.id}`,
+          postedAt: r.datePosted,
+          description,
+        };
+      }),
+      5,
     );
+    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
