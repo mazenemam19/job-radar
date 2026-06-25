@@ -74,19 +74,6 @@ function detectCountry(
   return fallback;
 }
 
-export function isTimezoneIncompatible(text: string): boolean {
-  const t = text.toLowerCase();
-  if (/\b(emea|europe|global|anywhere|africa|egypt|london|berlin|gmt\+2|gmt\+3)\b/.test(t))
-    return false;
-  const usOnly =
-    /\b(us\s+only|usa\s+only|united\s+states\s+only|north\s+america\s+only|canada\s+only)\b/.test(
-      t,
-    );
-  const usTimezones = /\b(pst|est|cst|mst|pacific\s+time|eastern\s+time)\b/.test(t);
-  const usRemote = /\bremote[,.\s-]+(us|usa|united\s+states)\b/.test(t);
-  return usOnly || usTimezones || usRemote;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const TMP_DIR = "/tmp";
@@ -281,21 +268,8 @@ export function processJobs(
     // is multi-tenant now. Role/seniority/skill filtering is the user's call,
     // applied downstream against their own /settings, not baked into ingestion.
 
-    // ── Global Mode Restrictions ──
-    // (Geographic/timezone eligibility, not role filtering — kept as-is.)
-    if (mode === "global") {
-      if (isTimezoneIncompatible(r.description + r.location)) continue;
-
-      // If there are specific country restrictions and it's not "Remote/Worldwide/Egypt/EMEA"
-      if (r.locationRestrictions && r.locationRestrictions.length > 0) {
-        const isBroad = r.locationRestrictions.some((loc) =>
-          /remote|worldwide|anywhere|emea|europe|global/i.test(loc),
-        );
-        const hasEgypt = r.locationRestrictions.some((loc) => /egypt/i.test(loc));
-
-        if (!isBroad && !hasEgypt) continue;
-      }
-    }
+    // NOTE: Global mode timezone/region filtering was previously hardcoded here.
+    // It has been moved to passesGlobalModeGate() in scoring.ts as a per-user setting.
 
     const postedMs = Date.parse(r.postedAt);
     if (!isNaN(postedMs) && postedMs < cutoff) continue;

@@ -61,6 +61,8 @@ const DEFAULT_SETTINGS: ResolvedSettings = {
     "no visa sponsorship",
   ],
   required_keywords: ["react", "next.js", "react native"],
+  global_mode_blocked_regions: ["us only", "usa only", "pst", "est", "remote us"],
+  global_mode_allowed_locations: ["remote", "worldwide", "anywhere", "emea", "europe", "global"],
   email_alerts_enabled: true,
   salary_reminder_enabled: true,
 };

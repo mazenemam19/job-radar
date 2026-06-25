@@ -12,7 +12,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
 import { filterJobsWithGemini } from "@/lib/gemini";
-import { scoreJob, mergeJobs, passesDateGate, passesSettingsGate } from "@/lib/scoring";
+import {
+  scoreJob,
+  mergeJobs,
+  passesDateGate,
+  passesSettingsGate,
+  passesGlobalModeGate,
+} from "@/lib/scoring";
 import { isCacheFresh } from "@/lib/runner";
 import { sendJobAlertEmail } from "@/lib/email";
 import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
@@ -114,6 +120,14 @@ export async function GET() {
   // ── Step 3: Settings filter (seniority + tech stack + regex gates) ──
   const afterSettingsFilter = afterDateFilter.filter((j) => passesSettingsGate(j, settings));
 
+  // ── Step 3.5: Global mode timezone/region filter ─────────────
+  // Only applies to jobs in the "global" pipeline. Uses per-user settings
+  // (global_mode_blocked_regions / global_mode_allowed_locations) instead of
+  // the old hardcoded isTimezoneIncompatible() in ats-utils.ts.
+  const afterGlobalModeFilter = afterSettingsFilter.filter((j) =>
+    j.mode === "global" ? passesGlobalModeGate(j, settings) : true,
+  );
+
   // ── Step 4: Gemini filter ────────────────────────────────────
   // No key -> skip Gemini entirely rather than hard-blocking the whole
   // dashboard (the old behavior). An invalid/exhausted key already failed
@@ -123,8 +137,8 @@ export async function GET() {
   // 1's matching already produces, so Feature Request 1's "Not
   // AI-reviewed" badge covers this for free.
   const geminiFiltered = profile?.gemini_api_key
-    ? await filterJobsWithGemini(profile.gemini_api_key, afterSettingsFilter, settings)
-    : afterSettingsFilter.map((j) => ({
+    ? await filterJobsWithGemini(profile.gemini_api_key, afterGlobalModeFilter, settings)
+    : afterGlobalModeFilter.map((j) => ({
         ...j,
         gemini_pass: true,
         gemini_reason: null,
