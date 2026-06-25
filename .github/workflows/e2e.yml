@@ -77,12 +77,39 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # --- Install only the Chromium browser (matches playwright.config.ts) ---
-      - name: Install Playwright browsers
+      # Browser binaries are versioned with the @playwright/test package, so
+      # keying on its installed version is exact — a cache hit guarantees the
+      # right browser build is already on disk.
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      # Cache hit: browser binary is already on disk, skip the download —
+      # `install-deps` only installs the apt-level OS libraries, which still
+      # need to run every time since the cache doesn't cover system packages.
+      - name: Install Playwright OS dependencies only (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Cache miss: full install (browser binary + OS deps).
+      - name: Install Playwright browsers (cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run Playwright smoke tests
         run: pnpm exec playwright test
+        env:
+          # Logs what host/port next start actually reports listening on —
+          # lets us confirm there's no 0.0.0.0 / localhost / 127.0.0.1
+          # mismatch against PLAYWRIGHT_BASE_URL.
+          DEBUG: pw:webserver
 
       - name: Upload Playwright report
         if: always()
@@ -91,3 +118,16 @@ jobs:
           name: playwright-report-${{ github.sha }}
           path: playwright-report/
           retention-days: 14
+
+      # TEMPORARY — for diagnosing the CI-only auth-state bug.
+      # e2e-test@example.com is a throwaway test account, but this still
+      # uploads a live (if short-lived) session token as a build artifact.
+      # Delete this step once the bug is root-caused.
+      - name: Upload auth state for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-auth-state-${{ github.sha }}
+          path: e2e/.auth/user.json
+          retention-days: 1
+          if-no-files-found: warn
