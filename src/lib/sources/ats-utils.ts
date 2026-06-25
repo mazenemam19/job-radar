@@ -74,19 +74,6 @@ function detectCountry(
   return fallback;
 }
 
-export function isTimezoneIncompatible(text: string): boolean {
-  const t = text.toLowerCase();
-  if (/\b(emea|europe|global|anywhere|africa|egypt|london|berlin|gmt\+2|gmt\+3)\b/.test(t))
-    return false;
-  const usOnly =
-    /\b(us\s+only|usa\s+only|united\s+states\s+only|north\s+america\s+only|canada\s+only)\b/.test(
-      t,
-    );
-  const usTimezones = /\b(pst|est|cst|mst|pacific\s+time|eastern\s+time)\b/.test(t);
-  const usRemote = /\bremote[,.\s-]+(us|usa|united\s+states)\b/.test(t);
-  return usOnly || usTimezones || usRemote;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const TMP_DIR = "/tmp";
@@ -245,8 +232,6 @@ export async function safeFetch(url: string, timeout = 45_000): Promise<Response
   }
 }
 
-const AGE_CAP_DAYS = 7;
-
 /** For local jobs: extract a specific Egyptian city from the raw location string. */
 function extractEgyptCity(rawLocation: string, companyCity?: string): string {
   const loc = (rawLocation || "").toLowerCase();
@@ -270,35 +255,14 @@ export function processJobs(
   visaSponsorship: boolean,
 ): Job[] {
   const now = new Date().toISOString();
-  const cutoff = Date.now() - AGE_CAP_DAYS * 864e5;
   const out: Job[] = [];
 
   for (const r of raw) {
     const title = r.title.trim();
 
-    // NOTE: title-based "too senior" / "non-frontend" filtering used to happen
-    // here via the old hardcoded scoring.ts. Removed deliberately — Job Radar
-    // is multi-tenant now. Role/seniority/skill filtering is the user's call,
-    // applied downstream against their own /settings, not baked into ingestion.
-
-    // ── Global Mode Restrictions ──
-    // (Geographic/timezone eligibility, not role filtering — kept as-is.)
-    if (mode === "global") {
-      if (isTimezoneIncompatible(r.description + r.location)) continue;
-
-      // If there are specific country restrictions and it's not "Remote/Worldwide/Egypt/EMEA"
-      if (r.locationRestrictions && r.locationRestrictions.length > 0) {
-        const isBroad = r.locationRestrictions.some((loc) =>
-          /remote|worldwide|anywhere|emea|europe|global/i.test(loc),
-        );
-        const hasEgypt = r.locationRestrictions.some((loc) => /egypt/i.test(loc));
-
-        if (!isBroad && !hasEgypt) continue;
-      }
-    }
-
-    const postedMs = Date.parse(r.postedAt);
-    if (!isNaN(postedMs) && postedMs < cutoff) continue;
+    // NOTE: All filtering (date, seniority, skills, timezone, Gemini) is now
+    // applied downstream in the per-user pipeline (scoring.ts + dashboard route).
+    // processJobs() only normalizes raw ATS data into the Job shape.
 
     const actualSponsorship =
       visaSponsorship || /visa\s+sponsorship|relocation/i.test(r.description);

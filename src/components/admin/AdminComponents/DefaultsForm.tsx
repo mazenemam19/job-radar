@@ -168,6 +168,55 @@ export function DefaultsForm() {
         />
       </Section2>
 
+      <Section2
+        title="Global mode — Blocked regions/timezones"
+        htmlFor="default-global-blocked-regions"
+      >
+        <textarea
+          id="default-global-blocked-regions"
+          value={((form.global_mode_blocked_regions ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "global_mode_blocked_regions",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated. Jobs in the Global pipeline matching these keywords are rejected.
+        </p>
+      </Section2>
+
+      <Section2
+        title="Global mode — Always-allowed locations"
+        htmlFor="default-global-allowed-locations"
+      >
+        <textarea
+          id="default-global-allowed-locations"
+          value={((form.global_mode_allowed_locations ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "global_mode_allowed_locations",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated. Jobs matching these always pass the global mode filter (overrides blocked
+          list).
+        </p>
+      </Section2>
+
       <Section2 title="Score denominator" htmlFor="default-score-denominator">
         <input
           id="default-score-denominator"

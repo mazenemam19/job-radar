@@ -56,6 +56,19 @@ export async function PUT(request: NextRequest) {
       (s): s is string => typeof s === "string",
     );
   }
+  if ("global_mode_blocked_regions" in body && Array.isArray(body.global_mode_blocked_regions)) {
+    patch.global_mode_blocked_regions = body.global_mode_blocked_regions.filter(
+      (s): s is string => typeof s === "string",
+    );
+  }
+  if (
+    "global_mode_allowed_locations" in body &&
+    Array.isArray(body.global_mode_allowed_locations)
+  ) {
+    patch.global_mode_allowed_locations = body.global_mode_allowed_locations.filter(
+      (s): s is string => typeof s === "string",
+    );
+  }
   if ("job_age_days" in body && typeof body.job_age_days === "number") {
     patch.job_age_days = body.job_age_days;
   }

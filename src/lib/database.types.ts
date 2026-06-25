@@ -183,6 +183,8 @@ export type Database = {
           excluded_keywords: string[];
           blacklisted_locations: string[];
           required_keywords: string[];
+          global_mode_blocked_regions: string[];
+          global_mode_allowed_locations: string[];
           updated_at: string;
         };
         Insert: {
@@ -201,6 +203,8 @@ export type Database = {
           excluded_keywords?: string[];
           blacklisted_locations?: string[];
           required_keywords?: string[];
+          global_mode_blocked_regions?: string[];
+          global_mode_allowed_locations?: string[];
           updated_at?: string;
         };
         Update: {
@@ -219,6 +223,8 @@ export type Database = {
           excluded_keywords?: string[];
           blacklisted_locations?: string[];
           required_keywords?: string[];
+          global_mode_blocked_regions?: string[];
+          global_mode_allowed_locations?: string[];
           updated_at?: string;
         };
         Relationships: [];
@@ -448,6 +454,8 @@ export type Database = {
           excluded_keywords: string[] | null;
           blacklisted_locations: string[] | null;
           required_keywords: string[] | null;
+          global_mode_blocked_regions: string[] | null;
+          global_mode_allowed_locations: string[] | null;
           updated_at: string;
         };
         Insert: {
@@ -467,6 +475,8 @@ export type Database = {
           excluded_keywords?: string[] | null;
           blacklisted_locations?: string[] | null;
           required_keywords?: string[] | null;
+          global_mode_blocked_regions?: string[] | null;
+          global_mode_allowed_locations?: string[] | null;
           updated_at?: string;
         };
         Update: {
@@ -486,6 +496,8 @@ export type Database = {
           excluded_keywords?: string[] | null;
           blacklisted_locations?: string[] | null;
           required_keywords?: string[] | null;
+          global_mode_blocked_regions?: string[] | null;
+          global_mode_allowed_locations?: string[] | null;
           updated_at?: string;
         };
         Relationships: [];
