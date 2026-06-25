@@ -44,14 +44,17 @@ const settings = { gemini_filter_prompt: "Evaluate for fit." };
 
 describe("filterJobsWithGemini — index-based matching", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     generateContentMock.mockReset();
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it("maps complete responses to the right jobs by idx, not id", async () => {
