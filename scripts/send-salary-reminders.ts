@@ -21,7 +21,7 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SE
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://job-radar-v2.vercel.app";
-const REMIND_AFTER_DAYS = 28;
+const REMIND_AFTER_DAYS = parseInt(process.env.REMIND_AFTER_DAYS ?? "28", 10);
 
 async function run() {
   const cutoff = new Date(Date.now() - REMIND_AFTER_DAYS * 86_400_000).toISOString();
@@ -39,15 +39,15 @@ async function run() {
     .single();
   const defaultSalaryReminderEnabled = defaultRow?.salary_reminder_enabled ?? true;
 
-  // Find most-recent salary report per user where last_updated_at is old
-  // and they haven't been reminded in the last 28 days
+  // Step 1: Fetch stale salary reports with user_profiles join.
+  // Note: salary_reports has no FK to user_settings, so we can't join
+  // user_settings here. We fetch settings separately in Step 2.
   const { data: reports, error } = await supabase
     .from("salary_reports")
     .select(
       `
       id, user_id, role_title, last_updated_at, reminder_sent_at,
-      user_profiles!inner(email, is_active),
-      user_settings(salary_reminder_enabled)
+      user_profiles!inner(email, is_active)
     `,
     )
     .lt("last_updated_at", cutoff)
@@ -65,7 +65,19 @@ async function run() {
     return;
   }
 
-  // Deduplicate: one reminder per user (their most-recent report)
+  // Step 2: Fetch user_settings for the affected users.
+  // salary_reports and user_settings are both children of user_profiles,
+  // so we query settings separately and merge in code.
+  const userIds = [...new Set(reports.map((r) => r.user_id))];
+  const { data: settingsRows } = await supabase
+    .from("user_settings")
+    .select("user_id, salary_reminder_enabled")
+    .in("user_id", userIds);
+  const settingsMap = new Map(
+    (settingsRows ?? []).map((s) => [s.user_id, s.salary_reminder_enabled]),
+  );
+
+  // Step 3: Deduplicate and filter — one reminder per user (their most-recent report)
   const seenUsers = new Set<string>();
   const toRemind = reports.filter((r) => {
     const profile = (r as Record<string, unknown>).user_profiles as {
@@ -75,15 +87,7 @@ async function run() {
     if (!r.user_id || !profile?.email || !profile.is_active) return false;
     if (seenUsers.has(r.user_id)) return false;
 
-    // Supabase embeds a to-one relation as a one-element array (same shape
-    // fix already applied to AdminUserListItem.user_settings — see audit.md,
-    // Phase 2). A user with no custom row yet (just signed up, never opened
-    // /settings) gets [] here, which falls through to the default.
-    const settingsRow = (r as Record<string, unknown>).user_settings as
-      | { salary_reminder_enabled: boolean | null }[]
-      | null;
-    const salaryReminderEnabled =
-      settingsRow?.[0]?.salary_reminder_enabled ?? defaultSalaryReminderEnabled;
+    const salaryReminderEnabled = settingsMap.get(r.user_id) ?? defaultSalaryReminderEnabled;
     if (!salaryReminderEnabled) return false;
 
     seenUsers.add(r.user_id);
