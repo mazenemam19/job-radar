@@ -34,6 +34,9 @@ export default defineConfig({
   // One retry in CI to absorb flakiness from cold-start latency.
   retries: process.env.CI ? 1 : 0,
 
+  // stop after 3 confirmed failures, not all 28
+  maxFailures: process.env.CI ? 3 : undefined,
+
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
