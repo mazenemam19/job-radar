@@ -21,7 +21,7 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SE
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://job-radar-v2.vercel.app";
-const REMIND_AFTER_DAYS = 28;
+const REMIND_AFTER_DAYS = parseInt(process.env.REMIND_AFTER_DAYS ?? "28", 10);
 
 async function run() {
   const cutoff = new Date(Date.now() - REMIND_AFTER_DAYS * 86_400_000).toISOString();
