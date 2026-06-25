@@ -199,6 +199,34 @@ export async function runCronJob(
     trigger,
   });
 
+  // 8. Send "scan complete" notification to all eligible users.
+  // No job listings included — users open the dashboard to see their
+  // personalized (post-Gemini) results. This avoids the mismatch where
+  // email showed pre-Gemini jobs but the dashboard later filtered them.
+  const companiesScanned = companies?.length ?? 0;
+  if (companiesScanned > 0) {
+    const { data: eligibleUsers } = await db
+      .from("user_profiles")
+      .select("email, user_settings(email_alerts_enabled)")
+      .eq("is_active", true);
+
+    if (eligibleUsers?.length) {
+      for (const raw of eligibleUsers) {
+        const u = raw as Record<string, unknown>;
+        const settings = u.user_settings as { email_alerts_enabled: boolean | null } | null;
+        // Default to true if no user_settings row or null value
+        const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
+
+        if (emailAlertsEnabled && u.email) {
+          const { sendNewScanNotificationEmail } = await import("@/lib/email");
+          sendNewScanNotificationEmail(companiesScanned, u.email as string).catch((err) => {
+            console.error(`[cron] Failed to send scan notification to ${u.email}:`, err);
+          });
+        }
+      }
+    }
+  }
+
   return {
     total_fetched: allJobs.length,
     duration_ms: durationMs,

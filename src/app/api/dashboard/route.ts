@@ -20,7 +20,6 @@ import {
   passesGlobalModeGate,
 } from "@/lib/scoring";
 import { isCacheFresh } from "@/lib/runner";
-import { sendJobAlertEmail } from "@/lib/email";
 import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
@@ -192,15 +191,11 @@ export async function GET() {
     { onConflict: "user_id" },
   );
 
-  // ── Step 8: New-job email alert (fire and forget) ────────────
-  if (hadPreviousCache && settings.email_alerts_enabled && user.email) {
-    const newJobs = finalJobs.filter((j) => !previousJobIds.has(j.id));
-    if (newJobs.length > 0) {
-      sendJobAlertEmail(newJobs, user.email).catch((err) => {
-        console.error("[dashboard] Failed to send job alert email:", err);
-      });
-    }
-  }
+  // Note: Job alert emails are sent from the cron job (runner.ts) after
+  // the scrape completes, not from the dashboard route. This avoids the
+  // mismatch where email shows pre-Gemini jobs but the dashboard shows
+  // post-Gemini results. Users get a generic "scan complete" notification
+  // and open the dashboard to see their personalized results.
 
   return NextResponse.json({
     ok: true,

@@ -6,7 +6,7 @@
 // Uses the same SMTP env vars as the old email.ts.
 
 import nodemailer from "nodemailer";
-import type { ScoredJob, SalaryReport } from "./types";
+import type { SalaryReport } from "./types";
 
 // ── Transporter (shared) ─────────────────────────────────────
 
@@ -22,92 +22,23 @@ function createTransporter() {
   });
 }
 
-// ── Helpers ──────────────────────────────────────────────────
+/**
+ * Sends a generic "scan complete" notification after a cron run.
+ * No job listings are included — users open the dashboard to see
+ * their personalized (post-Gemini) results. This avoids the mismatch
+ * where email showed pre-Gemini jobs that the dashboard later filtered.
+ *
+ * @param companiesScanned  Number of companies scanned this run
+ * @param recipient         Email address to send to
+ */
+export async function sendNewScanNotificationEmail(
+  companiesScanned: number,
+  recipient: string,
+): Promise<void> {
+  const transporter = createTransporter();
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://job-radar-v2.vercel.app";
 
-function scoreBar(score: number): string {
-  const filled = Math.round(score / 10);
-  return "█".repeat(filled) + "░".repeat(10 - filled);
-}
-
-function modeLabel(mode: "visa" | "local" | "global"): string {
-  return { visa: "✈️ Visa", local: "🇪🇬 Local", global: "🌐 Remote" }[mode];
-}
-
-const PIPELINE_COLOR: Record<string, string> = {
-  visa: "#6366f1",
-  local: "#22c55e",
-  global: "#f59e0b",
-};
-
-// ── Job alert email ───────────────────────────────────────────
-
-function reviewBadge(job: ScoredJob): string {
-  // Mirrors JobCard.tsx / job/[id]/page.tsx's badge logic — same two cases,
-  // same copy, inline-styled for email client compatibility. Without this,
-  // a recipient sees a score and a "match" with no indication that Gemini
-  // never actually evaluated the job (no key, or every model hit a quota
-  // error) — the score itself is still real (skill+recency, computed
-  // independently of Gemini), but it hasn't had the semantic sanity check
-  // Gemini provides on top of the keyword/regex gates.
-  if (job.gemini_quota_exhausted) {
-    return `<br><span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,0.12);color:#f59e0b;font-size:11px">⚠ Gemini quota exhausted</span>`;
-  }
-  if (!job.gemini_reviewed) {
-    return `<br><span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,0.12);color:#f59e0b;font-size:11px">⚠ Not AI-reviewed</span>`;
-  }
-  return "";
-}
-
-function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
-  // Group by mode for presentation
-  const byMode: Record<string, ScoredJob[]> = {};
-  for (const job of jobs) {
-    if (!byMode[job.mode]) byMode[job.mode] = [];
-    byMode[job.mode].push(job);
-  }
-
-  const sections = Object.entries(byMode)
-    .map(([mode, modeJobs]) => {
-      const cards = modeJobs
-        .slice(0, 10) // max 10 per pipeline in email
-        .map(
-          (job) => `
-        <tr>
-          <td style="padding:12px 0;border-bottom:1px solid #1e1e30">
-            <a href="${job.url}"
-               style="color:#818cf8;font-size:15px;font-weight:600;text-decoration:none">
-              ${job.title}
-            </a><br>
-            <span style="color:#9ca3af;font-size:13px">
-              ${job.company} · ${job.country_flag} ${job.location}
-            </span><br>
-            <span style="font-family:monospace;color:#4ade80;font-size:12px;letter-spacing:1px">
-              ${scoreBar(job.total_score)} ${job.total_score}%
-            </span>
-            ${reviewBadge(job)}
-            ${
-              job.matched_skills.length
-                ? `<br><span style="color:#94a3b8;font-size:12px">${job.matched_skills.slice(0, 6).join(" · ")}</span>`
-                : ""
-            }
-          </td>
-        </tr>`,
-        )
-        .join("");
-
-      return `
-      <tr>
-        <td style="padding-top:24px">
-          <h2 style="color:${PIPELINE_COLOR[mode] ?? "#6366f1"};margin:0 0 8px;font-size:16px">
-            ${modeLabel(mode as "visa" | "local" | "global")} — ${modeJobs.length} new
-          </h2>
-          <table width="100%" cellpadding="0" cellspacing="0">${cards}</table>
-        </td>
-      </tr>`;
-    })
-    .join("");
-
-  return `
+  const html = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -121,19 +52,34 @@ function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
           <!-- Header -->
           <tr>
             <td style="padding:24px 32px;background:#0f0f20;border-bottom:1px solid #1e1e30">
-              <h1 style="margin:0;color:#e2e8f0;font-size:22px">
-                🎯 Job Radar — ${jobs.length} new match${jobs.length !== 1 ? "es" : ""}
-              </h1>
+              <h1 style="margin:0;color:#e2e8f0;font-size:22px">🎯 Job Radar — New scan complete</h1>
               <p style="margin:6px 0 0;color:#64748b;font-size:13px">
                 ${new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
               </p>
             </td>
           </tr>
 
-          <!-- Job sections -->
+          <!-- Body -->
           <tr>
-            <td style="padding:0 32px 24px">
-              <table width="100%" cellpadding="0" cellspacing="0">${sections}</table>
+            <td style="padding:32px">
+              <p style="margin:0 0 16px;color:#94a3b8;font-size:14px;line-height:1.6">
+                We just scanned <strong style="color:#818cf8">${companiesScanned} companies</strong>
+                for new job postings. Your personalized feed has been updated.
+              </p>
+              <p style="margin:0 0 24px;color:#94a3b8;font-size:14px;line-height:1.6">
+                Open your dashboard to see matches filtered by your skills,
+                preferences, and Gemini prompt.
+              </p>
+              <a href="${dashboardUrl}/dashboard"
+                 style="display:inline-block;padding:12px 28px;background:#6366f1;
+                        color:#fff;text-decoration:none;border-radius:8px;
+                        font-weight:600;font-size:14px">
+                Open your dashboard →
+              </a>
+              <p style="margin:24px 0 0;color:#475569;font-size:12px">
+                Your results are filtered by your own settings — what you see
+                in the dashboard is what matches your profile.
+              </p>
             </td>
           </tr>
 
@@ -141,7 +87,8 @@ function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
           <tr>
             <td style="padding:16px 32px;background:#0f0f20;border-top:1px solid #1e1e30;text-align:center">
               <p style="margin:0;color:#475569;font-size:12px">
-                Job Radar · Sent to ${recipientEmail}
+                Job Radar · Sent to ${recipient} ·
+                <a href="${dashboardUrl}/settings" style="color:#64748b">Manage email preferences</a>
               </p>
             </td>
           </tr>
@@ -152,32 +99,12 @@ function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
   </table>
 </body>
 </html>`;
-}
-
-/**
- * Sends a job alert email for ALL new jobs across ALL pipelines.
- * FIX #4: Old code only fired for mode === "visa" jobs.
- *
- * @param jobs      Newly added scored jobs (all modes included)
- * @param recipient Email address to send to
- */
-export async function sendJobAlertEmail(jobs: ScoredJob[], recipient: string): Promise<void> {
-  if (!jobs.length) return;
-
-  const transporter = createTransporter();
-  const modeCount = jobs.reduce(
-    (acc, j) => ({ ...acc, [j.mode]: (acc[j.mode] ?? 0) + 1 }),
-    {} as Record<string, number>,
-  );
-  const summary = Object.entries(modeCount)
-    .map(([m, n]) => `${n} ${modeLabel(m as "visa" | "local" | "global")}`)
-    .join(", ");
 
   await transporter.sendMail({
     from: `"Job Radar" <${process.env.SMTP_USER}>`,
     to: recipient,
-    subject: `🎯 ${jobs.length} new job${jobs.length !== 1 ? "s" : ""} — ${summary}`,
-    html: buildJobAlertHtml(jobs, recipient),
+    subject: "🎯 Job Radar — New jobs available, check your dashboard",
+    html,
   });
 }
 
