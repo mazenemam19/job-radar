@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS: ResolvedSettings = {
   ],
   required_keywords: ["react", "next.js", "react native"],
   email_alerts_enabled: true,
+  salary_reminder_enabled: true,
 };
 
 // ── STAFF_KEYWORDS regex (Bug fix: word boundaries on ALL terms) ────

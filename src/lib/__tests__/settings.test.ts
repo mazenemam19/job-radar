@@ -63,6 +63,7 @@ const DEFAULT_ROW = {
   excluded_keywords: ["backend", "fullstack"],
   blacklisted_locations: ["israel", "us only"],
   required_keywords: ["react", "next.js"],
+  salary_reminder_enabled: true,
   updated_at: "2025-01-01T00:00:00Z",
 };
 
@@ -92,6 +93,7 @@ describe("resolveUserSettings", () => {
     expect(result.expert_skills).toEqual(DEFAULT_ROW.expert_skills);
     expect(result.job_age_days).toBe(7);
     expect(result.gemini_filter_prompt).toBe("Default prompt text");
+    expect(result.salary_reminder_enabled).toBe(true);
   });
 
   it("uses user values when non-null (uses_defaults = false)", async () => {
@@ -109,6 +111,7 @@ describe("resolveUserSettings", () => {
       gemini_filter_prompt: null,
       scoring_weights: null,
       score_denominator: null,
+      salary_reminder_enabled: false, // overridden — independent of email_alerts_enabled
     };
 
     const defaultQuery = mockQuery(DEFAULT_ROW);
@@ -133,6 +136,9 @@ describe("resolveUserSettings", () => {
     expect(result.secondary_skills).toEqual(DEFAULT_ROW.secondary_skills);
     expect(result.pipeline_local).toBe(DEFAULT_ROW.pipeline_local);
     expect(result.gemini_filter_prompt).toBe(DEFAULT_ROW.gemini_filter_prompt);
+
+    // The two email toggles resolve independently of each other
+    expect(result.salary_reminder_enabled).toBe(false); // explicitly overridden
   });
 
   it("normalises scoring weights when they don't sum to 1", async () => {
@@ -191,6 +197,7 @@ describe("resolveUserSettings", () => {
     expect(result.expert_skills).toContain("React");
     expect(result.score_denominator).toBe(18);
     expect(result.scoring_weights.skill).toBeCloseTo(0.6);
+    expect(result.salary_reminder_enabled).toBe(true);
   });
 
   it("saveUserSettings strips role field for security", async () => {

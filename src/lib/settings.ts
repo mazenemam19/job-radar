@@ -144,6 +144,7 @@ const FALLBACK_DEFAULTS: ResolvedSettings = {
   ],
   required_keywords: ["react", "next.js", "react native", "react.js", "reactjs"],
   email_alerts_enabled: true,
+  salary_reminder_enabled: true,
 };
 
 /** Fetch the single default_settings row. Falls back to hardcoded if DB unreachable. */
@@ -209,6 +210,7 @@ export async function resolveUserSettings(userId: string): Promise<ResolvedSetti
       blacklisted_locations: userRow.blacklisted_locations ?? defaults.blacklisted_locations,
       required_keywords: userRow.required_keywords ?? defaults.required_keywords,
       email_alerts_enabled: userRow.email_alerts_enabled ?? defaults.email_alerts_enabled,
+      salary_reminder_enabled: userRow.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
     };
   }
 
@@ -239,6 +241,7 @@ function mergeWithDefaults(
     blacklisted_locations: user?.blacklisted_locations ?? defaults.blacklisted_locations,
     required_keywords: user?.required_keywords ?? defaults.required_keywords,
     email_alerts_enabled: user?.email_alerts_enabled ?? defaults.email_alerts_enabled,
+    salary_reminder_enabled: user?.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
   };
 }
 
@@ -291,6 +294,7 @@ export async function saveUserSettings(
     "blacklisted_locations",
     "required_keywords",
     "email_alerts_enabled",
+    "salary_reminder_enabled",
   ];
 
   for (const key of allowed) {
