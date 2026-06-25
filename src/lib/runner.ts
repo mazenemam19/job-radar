@@ -158,11 +158,20 @@ export async function runCronJob(
       created_at: j.created_at,
     }));
 
-    // Batch upsert in chunks of 500 to avoid Supabase row limits
+    // Batch upsert in chunks of 500 to avoid Supabase row limits.
+    // Deduplicate within each chunk first — different companies can
+    // produce jobs with the same URL hash, and PostgreSQL rejects
+    // ON CONFLICT DO UPDATE if the same key appears twice in one statement.
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
-      const { error: upsertError } = await db.from("raw_jobs").upsert(chunk, {
+      const seen = new Set<string>();
+      const deduped = chunk.filter((row) => {
+        if (seen.has(row.id)) return false;
+        seen.add(row.id);
+        return true;
+      });
+      const { error: upsertError } = await db.from("raw_jobs").upsert(deduped, {
         onConflict: "id",
         ignoreDuplicates: false, // we want to update fetched_at
       });
