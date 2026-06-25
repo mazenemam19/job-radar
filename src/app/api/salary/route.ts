@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
     .order("reported_at", { ascending: false })
     .limit(1000);
 
-  if (roleFilter) query = query.ilike("role_title", `%${roleFilter}%`);
+  if (roleFilter) {
+    const safe = roleFilter.replace(/[%_]/g, "");
+    query = query.ilike("role_title", `%${safe}%`);
+  }
   if (pipelineFilter) query = query.eq("pipeline", pipelineFilter);
 
   const { data, error } = await query;
