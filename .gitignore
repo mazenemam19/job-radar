@@ -5,3 +5,8 @@ dist-scripts/
 data/
 tsconfig.tsbuildinfo
 .aider*
+
+# Playwright
+/playwright-report/
+/test-results/
+e2e/.auth/

@@ -1,0 +1,80 @@
+name: E2E smoke tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Prevent concurrent runs on the same branch from stomping on each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright smoke suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      # --- Supabase ---
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # --- SMTP (needed for next build; actual send mocked in email.test.ts) ---
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      # --- Gemini ---
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # --- Cron secret ---
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # --- Test user (required for auth-gated Playwright tests) ---
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      E2E_TEST_SECRET: ${{ secrets.E2E_TEST_SECRET }}
+      # --- Playwright ---
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- Unit + vitest (includes the new email.test.ts) ---
+      - name: Run vitest
+        run: pnpm test run
+
+      # --- Build before starting the server for Playwright ---
+      - name: Build
+        run: pnpm build
+
+      # --- Install only the Chromium browser (matches playwright.config.ts) ---
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: playwright-report/
+          retention-days: 14

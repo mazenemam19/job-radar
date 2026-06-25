@@ -47,6 +47,7 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
 
   return (
     <article
+      data-testid="job-card"
       className="mb-3 rounded-[10px] border border-[#1e1e30] bg-[#0d0d1a] px-5 py-4 transition-[border-color] duration-150 ease-in-out"
       style={{ borderLeft: `3px solid ${modeColor}` }}
     >

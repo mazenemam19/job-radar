@@ -260,8 +260,8 @@ export default function SettingsForm() {
         <Toggle
           checked={emailAlerts}
           onChange={setEmailAlerts}
-          label="Email me when new matches are found"
-          description="Sent after each dashboard refresh that turns up new jobs"
+          label="Email alerts"
+          description="Get notified when new matching jobs are found after each dashboard refresh"
         />
         <Toggle
           checked={salaryReminders}
