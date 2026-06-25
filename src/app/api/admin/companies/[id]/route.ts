@@ -62,6 +62,22 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
   const db = createAdminClient();
+
+  // Fetch the company first so we can clean up its raw_jobs entries by name.
+  // raw_jobs has no FK to ats_companies (linked by company name + ats_type),
+  // so orphaned jobs would linger in the pool forever after deletion.
+  const { data: company } = await db
+    .from("ats_companies")
+    .select("name, ats")
+    .eq("id", params.id)
+    .single();
+
+  // Delete raw_jobs that belong to this company (matched by name + ats)
+  if (company) {
+    await db.from("raw_jobs").delete().eq("ats_type", company.ats).eq("company", company.name);
+  }
+
+  // Delete the company itself
   const { error } = await db.from("ats_companies").delete().eq("id", params.id);
 
   if (error) return dbErrorResponse("admin/companies/[id]:DELETE", error);

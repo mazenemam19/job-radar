@@ -318,6 +318,7 @@ Focus on: skill alignment, how to position experience, what to emphasise, questi
 Return ONLY a JSON array of strings (the bullet points). No markdown, no preamble.`;
 
   const genAI = new GoogleGenAI({ apiKey });
+  let allFailuresWereQuota = true;
 
   for (const model of MODEL_QUEUE) {
     try {
@@ -331,14 +332,32 @@ Return ONLY a JSON array of strings (the bullet points). No markdown, no preambl
       if (Array.isArray(parsed)) {
         return { strategies: parsed as string[], model_used: model };
       }
+      // Non-array response — not a quota issue, try next model
+      allFailuresWereQuota = false;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (isQuotaError(msg)) {
-        continue;
+
+      // Invalid API key — fail immediately
+      if (
+        msg.includes("401") ||
+        msg.includes("API_KEY_INVALID") ||
+        msg.includes("INVALID_ARGUMENT")
+      ) {
+        throw err;
       }
-      throw err;
+
+      if (!isQuotaError(msg)) allFailuresWereQuota = false;
+
+      // For any other error (429 rate limit, 404 model unsupported, server error, parse error), try next model
+      console.warn(
+        `[gemini] Strategy generation — model ${model} failed, trying next... Error:`,
+        msg,
+      );
+      continue;
     }
   }
 
-  throw new Error("Failed to generate strategy: all models exhausted");
+  throw allFailuresWereQuota
+    ? new GeminiQuotaExhaustedError()
+    : new Error("Failed to generate strategy: all models exhausted");
 }

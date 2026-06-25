@@ -589,9 +589,10 @@ export async function fetchWorkable(
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-        const dr = await fetch(detailUrl, { headers: { "User-Agent": "Mozilla/5.0" } }).catch(
-          () => null,
-        );
+        const dr = await fetch(detailUrl, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          signal: AbortSignal.timeout(30_000),
+        }).catch(() => null);
         let desc = stripHtml(r.description || "");
         if (dr && dr.ok) {
           try {
