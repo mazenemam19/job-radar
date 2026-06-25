@@ -41,6 +41,23 @@ const PIPELINE_COLOR: Record<string, string> = {
 
 // ── Job alert email ───────────────────────────────────────────
 
+function reviewBadge(job: ScoredJob): string {
+  // Mirrors JobCard.tsx / job/[id]/page.tsx's badge logic — same two cases,
+  // same copy, inline-styled for email client compatibility. Without this,
+  // a recipient sees a score and a "match" with no indication that Gemini
+  // never actually evaluated the job (no key, or every model hit a quota
+  // error) — the score itself is still real (skill+recency, computed
+  // independently of Gemini), but it hasn't had the semantic sanity check
+  // Gemini provides on top of the keyword/regex gates.
+  if (job.gemini_quota_exhausted) {
+    return `<br><span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,0.12);color:#f59e0b;font-size:11px">⚠ Gemini quota exhausted</span>`;
+  }
+  if (!job.gemini_reviewed) {
+    return `<br><span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,0.12);color:#f59e0b;font-size:11px">⚠ Not AI-reviewed</span>`;
+  }
+  return "";
+}
+
 function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
   // Group by mode for presentation
   const byMode: Record<string, ScoredJob[]> = {};
@@ -67,6 +84,7 @@ function buildJobAlertHtml(jobs: ScoredJob[], recipientEmail: string): string {
             <span style="font-family:monospace;color:#4ade80;font-size:12px;letter-spacing:1px">
               ${scoreBar(job.total_score)} ${job.total_score}%
             </span>
+            ${reviewBadge(job)}
             ${
               job.matched_skills.length
                 ? `<br><span style="color:#94a3b8;font-size:12px">${job.matched_skills.slice(0, 6).join(" · ")}</span>`

@@ -119,6 +119,7 @@ export interface DefaultSettings {
   blacklisted_locations: string[];
   required_keywords: string[];
   email_alerts_enabled: boolean;
+  salary_reminder_enabled: boolean;
   updated_at: string;
 }
 
@@ -140,6 +141,7 @@ export interface UserSettingsRow {
   blacklisted_locations: string[] | null;
   required_keywords: string[] | null;
   email_alerts_enabled: boolean | null;
+  salary_reminder_enabled: boolean | null;
   updated_at: string;
 }
 
@@ -160,6 +162,7 @@ export interface ResolvedSettings {
   blacklisted_locations: string[];
   required_keywords: string[];
   email_alerts_enabled: boolean;
+  salary_reminder_enabled: boolean;
 }
 
 // ── User Profile ────────────────────────────────────────────

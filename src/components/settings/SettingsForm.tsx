@@ -30,6 +30,7 @@ export default function SettingsForm() {
   const [global, setGlobal] = useState(true);
   const [allowMid, setAllowMid] = useState(false);
   const [emailAlerts, setEmailAlerts] = useState(true);
+  const [salaryReminders, setSalaryReminders] = useState(true);
   const [prompt, setPrompt] = useState("");
   const [usesDefaults, setUsesDefaults] = useState(true);
   const [skillWeight, setSkillWeight] = useState(60);
@@ -55,6 +56,7 @@ export default function SettingsForm() {
         setGlobal(r.pipeline_global ?? true);
         setAllowMid(r.seniority_allow_mid ?? false);
         setEmailAlerts(r.email_alerts_enabled ?? true);
+        setSalaryReminders(r.salary_reminder_enabled ?? true);
         setPrompt(r.gemini_filter_prompt ?? "");
         setExcludedKeywords((r.excluded_keywords ?? []).join(", "));
         setBlacklistedLocations((r.blacklisted_locations ?? []).join(", "));
@@ -88,6 +90,7 @@ export default function SettingsForm() {
       pipeline_global: global,
       seniority_allow_mid: allowMid,
       email_alerts_enabled: emailAlerts,
+      salary_reminder_enabled: salaryReminders,
       scoring_weights: {
         skill: skillWeight / 100,
         recency: recencyWeight / 100,
@@ -258,7 +261,13 @@ export default function SettingsForm() {
           checked={emailAlerts}
           onChange={setEmailAlerts}
           label="Email me when new matches are found"
-          description="Also includes a monthly reminder to update your salary report"
+          description="Sent after each dashboard refresh that turns up new jobs"
+        />
+        <Toggle
+          checked={salaryReminders}
+          onChange={setSalaryReminders}
+          label="Monthly salary update reminder"
+          description="A nudge to keep your salary report current, sent once a month"
         />
       </Section>
 
