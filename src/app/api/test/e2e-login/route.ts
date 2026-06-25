@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   // identity to assume.
   const email = process.env.TEST_USER_EMAIL;
   if (!email) {
-    return NextResponse.json({ error: "TEST_USER_EMAIL not configured" }, { status: 500 });
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const body = await request.json().catch(() => null);
