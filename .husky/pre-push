@@ -2,17 +2,4 @@
 set -e
 # .husky/pre-push
 
-BASE=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo origin/main)
-
-# 1. Run changed tests (fast path — only tests affected by diffed files)
-echo "🧪 Running changed tests (vs $BASE)..."
-npx vitest run --changed "$BASE"
-
-# 2. Safety net: also run any staged test files
-# Catches the case where you create/rename a test file but the dependency
-# graph doesn't trace it back to source changes (e.g. dynamic imports).
-STAGED_TESTS=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.test\.ts$')
-if [ -n "$STAGED_TESTS" ]; then
-  echo "🧪 Running staged test files: $STAGED_TESTS"
-  npx vitest run $STAGED_TESTS
-fi
+npx vitest run
