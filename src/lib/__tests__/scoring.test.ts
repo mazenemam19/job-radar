@@ -9,6 +9,7 @@ import {
   mergeJobs,
   STAFF_KEYWORDS,
   passesSettingsGate,
+  passesGlobalModeGate,
 } from "../scoring";
 import type { RawJob, ResolvedSettings } from "../types";
 
@@ -61,6 +62,8 @@ const DEFAULT_SETTINGS: ResolvedSettings = {
     "no visa sponsorship",
   ],
   required_keywords: ["react", "next.js", "react native"],
+  global_mode_blocked_regions: ["us only", "usa only", "pst", "est", "remote us"],
+  global_mode_allowed_locations: ["remote", "worldwide", "anywhere", "emea", "europe", "global"],
   email_alerts_enabled: true,
   salary_reminder_enabled: true,
 };
@@ -546,5 +549,69 @@ describe("passesSettingsGate", () => {
         ),
     });
     expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+});
+
+describe("passesGlobalModeGate", () => {
+  it("allows a job with no blocked or allowed keywords", () => {
+    const job = makeJob({
+      title: "Frontend Engineer",
+      description: "React + TypeScript",
+      location: "Porto, Portugal",
+    });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("blocks a job that mentions a blocked region keyword", () => {
+    const job = makeJob({ title: "Frontend Engineer (US Only)", location: "New York" });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("blocks a job whose description mentions a blocked timezone", () => {
+    const job = makeJob({ title: "Developer", description: "This role is in PST timezone" });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("blocks a job with 'us only' in description when no allowed override", () => {
+    const job = makeJob({
+      title: "Backend Developer",
+      description: "This role is for US Only based teams",
+      location: "Texas",
+    });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("always allows a job matching an allowed location keyword", () => {
+    const job = makeJob({
+      title: "Developer",
+      description: "This is a worldwide remote role",
+      location: "US Only",
+    });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("always allows a job matching 'remote' even if also blocked", () => {
+    const job = makeJob({ title: "Remote US Developer", description: "Fully remote position" });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("falls through to pass when both lists are empty", () => {
+    const settings: ResolvedSettings = {
+      ...DEFAULT_SETTINGS,
+      global_mode_blocked_regions: [],
+      global_mode_allowed_locations: [],
+    };
+    const job = makeJob({ title: "Anything", description: "Anywhere", location: "US Only" });
+    expect(passesGlobalModeGate(job, settings)).toBe(true);
+  });
+
+  it("uses word boundaries — 'us only' should not match 'usability'", () => {
+    const job = makeJob({ title: "Developer", description: "Build great usability into products" });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("is case-insensitive when matching blocked regions", () => {
+    const job = makeJob({ title: "Developer", description: "This position is US Only" });
+    expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(false);
   });
 });

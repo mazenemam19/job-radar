@@ -118,6 +118,8 @@ export interface DefaultSettings {
   excluded_keywords: string[];
   blacklisted_locations: string[];
   required_keywords: string[];
+  global_mode_blocked_regions: string[];
+  global_mode_allowed_locations: string[];
   email_alerts_enabled: boolean;
   salary_reminder_enabled: boolean;
   updated_at: string;
@@ -140,6 +142,8 @@ export interface UserSettingsRow {
   excluded_keywords: string[] | null;
   blacklisted_locations: string[] | null;
   required_keywords: string[] | null;
+  global_mode_blocked_regions: string[] | null;
+  global_mode_allowed_locations: string[] | null;
   email_alerts_enabled: boolean | null;
   salary_reminder_enabled: boolean | null;
   updated_at: string;
@@ -161,6 +165,8 @@ export interface ResolvedSettings {
   excluded_keywords: string[];
   blacklisted_locations: string[];
   required_keywords: string[];
+  global_mode_blocked_regions: string[];
+  global_mode_allowed_locations: string[];
   email_alerts_enabled: boolean;
   salary_reminder_enabled: boolean;
 }

@@ -143,6 +143,23 @@ const FALLBACK_DEFAULTS: ResolvedSettings = {
     "unable to sponsor",
   ],
   required_keywords: ["react", "next.js", "react native", "react.js", "reactjs"],
+  global_mode_blocked_regions: [
+    "us only",
+    "usa only",
+    "united states only",
+    "north america only",
+    "canada only",
+    "pst",
+    "est",
+    "cst",
+    "mst",
+    "pacific time",
+    "eastern time",
+    "remote us",
+    "remote usa",
+    "remote united states",
+  ],
+  global_mode_allowed_locations: ["remote", "worldwide", "anywhere", "emea", "europe", "global"],
   email_alerts_enabled: true,
   salary_reminder_enabled: true,
 };
@@ -157,6 +174,8 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
     return {
       id: 1,
       ...FALLBACK_DEFAULTS,
+      email_alerts_enabled: true,
+      salary_reminder_enabled: true,
       updated_at: new Date().toISOString(),
     } as DefaultSettings;
   }
@@ -170,7 +189,7 @@ async function getUserSettingsRow(userId: string): Promise<UserSettingsRow | nul
   const { data, error } = await db.from("user_settings").select("*").eq("user_id", userId).single();
 
   if (error) return null;
-  return data as UserSettingsRow;
+  return data as unknown as UserSettingsRow;
 }
 
 /**
@@ -209,6 +228,10 @@ export async function resolveUserSettings(userId: string): Promise<ResolvedSetti
       excluded_keywords: userRow.excluded_keywords ?? defaults.excluded_keywords,
       blacklisted_locations: userRow.blacklisted_locations ?? defaults.blacklisted_locations,
       required_keywords: userRow.required_keywords ?? defaults.required_keywords,
+      global_mode_blocked_regions:
+        userRow.global_mode_blocked_regions ?? defaults.global_mode_blocked_regions,
+      global_mode_allowed_locations:
+        userRow.global_mode_allowed_locations ?? defaults.global_mode_allowed_locations,
       email_alerts_enabled: userRow.email_alerts_enabled ?? defaults.email_alerts_enabled,
       salary_reminder_enabled: userRow.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
     };
@@ -240,6 +263,10 @@ function mergeWithDefaults(
     excluded_keywords: user?.excluded_keywords ?? defaults.excluded_keywords,
     blacklisted_locations: user?.blacklisted_locations ?? defaults.blacklisted_locations,
     required_keywords: user?.required_keywords ?? defaults.required_keywords,
+    global_mode_blocked_regions:
+      user?.global_mode_blocked_regions ?? defaults.global_mode_blocked_regions,
+    global_mode_allowed_locations:
+      user?.global_mode_allowed_locations ?? defaults.global_mode_allowed_locations,
     email_alerts_enabled: user?.email_alerts_enabled ?? defaults.email_alerts_enabled,
     salary_reminder_enabled: user?.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
   };
@@ -293,6 +320,8 @@ export async function saveUserSettings(
     "excluded_keywords",
     "blacklisted_locations",
     "required_keywords",
+    "global_mode_blocked_regions",
+    "global_mode_allowed_locations",
     "email_alerts_enabled",
     "salary_reminder_enabled",
   ];

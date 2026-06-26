@@ -38,6 +38,8 @@ export default function SettingsForm() {
   const [excludedKeywords, setExcludedKeywords] = useState("");
   const [blacklistedLocations, setBlacklistedLocations] = useState("");
   const [requiredKeywords, setRequiredKeywords] = useState("");
+  const [globalBlockedRegions, setGlobalBlockedRegions] = useState("");
+  const [globalAllowedLocations, setGlobalAllowedLocations] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -61,6 +63,8 @@ export default function SettingsForm() {
         setExcludedKeywords((r.excluded_keywords ?? []).join(", "));
         setBlacklistedLocations((r.blacklisted_locations ?? []).join(", "));
         setRequiredKeywords((r.required_keywords ?? []).join(", "));
+        setGlobalBlockedRegions((r.global_mode_blocked_regions ?? []).join(", "));
+        setGlobalAllowedLocations((r.global_mode_allowed_locations ?? []).join(", "));
         if (r.scoring_weights) {
           setSkillWeight(Math.round(r.scoring_weights.skill * 100));
           setRecencyWeight(Math.round(r.scoring_weights.recency * 100));
@@ -105,6 +109,14 @@ export default function SettingsForm() {
         .map((s) => s.trim())
         .filter(Boolean),
       required_keywords: requiredKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      global_mode_blocked_regions: globalBlockedRegions
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      global_mode_allowed_locations: globalAllowedLocations
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
@@ -330,6 +342,37 @@ export default function SettingsForm() {
         />
         <p className="mt-1 text-[11px] text-[#475569]">
           Comma-separated. Auto-rejects if matched anywhere in job details.
+        </p>
+      </Section>
+
+      {/* Global mode blocked regions */}
+      <Section title="Global mode — Blocked regions/timezones" htmlFor="global-blocked-regions">
+        <textarea
+          id="global-blocked-regions"
+          value={globalBlockedRegions}
+          onChange={(e) => setGlobalBlockedRegions(e.target.value)}
+          rows={2}
+          placeholder="us only, usa only, pst, est, remote us..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated. Jobs in the Global pipeline matching these keywords are rejected.
+        </p>
+      </Section>
+
+      {/* Global mode allowed locations */}
+      <Section title="Global mode — Always-allowed locations" htmlFor="global-allowed-locations">
+        <textarea
+          id="global-allowed-locations"
+          value={globalAllowedLocations}
+          onChange={(e) => setGlobalAllowedLocations(e.target.value)}
+          rows={2}
+          placeholder="remote, worldwide, anywhere, emea, europe..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated. Jobs matching these always pass the global mode filter (overrides blocked
+          list).
         </p>
       </Section>
 
