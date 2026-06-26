@@ -220,17 +220,14 @@ export async function runCronJob(
       .eq("is_active", true);
 
     if (eligibleUsers?.length) {
+      const { sendNewScanNotificationEmail } = await import("@/lib/email");
       for (const raw of eligibleUsers) {
         const u = raw as Record<string, unknown>;
         const settings = u.user_settings as { email_alerts_enabled: boolean | null } | null;
-        // Default to true if no user_settings row or null value
         const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
 
         if (emailAlertsEnabled && u.email) {
-          const { sendNewScanNotificationEmail } = await import("@/lib/email");
-          sendNewScanNotificationEmail(companiesScanned, u.email as string).catch((err) => {
-            console.error(`[cron] Failed to send scan notification to ${u.email}:`, err);
-          });
+          await sendNewScanNotificationEmail(companiesScanned, u.email as string);
         }
       }
     }
