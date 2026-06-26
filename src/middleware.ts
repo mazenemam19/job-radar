@@ -53,7 +53,22 @@ export async function middleware(request: NextRequest) {
   // Validate JWT with Supabase (not from cache) — required for security
   const {
     data: { user },
+    error: getUserError,
   } = await supabase.auth.getUser();
+
+  // TEMPORARY — diagnosing a CI-only auth failure where this call appears to
+  // come back empty despite a valid, freshly-minted cookie. getUserError is
+  // normally just discarded; logging it here surfaces whatever Supabase (or
+  // the network call to reach it) is actually saying, directly in CI's
+  // captured [WebServer] output. Remove once root-caused.
+  if (getUserError) {
+    console.error(
+      `[middleware] getUser failed for ${pathname}:`,
+      getUserError.name,
+      getUserError.status,
+      getUserError.message,
+    );
+  }
 
   // ── Public paths ────────────────────────────────────────────
   if (PUBLIC_PATHS.has(pathname)) {
