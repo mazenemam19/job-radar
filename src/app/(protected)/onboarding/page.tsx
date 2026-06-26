@@ -1,4 +1,4 @@
-// src/app/onboarding/page.tsx
+// src/app/(protected)/onboarding/page.tsx
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 export default function OnboardingPage() {
   return <OnboardingFlow />;
