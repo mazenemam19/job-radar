@@ -1,0 +1,119 @@
+name: E2E smoke tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # Lets you trigger a run manually from the Actions tab on any branch —
+  # useful while iterating on this workflow file itself without needing
+  # an open PR each time.
+  workflow_dispatch:
+
+# Prevent concurrent runs on the same branch from stomping on each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright smoke suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      # --- Supabase ---
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # --- SMTP (needed for next build; actual send mocked in email.test.ts) ---
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      # --- Gemini ---
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # --- Cron secret ---
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # --- Test user (required for auth-gated Playwright tests) ---
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      E2E_TEST_SECRET: ${{ secrets.E2E_TEST_SECRET }}
+      # --- Playwright ---
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Caches Next's incremental compiler cache (webpack/SWC), separate from
+      # the pnpm store cache above. Key includes source file hashes so a
+      # meaningful code change still gets a fresh cache; falls back to the
+      # lockfile-only restore-key for a partial hit otherwise.
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- Unit + vitest (includes the new email.test.ts) ---
+      - name: Run vitest
+        run: pnpm test run
+
+      # --- Build before starting the server for Playwright ---
+      - name: Build
+        run: pnpm build
+
+      # Browser binaries are versioned with the @playwright/test package, so
+      # keying on its installed version is exact — a cache hit guarantees the
+      # right browser build is already on disk.
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      # Cache hit: browser binary is already on disk, skip the download —
+      # `install-deps` only installs the apt-level OS libraries, which still
+      # need to run every time since the cache doesn't cover system packages.
+      - name: Install Playwright OS dependencies only (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Cache miss: full install (browser binary + OS deps).
+      - name: Install Playwright browsers (cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: playwright-report/
+          retention-days: 14
