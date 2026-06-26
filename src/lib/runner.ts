@@ -158,11 +158,20 @@ export async function runCronJob(
       created_at: j.created_at,
     }));
 
-    // Batch upsert in chunks of 500 to avoid Supabase row limits
+    // Batch upsert in chunks of 500 to avoid Supabase row limits.
+    // Deduplicate within each chunk first — different companies can
+    // produce jobs with the same URL hash, and PostgreSQL rejects
+    // ON CONFLICT DO UPDATE if the same key appears twice in one statement.
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
-      const { error: upsertError } = await db.from("raw_jobs").upsert(chunk, {
+      const seen = new Set<string>();
+      const deduped = chunk.filter((row) => {
+        if (seen.has(row.id)) return false;
+        seen.add(row.id);
+        return true;
+      });
+      const { error: upsertError } = await db.from("raw_jobs").upsert(deduped, {
         onConflict: "id",
         ignoreDuplicates: false, // we want to update fetched_at
       });
@@ -198,6 +207,31 @@ export async function runCronJob(
     source_health: sourceHealth,
     trigger,
   });
+
+  // 8. Send "scan complete" notification to all eligible users.
+  // No job listings included — users open the dashboard to see their
+  // personalized (post-Gemini) results. This avoids the mismatch where
+  // email showed pre-Gemini jobs but the dashboard later filtered them.
+  const companiesScanned = companies?.length ?? 0;
+  if (companiesScanned > 0) {
+    const { data: eligibleUsers } = await db
+      .from("user_profiles")
+      .select("email, user_settings(email_alerts_enabled)")
+      .eq("is_active", true);
+
+    if (eligibleUsers?.length) {
+      const { sendNewScanNotificationEmail } = await import("@/lib/email");
+      for (const raw of eligibleUsers) {
+        const u = raw as Record<string, unknown>;
+        const settings = u.user_settings as { email_alerts_enabled: boolean | null } | null;
+        const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
+
+        if (emailAlertsEnabled && u.email) {
+          await sendNewScanNotificationEmail(companiesScanned, u.email as string);
+        }
+      }
+    }
+  }
 
   return {
     total_fetched: allJobs.length,

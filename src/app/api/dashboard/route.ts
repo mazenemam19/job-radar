@@ -20,7 +20,6 @@ import {
   passesGlobalModeGate,
 } from "@/lib/scoring";
 import { isCacheFresh } from "@/lib/runner";
-import { sendJobAlertEmail } from "@/lib/email";
 import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
@@ -66,24 +65,6 @@ export async function GET() {
       });
     }
   }
-
-  // ── Cache is stale — rebuild ─────────────────────────────────
-
-  // Read the previous cache's job IDs before we overwrite it — this is how
-  // we know which jobs in the new result are genuinely new vs. already seen.
-  // `hadPreviousCache` matters: on a user's very first-ever load there's
-  // nothing to diff against, and every job would look "new" — we don't want
-  // to email someone their entire initial match list as if it just appeared.
-  const { data: previousCache } = await db
-    .from("user_jobs_cache")
-    .select("jobs")
-    .eq("user_id", user.id)
-    .single();
-
-  const hadPreviousCache = !!previousCache;
-  const previousJobIds = new Set(
-    ((previousCache?.jobs as unknown as ScoredJob[]) ?? []).map((j) => j.id),
-  );
 
   // Load user settings and profile (need API key)
   const [settings, { data: profile }] = await Promise.all([
@@ -192,15 +173,11 @@ export async function GET() {
     { onConflict: "user_id" },
   );
 
-  // ── Step 8: New-job email alert (fire and forget) ────────────
-  if (hadPreviousCache && settings.email_alerts_enabled && user.email) {
-    const newJobs = finalJobs.filter((j) => !previousJobIds.has(j.id));
-    if (newJobs.length > 0) {
-      sendJobAlertEmail(newJobs, user.email).catch((err) => {
-        console.error("[dashboard] Failed to send job alert email:", err);
-      });
-    }
-  }
+  // Note: Job alert emails are sent from the cron job (runner.ts) after
+  // the scrape completes, not from the dashboard route. This avoids the
+  // mismatch where email shows pre-Gemini jobs but the dashboard shows
+  // post-Gemini results. Users get a generic "scan complete" notification
+  // and open the dashboard to see their personalized results.
 
   return NextResponse.json({
     ok: true,
