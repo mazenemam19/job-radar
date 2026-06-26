@@ -1,7 +1,7 @@
 // src/lib/__tests__/runner.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the admin client and ats-bridge before importing runner
+// Mock the admin client, ats-bridge, and email before importing runner
 vi.mock("../supabase/admin", () => ({
   createAdminClient: () => mockDb,
 }));
@@ -10,7 +10,12 @@ vi.mock("../ats-bridge", () => ({
   fetchCompany: vi.fn(),
 }));
 
+vi.mock("../email", () => ({
+  sendNewScanNotificationEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { fetchCompany } from "../ats-bridge";
+import { sendNewScanNotificationEmail } from "../email";
 import type { ATSCompanyRow, RawJob } from "../types";
 
 // ── Mock database ─────────────────────────────────────────────
@@ -181,6 +186,116 @@ describe("runCronJob", () => {
 
     expect(result.errors).toContain("Test Corp (visa): ATS timeout");
     expect(result.total_fetched).toBe(0);
+  });
+});
+
+describe("runCronJob — email notifications", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends scan notification to eligible users after successful scrape", async () => {
+    const company = makeCompanyRow({ pipeline_visa: true });
+    const jobs = [makeRawJob("j1")];
+
+    mockDb.from.mockImplementation((table: string) => {
+      if (table === "ats_companies") return makeChain([company]);
+      if (table === "raw_jobs") return makeChain(null);
+      if (table === "app_config") return makeChain(null);
+      if (table === "cron_logs_v2") return makeChain(null);
+      if (table === "user_profiles")
+        return makeChain([
+          {
+            email: "user@example.com",
+            user_settings: { email_alerts_enabled: true },
+          },
+        ]);
+      if (table === "default_settings") return makeChain({});
+      return makeChain(null);
+    });
+
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Test Corp",
+      mode: "visa",
+      jobs,
+      error: null,
+    });
+
+    const { runCronJob } = await import("../runner");
+    await runCronJob("manual");
+
+    expect(vi.mocked(sendNewScanNotificationEmail)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendNewScanNotificationEmail)).toHaveBeenCalledWith(1, "user@example.com");
+  });
+
+  it("skips users with email_alerts_enabled=false", async () => {
+    const company = makeCompanyRow({ pipeline_visa: true });
+    const jobs = [makeRawJob("j1")];
+
+    mockDb.from.mockImplementation((table: string) => {
+      if (table === "ats_companies") return makeChain([company]);
+      if (table === "user_profiles")
+        return makeChain([
+          {
+            email: "opted-out@example.com",
+            user_settings: { email_alerts_enabled: false },
+          },
+        ]);
+      if (table === "default_settings") return makeChain({});
+      return makeChain(null);
+    });
+
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Test Corp",
+      mode: "visa",
+      jobs,
+      error: null,
+    });
+
+    const { runCronJob } = await import("../runner");
+    await runCronJob("manual");
+
+    expect(vi.mocked(sendNewScanNotificationEmail)).not.toHaveBeenCalled();
+  });
+
+  it("defaults to sending when user has no user_settings row", async () => {
+    const company = makeCompanyRow({ pipeline_visa: true });
+    const jobs = [makeRawJob("j1")];
+
+    mockDb.from.mockImplementation((table: string) => {
+      if (table === "ats_companies") return makeChain([company]);
+      if (table === "user_profiles")
+        return makeChain([
+          {
+            email: "newuser@example.com",
+            user_settings: null, // no settings row yet
+          },
+        ]);
+      if (table === "default_settings") return makeChain({});
+      return makeChain(null);
+    });
+
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Test Corp",
+      mode: "visa",
+      jobs,
+      error: null,
+    });
+
+    const { runCronJob } = await import("../runner");
+    await runCronJob("manual");
+
+    expect(vi.mocked(sendNewScanNotificationEmail)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendNewScanNotificationEmail)).toHaveBeenCalledWith(1, "newuser@example.com");
+  });
+
+  it("does not send emails when no companies were scraped", async () => {
+    mockDb.from.mockReturnValue(makeChain([]));
+
+    const { runCronJob } = await import("../runner");
+    await runCronJob("manual");
+
+    expect(vi.mocked(sendNewScanNotificationEmail)).not.toHaveBeenCalled();
   });
 });
 
