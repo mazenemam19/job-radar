@@ -12,9 +12,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
 import { filterJobsWithGemini } from "@/lib/gemini";
-import { scoreJob, mergeJobs, passesDateGate, passesSettingsGate } from "@/lib/scoring";
+import {
+  scoreJob,
+  mergeJobs,
+  passesDateGate,
+  passesSettingsGate,
+  passesGlobalModeGate,
+} from "@/lib/scoring";
 import { isCacheFresh } from "@/lib/runner";
-import { sendJobAlertEmail } from "@/lib/email";
 import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
@@ -61,24 +66,6 @@ export async function GET() {
     }
   }
 
-  // ── Cache is stale — rebuild ─────────────────────────────────
-
-  // Read the previous cache's job IDs before we overwrite it — this is how
-  // we know which jobs in the new result are genuinely new vs. already seen.
-  // `hadPreviousCache` matters: on a user's very first-ever load there's
-  // nothing to diff against, and every job would look "new" — we don't want
-  // to email someone their entire initial match list as if it just appeared.
-  const { data: previousCache } = await db
-    .from("user_jobs_cache")
-    .select("jobs")
-    .eq("user_id", user.id)
-    .single();
-
-  const hadPreviousCache = !!previousCache;
-  const previousJobIds = new Set(
-    ((previousCache?.jobs as unknown as ScoredJob[]) ?? []).map((j) => j.id),
-  );
-
   // Load user settings and profile (need API key)
   const [settings, { data: profile }] = await Promise.all([
     resolveUserSettings(user.id),
@@ -114,6 +101,14 @@ export async function GET() {
   // ── Step 3: Settings filter (seniority + tech stack + regex gates) ──
   const afterSettingsFilter = afterDateFilter.filter((j) => passesSettingsGate(j, settings));
 
+  // ── Step 3.5: Global mode timezone/region filter ─────────────
+  // Only applies to jobs in the "global" pipeline. Uses per-user settings
+  // (global_mode_blocked_regions / global_mode_allowed_locations) instead of
+  // the old hardcoded isTimezoneIncompatible() in ats-utils.ts.
+  const afterGlobalModeFilter = afterSettingsFilter.filter((j) =>
+    j.mode === "global" ? passesGlobalModeGate(j, settings) : true,
+  );
+
   // ── Step 4: Gemini filter ────────────────────────────────────
   // No key -> skip Gemini entirely rather than hard-blocking the whole
   // dashboard (the old behavior). An invalid/exhausted key already failed
@@ -123,8 +118,8 @@ export async function GET() {
   // 1's matching already produces, so Feature Request 1's "Not
   // AI-reviewed" badge covers this for free.
   const geminiFiltered = profile?.gemini_api_key
-    ? await filterJobsWithGemini(profile.gemini_api_key, afterSettingsFilter, settings)
-    : afterSettingsFilter.map((j) => ({
+    ? await filterJobsWithGemini(profile.gemini_api_key, afterGlobalModeFilter, settings)
+    : afterGlobalModeFilter.map((j) => ({
         ...j,
         gemini_pass: true,
         gemini_reason: null,
@@ -178,15 +173,11 @@ export async function GET() {
     { onConflict: "user_id" },
   );
 
-  // ── Step 8: New-job email alert (fire and forget) ────────────
-  if (hadPreviousCache && settings.email_alerts_enabled && user.email) {
-    const newJobs = finalJobs.filter((j) => !previousJobIds.has(j.id));
-    if (newJobs.length > 0) {
-      sendJobAlertEmail(newJobs, user.email).catch((err) => {
-        console.error("[dashboard] Failed to send job alert email:", err);
-      });
-    }
-  }
+  // Note: Job alert emails are sent from the cron job (runner.ts) after
+  // the scrape completes, not from the dashboard route. This avoids the
+  // mismatch where email shows pre-Gemini jobs but the dashboard shows
+  // post-Gemini results. Users get a generic "scan complete" notification
+  // and open the dashboard to see their personalized results.
 
   return NextResponse.json({
     ok: true,

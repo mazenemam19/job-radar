@@ -236,6 +236,40 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
   return true;
 }
 
+// ── Global mode gate ────────────────────────────────────────
+
+/**
+ * Evaluates whether a job passes the user's global mode timezone/region filter.
+ * Replaces the old hardcoded isTimezoneIncompatible() in ats-utils.ts.
+ *
+ * A job is rejected if:
+ *   - Its title/description/location matches any blocked region keyword, AND
+ *   - It does NOT match any allowed location keyword (allowed list overrides blocked list).
+ */
+export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): boolean {
+  const text = `${job.title} ${job.description} ${job.location}`.toLowerCase();
+
+  // Allowed locations always pass (overrides blocked list)
+  if (settings.global_mode_allowed_locations?.length) {
+    const isAllowed = settings.global_mode_allowed_locations.some((loc) =>
+      text.includes(loc.toLowerCase()),
+    );
+    if (isAllowed) return true;
+  }
+
+  // Check blocked regions
+  if (settings.global_mode_blocked_regions?.length) {
+    const isBlocked = settings.global_mode_blocked_regions.some((region) => {
+      const escaped = region.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      return regex.test(text);
+    });
+    if (isBlocked) return false;
+  }
+
+  return true;
+}
+
 // ── Date gate ────────────────────────────────────────────────
 
 /**
