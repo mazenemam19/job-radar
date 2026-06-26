@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+  # Lets you trigger a run manually from the Actions tab on any branch —
+  # useful while iterating on this workflow file itself without needing
+  # an open PR each time.
+  workflow_dispatch:
 
 # Prevent concurrent runs on the same branch from stomping on each other.
 concurrency:
@@ -105,11 +109,6 @@ jobs:
 
       - name: Run Playwright smoke tests
         run: pnpm exec playwright test
-        env:
-          # Logs what host/port next start actually reports listening on —
-          # lets us confirm there's no 0.0.0.0 / localhost / 127.0.0.1
-          # mismatch against PLAYWRIGHT_BASE_URL.
-          DEBUG: pw:webserver
 
       - name: Upload Playwright report
         if: always()
@@ -118,16 +117,3 @@ jobs:
           name: playwright-report-${{ github.sha }}
           path: playwright-report/
           retention-days: 14
-
-      # TEMPORARY — for diagnosing the CI-only auth-state bug.
-      # e2e-test@example.com is a throwaway test account, but this still
-      # uploads a live (if short-lived) session token as a build artifact.
-      # Delete this step once the bug is root-caused.
-      - name: Upload auth state for debugging
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-auth-state-${{ github.sha }}
-          path: e2e/.auth/user.json
-          retention-days: 1
-          if-no-files-found: warn
