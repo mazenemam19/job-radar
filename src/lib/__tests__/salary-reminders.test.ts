@@ -1,7 +1,6 @@
 // src/lib/__tests__/salary-reminders.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const sendMailMock = vi.fn().mockResolvedValue({ messageId: "test-123" });
 const sendSalaryReminderEmailMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@supabase/supabase-js", () => ({
@@ -12,10 +11,21 @@ vi.mock("../email", () => ({
   sendSalaryReminderEmail: sendSalaryReminderEmailMock,
 }));
 
+// ── Types ────────────────────────────────────────────────────
+
+interface SalaryReportRow {
+  id: string;
+  user_id: string;
+  role_title: string;
+  last_updated_at: string;
+  reminder_sent_at: string | null;
+  user_profiles: { email: string; is_active: boolean };
+}
+
 // ── Mock Supabase query builder ──────────────────────────────
 
 function makeQuery(data: unknown, error: unknown = null) {
-  const query: Record<string, any> = {
+  const query: Record<string, ReturnType<typeof vi.fn>> = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
@@ -26,8 +36,6 @@ function makeQuery(data: unknown, error: unknown = null) {
     single: vi.fn().mockResolvedValue({ data: error ? null : data, error: error || null }),
     update: vi.fn().mockReturnThis(),
   };
-  // Make the query itself awaitable
-  query.then = (resolve: any) => Promise.resolve({ data: error ? null : data, error: error || null }).then(resolve);
   return query;
 }
 
@@ -36,23 +44,14 @@ const mockSupabase = {
     if (table === "default_settings") {
       return makeQuery({ salary_reminder_enabled: true });
     }
-    if (table === "salary_reports") {
-      return makeQuery([]);
-    }
-    if (table === "user_settings") {
-      return makeQuery([]);
-    }
     return makeQuery([]);
   }),
 };
 
-import type { SalaryReport } from "../types";
-
-describe("send-salary-reminders script", () => {
+describe("send-salary-reminders script logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sendSalaryReminderEmailMock.mockClear();
-    // Reset the from mock to return empty by default
     mockSupabase.from = vi.fn((table: string) => {
       if (table === "default_settings") return makeQuery({ salary_reminder_enabled: true });
       return makeQuery([]);
@@ -60,12 +59,7 @@ describe("send-salary-reminders script", () => {
   });
 
   it("exits early with no reminders when no stale reports exist", async () => {
-    // from() already returns empty for salary_reports by default
-
-    // We can't easily import and run the script since it calls run() at module level.
-    // Instead, test the logic by simulating the script's behavior.
-
-    const reports: unknown[] = [];
+    const reports: SalaryReportRow[] = [];
     const toRemind = reports.filter(() => false);
 
     expect(toRemind.length).toBe(0);
@@ -73,7 +67,7 @@ describe("send-salary-reminders script", () => {
   });
 
   it("fetches user_settings separately and merges in code", async () => {
-    const reports = [
+    const reports: SalaryReportRow[] = [
       {
         id: "r1",
         user_id: "u1",
@@ -84,16 +78,12 @@ describe("send-salary-reminders script", () => {
       },
     ];
 
-    const settingsRows = [
-      { user_id: "u1", salary_reminder_enabled: true },
-    ];
+    const settingsRows = [{ user_id: "u1", salary_reminder_enabled: true }];
 
-    const settingsMap = new Map(
-      settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]),
-    );
+    const settingsMap = new Map(settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]));
 
     const seenUsers = new Set<string>();
-    const toRemind = reports.filter((r: any) => {
+    const toRemind = reports.filter((r) => {
       const profile = r.user_profiles;
       if (!r.user_id || !profile?.email || !profile.is_active) return false;
       if (seenUsers.has(r.user_id)) return false;
@@ -110,7 +100,7 @@ describe("send-salary-reminders script", () => {
   });
 
   it("skips users with salary_reminder_enabled=false", async () => {
-    const reports = [
+    const reports: SalaryReportRow[] = [
       {
         id: "r1",
         user_id: "u1",
@@ -121,16 +111,12 @@ describe("send-salary-reminders script", () => {
       },
     ];
 
-    const settingsRows = [
-      { user_id: "u1", salary_reminder_enabled: false },
-    ];
+    const settingsRows = [{ user_id: "u1", salary_reminder_enabled: false }];
 
-    const settingsMap = new Map(
-      settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]),
-    );
+    const settingsMap = new Map(settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]));
 
     const seenUsers = new Set<string>();
-    const toRemind = reports.filter((r: any) => {
+    const toRemind = reports.filter((r) => {
       if (seenUsers.has(r.user_id)) return false;
       const enabled = settingsMap.get(r.user_id) ?? true;
       if (!enabled) return false;
@@ -142,7 +128,7 @@ describe("send-salary-reminders script", () => {
   });
 
   it("deduplicates — one reminder per user", async () => {
-    const reports = [
+    const reports: SalaryReportRow[] = [
       {
         id: "r1",
         user_id: "u1",
@@ -161,16 +147,12 @@ describe("send-salary-reminders script", () => {
       },
     ];
 
-    const settingsRows = [
-      { user_id: "u1", salary_reminder_enabled: true },
-    ];
+    const settingsRows = [{ user_id: "u1", salary_reminder_enabled: true }];
 
-    const settingsMap = new Map(
-      settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]),
-    );
+    const settingsMap = new Map(settingsRows.map((s) => [s.user_id, s.salary_reminder_enabled]));
 
     const seenUsers = new Set<string>();
-    const toRemind = reports.filter((r: any) => {
+    const toRemind = reports.filter((r) => {
       if (!r.user_id) return false;
       if (seenUsers.has(r.user_id)) return false;
       const enabled = settingsMap.get(r.user_id) ?? true;
@@ -180,11 +162,11 @@ describe("send-salary-reminders script", () => {
     });
 
     expect(toRemind.length).toBe(1);
-    expect(toRemind[0].id).toBe("r1"); // most-recent-first order from query
+    expect(toRemind[0].id).toBe("r1");
   });
 
   it("skips inactive users", async () => {
-    const reports = [
+    const reports: SalaryReportRow[] = [
       {
         id: "r1",
         user_id: "u1",
@@ -196,7 +178,7 @@ describe("send-salary-reminders script", () => {
     ];
 
     const seenUsers = new Set<string>();
-    const toRemind = reports.filter((r: any) => {
+    const toRemind = reports.filter((r) => {
       const profile = r.user_profiles;
       if (!r.user_id || !profile?.email || !profile.is_active) return false;
       if (seenUsers.has(r.user_id)) return false;
@@ -208,7 +190,7 @@ describe("send-salary-reminders script", () => {
   });
 
   it("defaults to sending when user has no settings row", async () => {
-    const reports = [
+    const reports: SalaryReportRow[] = [
       {
         id: "r1",
         user_id: "u1",
@@ -219,14 +201,13 @@ describe("send-salary-reminders script", () => {
       },
     ];
 
-    // No settings rows returned
     const settingsMap = new Map<string, boolean | null>();
 
     const seenUsers = new Set<string>();
-    const toRemind = reports.filter((r: any) => {
+    const toRemind = reports.filter((r) => {
       if (!r.user_id) return false;
       if (seenUsers.has(r.user_id)) return false;
-      const enabled = settingsMap.get(r.user_id) ?? true; // default true
+      const enabled = settingsMap.get(r.user_id) ?? true;
       if (!enabled) return false;
       seenUsers.add(r.user_id);
       return true;

@@ -66,24 +66,6 @@ export async function GET() {
     }
   }
 
-  // ── Cache is stale — rebuild ─────────────────────────────────
-
-  // Read the previous cache's job IDs before we overwrite it — this is how
-  // we know which jobs in the new result are genuinely new vs. already seen.
-  // `hadPreviousCache` matters: on a user's very first-ever load there's
-  // nothing to diff against, and every job would look "new" — we don't want
-  // to email someone their entire initial match list as if it just appeared.
-  const { data: previousCache } = await db
-    .from("user_jobs_cache")
-    .select("jobs")
-    .eq("user_id", user.id)
-    .single();
-
-  const hadPreviousCache = !!previousCache;
-  const previousJobIds = new Set(
-    ((previousCache?.jobs as unknown as ScoredJob[]) ?? []).map((j) => j.id),
-  );
-
   // Load user settings and profile (need API key)
   const [settings, { data: profile }] = await Promise.all([
     resolveUserSettings(user.id),
