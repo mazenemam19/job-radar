@@ -1,2 +1,5 @@
-BASE=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo origin/main)
-npx vitest run --changed "$BASE"
+#!/bin/bash
+set -e
+# .husky/pre-push
+
+npx vitest run
