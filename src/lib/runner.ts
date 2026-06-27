@@ -224,14 +224,18 @@ export async function runCronJob(
     const { data: eligibleUsers } = await db
       .from("user_profiles")
       .select("email, user_settings(email_alerts_enabled)")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("onboarding_complete", true); // exclude users who haven't finished setup
 
     if (eligibleUsers?.length) {
       const { sendNewScanNotificationEmail } = await import("@/lib/email");
       for (const raw of eligibleUsers) {
         const u = raw as Record<string, unknown>;
         const settings = u.user_settings as { email_alerts_enabled: boolean | null } | null;
-        const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
+        // Default to false when the settings row is missing — no explicit opt-in,
+        // no email. (A missing row means onboarding wasn't completed, which the
+        // query above already guards against, but this is a safe second layer.)
+        const emailAlertsEnabled = settings?.email_alerts_enabled ?? false;
 
         if (emailAlertsEnabled && u.email) {
           await sendNewScanNotificationEmail(companiesScanned, u.email as string);
