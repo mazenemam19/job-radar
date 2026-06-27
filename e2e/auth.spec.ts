@@ -1,17 +1,31 @@
 /**
  * auth.spec.ts — Tier 1, Test 1
  *
- * Covers middleware.ts — the single file that enforces:
+ * Part 1 covers middleware.ts, which as of bc970e7 ("move onboarding to
+ * protected layout") enforces exactly one thing:
  *   • unauthenticated → /login
- *   • onboarding incomplete → /onboarding
- *   • non-admin → bounced from /admin to /dashboard
+ *
+ * Part 2 covers the non-admin → /dashboard redirect, but NOT in
+ * middleware.ts — that check now lives in
+ * src/app/(protected)/admin/layout.tsx. The assertion is still correct
+ * (the end-user-visible behavior is unchanged), it's just enforced by a
+ * different file than this docstring used to claim.
+ *
+ * "onboarding incomplete → /onboarding" used to be covered here too, back
+ * when middleware did that check directly on every request. bc970e7 moved
+ * it to a client-side guard (OnboardingGuard.tsx) fed by a profile prop
+ * cached at the (protected) layout level, which is a fundamentally
+ * different risk profile (see onboarding.spec.ts for why, and for the bug
+ * that gap let through). DO NOT re-add an onboarding assertion to this
+ * file — it belongs in onboarding.spec.ts, which logs in as a genuinely
+ * incomplete-onboarding user. Nothing in this file's AUTH_FILE fixture
+ * ever is one (global-setup.ts always sets onboardingComplete: true).
  *
  * WHY this test exists:
  *   - CVE-2025-29927 (CVSS 9.1) was a middleware auth-bypass in Next.js
- *     14.2.5 fixed in 14.2.25 — the exact file this test exercises.
+ *     14.2.5 fixed in 14.2.25 — the exact file Part 1 exercises.
  *   - A future Next.js 15/16 migration rewrites middleware.ts (async cookies/
  *     headers). This test is the regression net for that change.
- *   - middleware.ts has zero existing coverage of any kind.
  *
  * Part 1 (unauthenticated redirects) — no auth state, always runs.
  * Part 2 (authenticated non-admin access control) — requires AUTH_FILE.
