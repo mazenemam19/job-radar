@@ -3,6 +3,7 @@
 
 import { useState, useEffect, type ReactNode } from "react";
 import type { ResolvedSettings, UserSettingsRow } from "@/lib/types";
+import DeleteAccountSection from "@/components/settings/DeleteAccountSection";
 
 interface SettingsData {
   resolved: ResolvedSettings;
@@ -417,6 +418,10 @@ export default function SettingsForm() {
       >
         {saving ? "Saving..." : "Save settings"}
       </button>
+
+      <div className="mt-10 border-t border-[#1e1e30] pt-7">
+        <DeleteAccountSection />
+      </div>
     </div>
   );
 }
