@@ -14,6 +14,15 @@ export function useDialogA11y(isOpen: boolean, onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
+  // Track the latest onClose via a ref instead of an effect dependency.
+  // Callers often pass an inline closure that captures local state (e.g. a
+  // confirm-text input inside the dialog itself), which gets a new identity
+  // on every keystroke. If onClose were a dependency, every keystroke would
+  // re-run this effect and re-focus the dialog's first focusable element —
+  // which visibly steals focus away from whatever the user is typing into.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -26,7 +35,7 @@ export function useDialogA11y(isOpen: boolean, onClose: () => void) {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -54,7 +63,7 @@ export function useDialogA11y(isOpen: boolean, onClose: () => void) {
       document.removeEventListener("keydown", handleKeyDown);
       triggerRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   return dialogRef;
 }
