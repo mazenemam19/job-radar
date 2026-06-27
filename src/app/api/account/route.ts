@@ -21,6 +21,12 @@
 // account and can simply try again — we never want to end up with an
 // orphaned auth user that has no profile, or a half-deleted profile that
 // still has an active login.
+//
+// Last-admin guard: mirrors admin/users/[id]:PATCH, which already blocks an
+// admin from deactivating their own account. The same reasoning applies
+// here, even harder — deletion is irreversible, and an app with zero admins
+// has no one left who can promote a new one via the database, locking
+// everyone out of /admin permanently.
 
 import { NextResponse } from "next/server";
 import { getUser } from "@/lib/supabase/server";
@@ -32,6 +38,33 @@ export async function DELETE() {
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const db = createAdminClient();
+
+  // ── 0. Block deletion if this is the last remaining admin ─────────────
+  const { data: callerProfile, error: callerError } = await db
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (callerError) return dbErrorResponse("account:DELETE:caller_profile", callerError);
+
+  if (callerProfile?.role === "admin") {
+    const { count, error: countError } = await db
+      .from("user_profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "admin");
+    if (countError) return dbErrorResponse("account:DELETE:admin_count", countError);
+
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "You're the only admin. Promote another user to admin before deleting your account.",
+        },
+        { status: 400 },
+      );
+    }
+  }
 
   // ── 1. Dependent data (each optional — may be zero rows) ──────────────
   const { error: trackerError } = await db.from("tracker_entries").delete().eq("user_id", user.id);
