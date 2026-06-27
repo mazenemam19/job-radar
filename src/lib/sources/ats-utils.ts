@@ -208,13 +208,18 @@ export function stripHtml(html: string): string {
 }
 
 /** Increased timeout to 45s to avoid AbortErrors under load */
-export async function safeFetch(url: string, timeout = 45_000): Promise<Response | null> {
+export async function safeFetch(
+  url: string,
+  timeout = 45_000,
+  extraHeaders?: Record<string, string>,
+): Promise<Response | null> {
   trackDomainRequest(url);
   try {
     return await fetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ...extraHeaders,
       },
       signal: AbortSignal.timeout(timeout),
     });
@@ -625,10 +630,7 @@ export async function fetchTeamtailor(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
-  const res = await fetch(publicUrl, {
-    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
+  const res = await safeFetch(publicUrl, 30_000, { Accept: "application/json" });
 
   if (!res)
     return {
@@ -683,10 +685,7 @@ export async function fetchBreezy(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
+  const res = await safeFetch(url, 30_000, { Accept: "application/json" });
 
   if (!res)
     return {
