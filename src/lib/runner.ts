@@ -12,7 +12,11 @@
 
 import { createAdminClient } from "./supabase/admin";
 import { fetchCompany } from "./ats-bridge";
-import { loadWorkableStateFromDB, flushWorkable429sToDB } from "./sources/ats-utils";
+import {
+  loadWorkableStateFromDB,
+  flushWorkable429sToDB,
+  flushDomainCountsToDB,
+} from "./sources/ats-utils";
 import type { ATSCompanyRow, CronRunResult, RawJob } from "./types";
 
 const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
@@ -195,6 +199,9 @@ export async function runCronJob(
   // Persist any Workable 429s detected this run, so the next run actually
   // skips those companies instead of hammering them again immediately.
   await flushWorkable429sToDB();
+
+  // Persist domain request counts for rate-limiting accuracy across runs.
+  await flushDomainCountsToDB();
 
   const durationMs = Date.now() - startMs;
 

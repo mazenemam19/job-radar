@@ -14,6 +14,7 @@ export type Database = {
           updated_at: string | null;
           workable_blocked: Json;
           workable_budget: Json;
+          domain_counts: Json;
         };
         Insert: {
           id?: number;
@@ -21,6 +22,7 @@ export type Database = {
           updated_at?: string | null;
           workable_blocked?: Json;
           workable_budget?: Json;
+          domain_counts?: Json;
         };
         Update: {
           id?: number;
@@ -28,6 +30,7 @@ export type Database = {
           updated_at?: string | null;
           workable_blocked?: Json;
           workable_budget?: Json;
+          domain_counts?: Json;
         };
         Relationships: [];
       };

@@ -24,8 +24,6 @@ import type {
 } from "@/types";
 import { COUNTRY_MAP } from "../constants";
 import type { Json } from "@/lib/database.types";
-import fs from "fs";
-import path from "path";
 
 // ── Shared Helper Functions ──────────────────────────────────────────────────
 
@@ -76,35 +74,12 @@ function detectCountry(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const TMP_DIR = "/tmp";
-const REQ_COUNTS_PATH = path.resolve(TMP_DIR, "req-counts.json");
-
 let workableBlockedCache: WorkableCooldownEntry[] = [];
 let domainCountsCache: DomainCounts | null = null;
 
-function ensureTmpDir(filePath: string): void {
-  const dir = path.dirname(filePath);
-  try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch {}
-}
-
 function loadDomainCounts(): DomainCounts {
   if (domainCountsCache) return domainCountsCache;
-  try {
-    const raw = fs.readFileSync(REQ_COUNTS_PATH, "utf-8");
-    domainCountsCache = JSON.parse(raw);
-  } catch {
-    domainCountsCache = {};
-  }
-  return domainCountsCache || {};
-}
-
-function saveDomainCounts(counts: DomainCounts): void {
-  try {
-    ensureTmpDir(REQ_COUNTS_PATH);
-    fs.writeFileSync(REQ_COUNTS_PATH, JSON.stringify(counts, null, 2));
-  } catch {}
+  return {};
 }
 
 function trackDomainRequest(url: string): void {
@@ -112,7 +87,7 @@ function trackDomainRequest(url: string): void {
     const host = new URL(url).host || "unknown";
     const counts = loadDomainCounts();
     counts[host] = (counts[host] ?? 0) + 1;
-    saveDomainCounts(counts);
+    domainCountsCache = counts;
   } catch {}
 }
 
@@ -146,7 +121,7 @@ export async function loadWorkableStateFromDB(): Promise<void> {
   const db = createAdminClient();
   const { data } = await db
     .from("app_config")
-    .select("workable_blocked, workable_budget")
+    .select("workable_blocked, workable_budget, domain_counts")
     .eq("id", 1)
     .single();
   if (data?.workable_blocked) {
@@ -160,6 +135,22 @@ export async function loadWorkableStateFromDB(): Promise<void> {
       ...(data.workable_budget as Partial<WorkableBudgetConfig>),
     };
   }
+  if (data?.domain_counts) {
+    domainCountsCache = data.domain_counts as unknown as DomainCounts;
+  }
+}
+
+export async function flushDomainCountsToDB(): Promise<void> {
+  if (!domainCountsCache || Object.keys(domainCountsCache).length === 0) return;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const db = createAdminClient();
+  await db
+    .from("app_config")
+    .update({
+      domain_counts: domainCountsCache as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
 }
 
 export async function flushWorkable429sToDB(): Promise<void> {

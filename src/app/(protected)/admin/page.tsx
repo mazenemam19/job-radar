@@ -23,7 +23,11 @@ export default async function AdminIndexPage() {
       .order("run_at", { ascending: false })
       .limit(1)
       .single(),
-    db.from("app_config").select("workable_blocked, workable_budget").eq("id", 1).single(),
+    db
+      .from("app_config")
+      .select("workable_blocked, workable_budget, domain_counts")
+      .eq("id", 1)
+      .single(),
   ]);
 
   const workableBlocked =
@@ -110,6 +114,31 @@ export default async function AdminIndexPage() {
           </div>
         )}
       </div>
+
+      {/* Domain request counts */}
+      {appConfig?.domain_counts && Object.keys(appConfig.domain_counts as object).length > 0 && (
+        <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
+          <h2 className="m-0 mb-3 text-sm text-slate-400">Domain request counts (rate limiting)</h2>
+          <div className="flex flex-wrap gap-4">
+            {Object.entries(appConfig.domain_counts as Record<string, number>)
+              .sort(([, a], [, b]) => b - a)
+              .map(([domain, count]) => (
+                <div
+                  key={domain}
+                  className="flex items-center gap-2 rounded-lg border border-[#1e1e30] bg-[#08080f] px-3 py-1.5"
+                >
+                  <span className="text-[13px] text-slate-300">{domain}</span>
+                  <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-400">
+                    {count}
+                  </span>
+                </div>
+              ))}
+          </div>
+          <div className="mt-2 text-[11px] text-slate-600">
+            Tracks requests per host for rate limiting. Persisted to Supabase.
+          </div>
+        </div>
+      )}
 
       {/* Quick links */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
