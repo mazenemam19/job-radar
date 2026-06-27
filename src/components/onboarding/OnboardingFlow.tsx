@@ -7,10 +7,8 @@
 // + the defaults-vs-customize choice, both saved in one PATCH call.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function OnboardingFlow() {
-  const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +43,16 @@ export default function OnboardingFlow() {
         setLoading(false);
         return;
       }
-      router.push(useDefaults ? "/dashboard" : "/settings");
+      // The (protected) layout is a Server Component that fetched `profile`
+      // once and handed it down to OnboardingGuard. A client-side navigation
+      // (router.push) to a sibling route under the same layout can reuse
+      // that already-rendered layout — including the now-stale
+      // onboarding_complete: false — via Next's Router Cache, even after a
+      // router.refresh() call (refresh and push race independently, with no
+      // guaranteed ordering). A full browser navigation always asks the
+      // server for a brand new page load, so the layout re-runs
+      // getUserProfile() and gets the freshly-saved value every time.
+      window.location.href = useDefaults ? "/dashboard" : "/settings";
     } catch {
       setKeyError("Network error. Please try again.");
       setLoading(false);
