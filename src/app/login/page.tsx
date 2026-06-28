@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -52,7 +53,14 @@ function LoginContent() {
         >
           ← Back
         </Link>
-        <div className="mb-3 text-4xl">🎯</div>
+        <Image
+          src="/icon-192.png"
+          alt=""
+          width={40}
+          height={40}
+          className="mb-3 inline-block h-10 w-10"
+          priority
+        />
         <h1 className="m-0 mb-1.5 text-[22px] font-bold text-slate-200">Job Radar</h1>
         <p className="m-0 mb-8 text-sm leading-relaxed text-slate-500">
           AI-powered job feed personalised to your skills and preferences

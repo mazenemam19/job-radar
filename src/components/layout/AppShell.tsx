@@ -1,6 +1,7 @@
 "use client";
 // src/components/layout/AppShell.tsx
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -50,7 +51,10 @@ export default function AppShell({ children, isAdmin, userEmail }: Props) {
       <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#1e1e30] bg-[#0d0d1a] py-6">
         {/* Logo */}
         <div className="mb-4 border-b border-[#1e1e30] px-5 pb-6">
-          <div className="text-lg font-bold tracking-tight text-indigo-400">🎯 Job Radar</div>
+          <div className="flex items-center gap-2 text-lg font-bold tracking-tight text-indigo-400">
+            <Image src="/icon-192.png" alt="" width={20} height={20} className="h-5 w-5" />
+            Job Radar
+          </div>
           <div className="mt-0.5 text-[11px] text-slate-600">Multi-tenant</div>
         </div>
 

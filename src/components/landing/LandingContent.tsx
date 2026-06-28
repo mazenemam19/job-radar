@@ -1,6 +1,7 @@
 // src/components/landing/LandingContent.tsx
 // Server Component — static landing page content (no client-side JS needed)
 
+import Image from "next/image";
 import Link from "next/link";
 
 const DEMO_JOBS = [
@@ -110,7 +111,10 @@ export default function LandingContent({ isLoggedIn }: LandingContentProps) {
 
       {/* Nav */}
       <nav className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-white/[0.06] bg-[#08080f]/80 px-8 backdrop-blur-xl">
-        <div className="text-lg font-bold text-indigo-400">🎯 Job Radar</div>
+        <div className="flex items-center gap-2 text-lg font-bold text-indigo-400">
+          <Image src="/icon-192.png" alt="" width={20} height={20} className="h-5 w-5" />
+          Job Radar
+        </div>
         <Link
           href={isLoggedIn ? "/dashboard" : "/login"}
           className="rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white no-underline"

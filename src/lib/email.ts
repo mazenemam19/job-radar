@@ -70,10 +70,18 @@ export async function sendNewScanNotificationEmail(
           <!-- Header -->
           <tr>
             <td style="padding:24px 32px;background:#0f0f20;border-bottom:1px solid #1e1e30">
-              <h1 style="margin:0;color:#e2e8f0;font-size:22px">🎯 Job Radar — New scan complete</h1>
-              <p style="margin:6px 0 0;color:#64748b;font-size:13px">
-                ${new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
-              </p>
+              <table cellpadding="0" cellspacing="0"><tr>
+                <td style="padding-right:12px">
+                  <img src="${dashboardUrl}/email-logo.png" width="28" height="28" alt="Job Radar"
+                       style="display:block;border-radius:6px">
+                </td>
+                <td>
+                  <h1 style="margin:0;color:#e2e8f0;font-size:22px">Job Radar — New scan complete</h1>
+                  <p style="margin:6px 0 0;color:#64748b;font-size:13px">
+                    ${new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                  </p>
+                </td>
+              </tr></table>
             </td>
           </tr>
 
@@ -133,7 +141,24 @@ export async function sendNewScanNotificationEmail(
 // `export async function sendSalaryReminderEmail` in your local email.ts and
 // replace both with what's below.
 
-function buildSalaryReminderHtml(report: SalaryReport | null, updateUrl: string): string {
+function buildSalaryReminderHtml(
+  report: SalaryReport | null,
+  updateUrl: string,
+  dashboardUrl: string,
+): string {
+  // Small header strip with the brand logo, shared by both branches below —
+  // mirrors the header in sendNewScanNotificationEmail's template so every
+  // "Job Radar" email carries the same mark. The 💼 emoji stays in the body
+  // copy as a topic icon (this email is about salary, specifically); the
+  // logo next to it is the brand mark, not a topic icon.
+  const logoRow = `
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto 16px">
+                <tr><td>
+                  <img src="${dashboardUrl}/email-logo.png" width="28" height="28" alt="Job Radar"
+                       style="display:block;border-radius:6px">
+                </td></tr>
+              </table>`;
+
   // No existing report — generic first-time prompt.
   if (!report) {
     return `
@@ -148,6 +173,7 @@ function buildSalaryReminderHtml(report: SalaryReport | null, updateUrl: string)
                style="background:#0d0d1a;border-radius:12px;overflow:hidden;border:1px solid #1e1e30">
           <tr>
             <td style="padding:32px;text-align:center">
+              ${logoRow}
               <p style="margin:0 0 8px;font-size:32px">💼</p>
               <h2 style="margin:0 0 12px;color:#e2e8f0;font-size:20px">
                 Share your salary data
@@ -193,6 +219,7 @@ function buildSalaryReminderHtml(report: SalaryReport | null, updateUrl: string)
                style="background:#0d0d1a;border-radius:12px;overflow:hidden;border:1px solid #1e1e30">
           <tr>
             <td style="padding:32px;text-align:center">
+              ${logoRow}
               <p style="margin:0 0 8px;font-size:32px">💼</p>
               <h2 style="margin:0 0 12px;color:#e2e8f0;font-size:20px">
                 Time to update your salary data
@@ -233,6 +260,7 @@ export async function sendSalaryReminderEmail(
   updateUrl: string,
 ): Promise<void> {
   const transporter = createTransporter();
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://job-radar-v2.vercel.app";
   const subject = report
     ? "💼 Update your salary data — help others get paid fairly"
     : "💼 Add your salary data — help others get paid fairly";
@@ -241,6 +269,6 @@ export async function sendSalaryReminderEmail(
     from: `"Job Radar" <${process.env.SMTP_USER}>`,
     to: email,
     subject,
-    html: buildSalaryReminderHtml(report, updateUrl),
+    html: buildSalaryReminderHtml(report, updateUrl, dashboardUrl),
   });
 }
