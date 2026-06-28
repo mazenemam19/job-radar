@@ -92,4 +92,29 @@ describe("domain_counts persistence", () => {
     // update should NOT have been called (cache was null/empty)
     expect(updateMock).not.toHaveBeenCalled();
   });
+
+  it("logs and returns early when the app_config select fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mockDb.from.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: { message: 'relation "app_config" does not exist' },
+          }),
+        }),
+      }),
+    });
+
+    const { loadWorkableStateFromDB } = await import("../sources/ats-utils");
+    await loadWorkableStateFromDB();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[ats-utils] loadWorkableStateFromDB select failed:",
+      'relation "app_config" does not exist',
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
 });

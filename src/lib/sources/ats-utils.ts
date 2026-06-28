@@ -76,9 +76,20 @@ function detectCountry(
 
 let workableBlockedCache: WorkableCooldownEntry[] = [];
 let domainCountsCache: DomainCounts | null = null;
+// Set by loadWorkableStateFromDB() once the app_config row has actually been
+// read. loadDomainCounts() relies on call-order (runner.ts always loads state
+// before any fetch happens) — this flag makes that ordering requirement
+// visible instead of silently returning {} if it's ever violated.
+let stateLoaded = false;
 
 function loadDomainCounts(): DomainCounts {
   if (domainCountsCache) return domainCountsCache;
+  if (!stateLoaded) {
+    console.warn(
+      "[ats-utils] loadDomainCounts() called before loadWorkableStateFromDB() — " +
+        "starting from an empty count. Counts for this run may overwrite persisted history on flush.",
+    );
+  }
   return {};
 }
 
@@ -119,11 +130,16 @@ export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): 
 export async function loadWorkableStateFromDB(): Promise<void> {
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  const { data } = await db
+  const { data, error } = await db
     .from("app_config")
     .select("workable_blocked, workable_budget, domain_counts")
     .eq("id", 1)
     .single();
+  if (error) {
+    console.error("[ats-utils] loadWorkableStateFromDB select failed:", error.message);
+    return;
+  }
+  stateLoaded = true;
   if (data?.workable_blocked) {
     workableBlockedCache = (data.workable_blocked as unknown as WorkableCooldownEntry[]).filter(
       (e) => new Date(e.until).getTime() > Date.now(),
@@ -144,13 +160,16 @@ export async function flushDomainCountsToDB(): Promise<void> {
   if (!domainCountsCache || Object.keys(domainCountsCache).length === 0) return;
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  await db
+  const { error } = await db
     .from("app_config")
     .update({
       domain_counts: domainCountsCache as unknown as Json,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);
+  if (error) {
+    console.error("[ats-utils] flushDomainCountsToDB update failed:", error.message);
+  }
 }
 
 export async function flushWorkable429sToDB(): Promise<void> {
@@ -160,13 +179,16 @@ export async function flushWorkable429sToDB(): Promise<void> {
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  await db
+  const { error } = await db
     .from("app_config")
     .update({
       workable_blocked: workableBlockedCache as unknown as Json,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);
+  if (error) {
+    console.error("[ats-utils] flushWorkable429sToDB update failed:", error.message);
+  }
 }
 
 function setWorkableBlocked(slug: string, until: Date): void {
