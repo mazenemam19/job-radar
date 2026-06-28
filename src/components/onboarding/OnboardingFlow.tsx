@@ -27,7 +27,6 @@ export default function OnboardingFlow() {
     setLoading(true);
     try {
       const body: Record<string, unknown> = {
-        uses_defaults: useDefaults,
         onboarding_complete: true,
       };
       if (trimmedKey) body.gemini_api_key = trimmedKey;

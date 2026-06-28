@@ -40,13 +40,11 @@ export function UsersTable() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {["Email", "Role", "Active", "Onboarded", "Profile", "Last active", "Actions"].map(
-                (h) => (
-                  <th key={h} className={TH_CLASS}>
-                    {h}
-                  </th>
-                ),
-              )}
+              {["Email", "Role", "Active", "Onboarded", "Last active", "Actions"].map((h) => (
+                <th key={h} className={TH_CLASS}>
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -73,13 +71,6 @@ export function UsersTable() {
                   <span style={{ color: u.onboarding_complete ? "#4ade80" : "#64748b" }}>
                     {u.onboarding_complete ? "✓" : "—"}
                   </span>
-                </td>
-                <td className={TD_CLASS}>
-                  {u.user_settings?.[0]?.uses_defaults ? (
-                    <span className="text-[11px] text-[#64748b]">Default</span>
-                  ) : (
-                    <span className="text-[11px] text-[#818cf8]">Custom</span>
-                  )}
                 </td>
                 <td className={`${TD_CLASS} text-[11px] text-[#64748b]`}>
                   {u.last_active_at ? new Date(u.last_active_at).toLocaleDateString() : "—"}

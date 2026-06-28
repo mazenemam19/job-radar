@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // We test the private mergeWithDefaults logic by testing resolveUserSettings
 // with mocked Supabase clients. The key behaviour to verify:
-//   1. uses_defaults = true  → all fields come from defaults
-//   2. uses_defaults = false → per-field: user value if non-null, else default
-//   3. Weights are normalised if they don't sum to 1
+//   1. Per-field: user value if non-null, else default
+//   2. Weights are normalised if they don't sum to 1
+//   3. Defaults are a one-time signup snapshot (initializeUserSettingsForSignup),
+//      never a live, ongoing override of existing user data.
 
 // ── Mock Supabase clients ──────────────────────────────────────
 // getDefaultSettings() reads default_settings via the service-role client
@@ -74,11 +75,20 @@ describe("resolveUserSettings", () => {
     vi.clearAllMocks();
   });
 
-  it("returns all defaults when uses_defaults = true", async () => {
-    // Default settings query
+  it("never live-overrides a user's stored value with current defaults, even when other fields are null", async () => {
+    // Regression test: there used to be a `uses_defaults` flag that, when
+    // true, ignored the user's own row and read skills/prompt straight from
+    // default_settings on every request. That meant an admin editing
+    // default_settings silently changed what these users saw — effectively
+    // overwriting user-facing behavior without touching their stored data.
+    // resolveUserSettings must never do this: a non-null stored value always
+    // wins, full stop.
     const defaultQuery = mockQuery(DEFAULT_ROW);
-    // User settings query — row says uses_defaults = true
-    const userQuery = mockQuery({ user_id: "u1", uses_defaults: true, expert_skills: null });
+    const userQuery = mockQuery({
+      user_id: "u1",
+      expert_skills: ["Go", "Rust"], // user's own value, set at signup
+      secondary_skills: null, // genuinely unset — falls back
+    });
 
     mockAdminDb.from.mockImplementation((table: string) =>
       table === "default_settings" ? defaultQuery : mockQuery(null, { message: "unknown table" }),
@@ -90,16 +100,15 @@ describe("resolveUserSettings", () => {
     const { resolveUserSettings } = await import("../settings");
     const result = await resolveUserSettings("u1");
 
-    expect(result.expert_skills).toEqual(DEFAULT_ROW.expert_skills);
-    expect(result.job_age_days).toBe(7);
-    expect(result.gemini_filter_prompt).toBe("Default prompt text");
-    expect(result.salary_reminder_enabled).toBe(true);
+    // Stored value wins — defaults never override it.
+    expect(result.expert_skills).toEqual(["Go", "Rust"]);
+    // Genuinely-unset field still falls back.
+    expect(result.secondary_skills).toEqual(DEFAULT_ROW.secondary_skills);
   });
 
-  it("uses user values when non-null (uses_defaults = false)", async () => {
+  it("uses user values when non-null", async () => {
     const userSettingsRow = {
       user_id: "u2",
-      uses_defaults: false,
       expert_skills: ["Vue", "Svelte"], // overridden
       secondary_skills: null, // inherit default
       bonus_skills: null,
@@ -144,7 +153,6 @@ describe("resolveUserSettings", () => {
   it("normalises scoring weights when they don't sum to 1", async () => {
     const userWithBadWeights = {
       user_id: "u3",
-      uses_defaults: false,
       expert_skills: null,
       secondary_skills: null,
       bonus_skills: null,
@@ -211,7 +219,6 @@ describe("resolveUserSettings", () => {
 
     const { saveUserSettings } = await import("../settings");
     await saveUserSettings("u5", {
-      uses_defaults: false,
       job_age_days: 14,
       // @ts-expect-error intentional test of security strip
       role: "admin",
@@ -220,5 +227,57 @@ describe("resolveUserSettings", () => {
     const call = upsertMock.mock.calls[0][0];
     expect(call).not.toHaveProperty("role");
     expect(call).toHaveProperty("job_age_days", 14);
+  });
+
+  describe("initializeUserSettingsForSignup", () => {
+    function mockSettingsChain(existing: unknown, insertError: unknown = null) {
+      const insertMock = vi.fn().mockResolvedValue({ error: insertError });
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: existing, error: null }),
+        insert: insertMock,
+      };
+      return { chain, insertMock };
+    }
+
+    it("snapshots current defaults into a brand-new row", async () => {
+      const defaultQuery = mockQuery(DEFAULT_ROW);
+      const { chain: userChain, insertMock } = mockSettingsChain(null);
+
+      mockAdminDb.from.mockImplementation((table: string) =>
+        table === "default_settings" ? defaultQuery : mockQuery(null),
+      );
+      mockServerDb.from.mockImplementation((table: string) =>
+        table === "user_settings" ? userChain : mockQuery(null),
+      );
+
+      const { initializeUserSettingsForSignup } = await import("../settings");
+      await initializeUserSettingsForSignup("u6");
+
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      const inserted = insertMock.mock.calls[0][0];
+      expect(inserted.user_id).toBe("u6");
+      expect(inserted.expert_skills).toEqual(DEFAULT_ROW.expert_skills);
+      expect(inserted.job_age_days).toBe(DEFAULT_ROW.job_age_days);
+      expect(inserted.gemini_filter_prompt).toBe(DEFAULT_ROW.gemini_filter_prompt);
+    });
+
+    it("does nothing if the user already has a row — never clobbers existing data", async () => {
+      const defaultQuery = mockQuery(DEFAULT_ROW);
+      const { chain: userChain, insertMock } = mockSettingsChain({ user_id: "u7" });
+
+      mockAdminDb.from.mockImplementation((table: string) =>
+        table === "default_settings" ? defaultQuery : mockQuery(null),
+      );
+      mockServerDb.from.mockImplementation((table: string) =>
+        table === "user_settings" ? userChain : mockQuery(null),
+      );
+
+      const { initializeUserSettingsForSignup } = await import("../settings");
+      await initializeUserSettingsForSignup("u7");
+
+      expect(insertMock).not.toHaveBeenCalled();
+    });
   });
 });

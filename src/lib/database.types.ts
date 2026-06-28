@@ -442,7 +442,6 @@ export type Database = {
       user_settings: {
         Row: {
           user_id: string;
-          uses_defaults: boolean;
           expert_skills: string[] | null;
           secondary_skills: string[] | null;
           bonus_skills: string[] | null;
@@ -459,11 +458,12 @@ export type Database = {
           required_keywords: string[] | null;
           global_mode_blocked_regions: string[] | null;
           global_mode_allowed_locations: string[] | null;
+          email_alerts_enabled: boolean | null;
+          salary_reminder_enabled: boolean | null;
           updated_at: string;
         };
         Insert: {
           user_id: string;
-          uses_defaults?: boolean;
           expert_skills?: string[] | null;
           secondary_skills?: string[] | null;
           bonus_skills?: string[] | null;
@@ -480,11 +480,12 @@ export type Database = {
           required_keywords?: string[] | null;
           global_mode_blocked_regions?: string[] | null;
           global_mode_allowed_locations?: string[] | null;
+          email_alerts_enabled?: boolean | null;
+          salary_reminder_enabled?: boolean | null;
           updated_at?: string;
         };
         Update: {
           user_id?: string;
-          uses_defaults?: boolean;
           expert_skills?: string[] | null;
           secondary_skills?: string[] | null;
           bonus_skills?: string[] | null;
@@ -501,6 +502,8 @@ export type Database = {
           required_keywords?: string[] | null;
           global_mode_blocked_regions?: string[] | null;
           global_mode_allowed_locations?: string[] | null;
+          email_alerts_enabled?: boolean | null;
+          salary_reminder_enabled?: boolean | null;
           updated_at?: string;
         };
         Relationships: [];

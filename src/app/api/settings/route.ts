@@ -3,7 +3,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse, catchErrorResponse } from "@/lib/api-errors";
-import { resolveUserSettings, saveUserSettings } from "@/lib/settings";
+import {
+  resolveUserSettings,
+  saveUserSettings,
+  initializeUserSettingsForSignup,
+} from "@/lib/settings";
 
 // ── GET /api/settings ─────────────────────────────────────
 
@@ -77,6 +81,10 @@ export async function PATCH(request: NextRequest) {
   // Handle onboarding_complete separately
   if (body.onboarding_complete === true) {
     await db.from("user_profiles").update({ onboarding_complete: true }).eq("id", user.id);
+
+    // One-time snapshot: copy today's defaults into this user's row so
+    // later admin changes to default_settings never affect them.
+    await initializeUserSettingsForSignup(user.id);
 
     delete body.onboarding_complete;
   }

@@ -33,7 +33,6 @@ export default function SettingsForm() {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [salaryReminders, setSalaryReminders] = useState(true);
   const [prompt, setPrompt] = useState("");
-  const [usesDefaults, setUsesDefaults] = useState(true);
   const [skillWeight, setSkillWeight] = useState(60);
   const [recencyWeight, setRecencyWeight] = useState(30);
   const [excludedKeywords, setExcludedKeywords] = useState("");
@@ -50,7 +49,6 @@ export default function SettingsForm() {
         const d: SettingsData = json.data;
         setData(d);
         const r = d.resolved;
-        setUsesDefaults(d.raw?.uses_defaults ?? true);
         setExpertSkills((r.expert_skills ?? []).join(", "));
         setSecSkills((r.secondary_skills ?? []).join(", "));
         setJobAgeDays(r.job_age_days ?? 7);
@@ -88,7 +86,6 @@ export default function SettingsForm() {
     }
 
     const body: Record<string, unknown> = {
-      uses_defaults: usesDefaults,
       job_age_days: jobAgeDays,
       pipeline_visa: visa,
       pipeline_local: local,
@@ -96,6 +93,15 @@ export default function SettingsForm() {
       seniority_allow_mid: allowMid,
       email_alerts_enabled: emailAlerts,
       salary_reminder_enabled: salaryReminders,
+      expert_skills: expertSkills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      secondary_skills: secSkills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      gemini_filter_prompt: prompt,
       scoring_weights: {
         skill: skillWeight / 100,
         recency: recencyWeight / 100,
@@ -122,18 +128,6 @@ export default function SettingsForm() {
         .map((s) => s.trim())
         .filter(Boolean),
     };
-
-    if (!usesDefaults) {
-      body.expert_skills = expertSkills
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      body.secondary_skills = secSkills
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      body.gemini_filter_prompt = prompt;
-    }
 
     if (geminiKey.trim()) body.gemini_api_key = geminiKey.trim();
 
@@ -183,58 +177,44 @@ export default function SettingsForm() {
         />
       </Section>
 
-      {/* Profile mode */}
-      <Section title="Profile mode">
-        <Toggle
-          checked={usesDefaults}
-          onChange={setUsesDefaults}
-          label="Use platform defaults"
-          description="Inherit the admin's default skill list, prompt, and weights"
+      {/* Skills */}
+      <Section title="Expert skills (×3 weight)" htmlFor="expert-skills">
+        <textarea
+          id="expert-skills"
+          value={expertSkills}
+          onChange={(e) => setExpertSkills(e.target.value)}
+          rows={3}
+          placeholder="React, TypeScript, Next.js, Tailwind..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">Comma-separated</p>
+      </Section>
+
+      <Section title="Secondary skills (×1 weight)" htmlFor="secondary-skills">
+        <textarea
+          id="secondary-skills"
+          value={secSkills}
+          onChange={(e) => setSecSkills(e.target.value)}
+          rows={2}
+          placeholder="Jest, Vitest, GraphQL..."
+          className={`${INPUT_CLASS} resize-y`}
         />
       </Section>
 
-      {/* Skills — only shown when not using defaults */}
-      {!usesDefaults && (
-        <>
-          <Section title="Expert skills (×3 weight)" htmlFor="expert-skills">
-            <textarea
-              id="expert-skills"
-              value={expertSkills}
-              onChange={(e) => setExpertSkills(e.target.value)}
-              rows={3}
-              placeholder="React, TypeScript, Next.js, Tailwind..."
-              className={`${INPUT_CLASS} resize-y`}
-            />
-            <p className="mt-1 text-[11px] text-[#475569]">Comma-separated</p>
-          </Section>
-
-          <Section title="Secondary skills (×1 weight)" htmlFor="secondary-skills">
-            <textarea
-              id="secondary-skills"
-              value={secSkills}
-              onChange={(e) => setSecSkills(e.target.value)}
-              rows={2}
-              placeholder="Jest, Vitest, GraphQL..."
-              className={`${INPUT_CLASS} resize-y`}
-            />
-          </Section>
-
-          <Section title="Gemini evaluation criteria" htmlFor="gemini-prompt">
-            <textarea
-              id="gemini-prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={8}
-              placeholder="You are a job filter for..."
-              className={`${INPUT_CLASS} resize-y font-mono text-xs`}
-            />
-            <p className="mt-1.5 text-xs text-[#94a3b8]">
-              Describe what makes a job a good fit. Response formatting is handled automatically —
-              no need to specify JSON shape here.
-            </p>
-          </Section>
-        </>
-      )}
+      <Section title="Gemini evaluation criteria" htmlFor="gemini-prompt">
+        <textarea
+          id="gemini-prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={8}
+          placeholder="You are a job filter for..."
+          className={`${INPUT_CLASS} resize-y font-mono text-xs`}
+        />
+        <p className="mt-1.5 text-xs text-[#94a3b8]">
+          Describe what makes a job a good fit. Response formatting is handled automatically — no
+          need to specify JSON shape here.
+        </p>
+      </Section>
 
       {/* Pipelines */}
       <Section title="Pipelines">

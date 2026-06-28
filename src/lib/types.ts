@@ -127,7 +127,6 @@ export interface DefaultSettings {
 
 export interface UserSettingsRow {
   user_id: string;
-  uses_defaults: boolean;
   expert_skills: string[] | null;
   secondary_skills: string[] | null;
   bonus_skills: string[] | null;
@@ -287,9 +286,6 @@ export interface AdminUserListItem {
   is_active: boolean;
   created_at: string;
   last_active_at: string | null;
-  // Supabase returns the joined embed as an array (no unique FK hint on
-  // user_id), even though it's one row per user in practice.
-  user_settings: { uses_defaults: boolean }[] | null;
 }
 
 // ── Cron ────────────────────────────────────────────────────
