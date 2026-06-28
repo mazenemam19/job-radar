@@ -1,7 +1,15 @@
 // src/lib/settings.ts
 // Resolves per-user settings by merging user_settings with default_settings.
 // Each field falls back to the default when the user's value is null.
-// If uses_defaults = true, returns defaults directly (fast path).
+//
+// IMPORTANT: defaults are a one-time starting point, not a live subscription.
+// initializeUserSettingsForSignup() snapshots default_settings into a new
+// user's row at signup. From then on, the per-field `?? default` fallback
+// below only covers genuinely-missing data (e.g. a row that predates this
+// snapshot, or a field added after the user signed up) — it must never be
+// relied on as an ongoing sync path. An admin changing default_settings
+// must not change what an existing user sees. See
+// docs/plans/2026-06-28-defaults-snapshot-on-signup.md.
 
 import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
@@ -204,39 +212,6 @@ async function getUserSettingsRow(userId: string): Promise<UserSettingsRow | nul
 export async function resolveUserSettings(userId: string): Promise<ResolvedSettings> {
   const [defaults, userRow] = await Promise.all([getDefaultSettings(), getUserSettingsRow(userId)]);
 
-  if (!userRow) {
-    return mergeWithDefaults(defaults, null);
-  }
-
-  // If uses_defaults is true, we ignore user's custom skills/prompt
-  // but still respect their pipeline/seniority/age/weights/denominator/keywords choices!
-  if (userRow.uses_defaults) {
-    return {
-      expert_skills: defaults.expert_skills,
-      secondary_skills: defaults.secondary_skills,
-      bonus_skills: defaults.bonus_skills,
-      gemini_filter_prompt: defaults.gemini_filter_prompt ?? FALLBACK_PROMPT,
-      scoring_weights: normaliseWeights(userRow.scoring_weights ?? defaults.scoring_weights),
-      score_denominator: userRow.score_denominator ?? defaults.score_denominator,
-
-      // Respect user's choices for these:
-      job_age_days: userRow.job_age_days ?? defaults.job_age_days,
-      pipeline_visa: userRow.pipeline_visa ?? defaults.pipeline_visa,
-      pipeline_local: userRow.pipeline_local ?? defaults.pipeline_local,
-      pipeline_global: userRow.pipeline_global ?? defaults.pipeline_global,
-      seniority_allow_mid: userRow.seniority_allow_mid ?? defaults.seniority_allow_mid,
-      excluded_keywords: userRow.excluded_keywords ?? defaults.excluded_keywords,
-      blacklisted_locations: userRow.blacklisted_locations ?? defaults.blacklisted_locations,
-      required_keywords: userRow.required_keywords ?? defaults.required_keywords,
-      global_mode_blocked_regions:
-        userRow.global_mode_blocked_regions ?? defaults.global_mode_blocked_regions,
-      global_mode_allowed_locations:
-        userRow.global_mode_allowed_locations ?? defaults.global_mode_allowed_locations,
-      email_alerts_enabled: userRow.email_alerts_enabled ?? defaults.email_alerts_enabled,
-      salary_reminder_enabled: userRow.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
-    };
-  }
-
   return mergeWithDefaults(defaults, userRow);
 }
 
@@ -305,7 +280,6 @@ export async function saveUserSettings(
   // Strip anything that isn't a settings field
   const safe: Record<string, unknown> = { updated_at: new Date().toISOString() };
   const allowed = [
-    "uses_defaults",
     "expert_skills",
     "secondary_skills",
     "bonus_skills",
@@ -335,4 +309,58 @@ export async function saveUserSettings(
     .upsert({ user_id: userId, ...safe }, { onConflict: "user_id" });
 
   if (error) throw new Error(`Failed to save settings: ${error.message}`);
+}
+
+/**
+ * Snapshots the current default_settings into a new user's row, once, at
+ * signup. This is the ONLY place default values get copied into a user's
+ * profile. After this call, the row is the user's own data — later admin
+ * edits to default_settings must never touch it again (that's the bug this
+ * function replaces: the old `uses_defaults` flag re-read defaults live on
+ * every request instead of copying them once).
+ *
+ * Safe to call more than once: if the user already has a row (e.g. this
+ * fires twice, or a row was created some other way), it's left untouched
+ * rather than overwritten.
+ */
+export async function initializeUserSettingsForSignup(userId: string): Promise<void> {
+  const db = createServerClient();
+
+  const { data: existing } = await db
+    .from("user_settings")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing) return; // already initialized — never clobber
+
+  const defaults = await getDefaultSettings();
+
+  const { error } = await db.from("user_settings").insert({
+    user_id: userId,
+    expert_skills: defaults.expert_skills,
+    secondary_skills: defaults.secondary_skills,
+    bonus_skills: defaults.bonus_skills,
+    job_age_days: defaults.job_age_days,
+    pipeline_visa: defaults.pipeline_visa,
+    pipeline_local: defaults.pipeline_local,
+    pipeline_global: defaults.pipeline_global,
+    seniority_allow_mid: defaults.seniority_allow_mid,
+    gemini_filter_prompt: defaults.gemini_filter_prompt,
+    scoring_weights: { ...defaults.scoring_weights },
+    score_denominator: defaults.score_denominator,
+    excluded_keywords: defaults.excluded_keywords,
+    blacklisted_locations: defaults.blacklisted_locations,
+    required_keywords: defaults.required_keywords,
+    global_mode_blocked_regions: defaults.global_mode_blocked_regions,
+    global_mode_allowed_locations: defaults.global_mode_allowed_locations,
+    email_alerts_enabled: defaults.email_alerts_enabled,
+    salary_reminder_enabled: defaults.salary_reminder_enabled,
+    updated_at: new Date().toISOString(),
+  });
+
+  // Don't fail onboarding over this — resolveUserSettings() still falls
+  // back to live defaults per-field if the row is missing/partial, so the
+  // user isn't blocked. Surface it for visibility instead.
+  if (error) console.error("initializeUserSettingsForSignup failed:", error.message);
 }

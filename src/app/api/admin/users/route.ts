@@ -16,8 +16,7 @@ export async function GET() {
     .select(
       `
       id, email, role, onboarding_complete, is_active,
-      created_at, last_active_at,
-      user_settings(uses_defaults)
+      created_at, last_active_at
     `,
     )
     .order("created_at", { ascending: false });
