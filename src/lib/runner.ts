@@ -219,6 +219,7 @@ export async function runCronJob(
   // personalized (post-Gemini) results. This avoids the mismatch where
   // email showed pre-Gemini jobs but the dashboard later filtered them.
   const companiesScanned = companies?.length ?? 0;
+  const emailResults: { email: string; sent: boolean; error?: string; messageId?: string }[] = [];
   if (companiesScanned > 0) {
     const { data: eligibleUsers } = await db
       .from("user_profiles")
@@ -234,11 +235,30 @@ export async function runCronJob(
         const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
 
         if (emailAlertsEnabled && u.email) {
-          await sendNewScanNotificationEmail(companiesScanned, u.email as string);
+          try {
+            console.log(`[cron email] → sending scan notification to ${u.email}`);
+            await sendNewScanNotificationEmail(companiesScanned, u.email as string);
+            console.log(`[cron email] ✓ sent to ${u.email}`);
+            emailResults.push({ email: u.email as string, sent: true });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[cron email] ✗ failed for ${u.email}: ${msg}`);
+            emailResults.push({ email: u.email as string, sent: false, error: msg });
+            errors.push(`Email failed for ${u.email}: ${msg}`);
+          }
+        } else {
+          console.log(
+            `[cron email] ⊘ skipped ${u.email ?? "(no email)"} (alerts disabled=${!emailAlertsEnabled})`,
+          );
         }
       }
+    } else {
+      console.log("[cron email] 0 eligible users for scan notification");
     }
   }
+  console.log(
+    `[cron email] summary: ${emailResults.filter((r) => r.sent).length} sent, ${emailResults.filter((r) => !r.sent).length} failed`,
+  );
 
   return {
     total_fetched: allJobs.length,
@@ -246,6 +266,7 @@ export async function runCronJob(
     errors,
     source_health: sourceHealth,
     trigger,
+    email_results: emailResults,
   };
 }
 

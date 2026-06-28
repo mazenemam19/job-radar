@@ -56,6 +56,8 @@ async function handler(request: NextRequest) {
         duration_ms: result.duration_ms,
         error_count: result.errors.length,
         errors: result.errors.slice(0, 20), // truncate for response size
+        email_sent_count: result.email_results?.filter((r) => r.sent).length ?? 0,
+        email_failed_count: result.email_results?.filter((r) => !r.sent).length ?? 0,
         trigger: result.trigger,
       },
     });
