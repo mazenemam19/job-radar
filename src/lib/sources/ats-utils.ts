@@ -75,6 +75,13 @@ function detectCountry(
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 let workableBlockedCache: WorkableCooldownEntry[] = [];
+// Holds ONLY this run's not-yet-flushed increments — NOT the full historical
+// total. flushDomainCountsToDB() adds these onto the DB's existing value via
+// an atomic Postgres function (increment_domain_counts), so this cache must
+// never be seeded from the DB's current value, or every flush would
+// double-count the baseline on top of itself. Reset to null after a
+// successful flush so a warm/reused process doesn't resend an already-
+// persisted delta on its next run.
 let domainCountsCache: DomainCounts | null = null;
 // Set by loadWorkableStateFromDB() once the app_config row has actually been
 // read. loadDomainCounts() relies on call-order (runner.ts always loads state
@@ -87,7 +94,9 @@ function loadDomainCounts(): DomainCounts {
   if (!stateLoaded) {
     console.warn(
       "[ats-utils] loadDomainCounts() called before loadWorkableStateFromDB() — " +
-        "starting from an empty count. Counts for this run may overwrite persisted history on flush.",
+        "starting this run's delta from zero. Harmless for domain_counts itself " +
+        "(the flush is additive, not an overwrite), but it means Workable cooldown/" +
+        "budget state wasn't loaded either, since both share this same load step.",
     );
   }
   return {};
@@ -132,7 +141,7 @@ export async function loadWorkableStateFromDB(): Promise<void> {
   const db = createAdminClient();
   const { data, error } = await db
     .from("app_config")
-    .select("workable_blocked, workable_budget, domain_counts")
+    .select("workable_blocked, workable_budget")
     .eq("id", 1)
     .single();
   if (error) {
@@ -151,25 +160,25 @@ export async function loadWorkableStateFromDB(): Promise<void> {
       ...(data.workable_budget as Partial<WorkableBudgetConfig>),
     };
   }
-  if (data?.domain_counts) {
-    domainCountsCache = data.domain_counts as unknown as DomainCounts;
-  }
 }
 
 export async function flushDomainCountsToDB(): Promise<void> {
   if (!domainCountsCache || Object.keys(domainCountsCache).length === 0) return;
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  const { error } = await db
-    .from("app_config")
-    .update({
-      domain_counts: domainCountsCache as unknown as Json,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", 1);
+  // Atomic server-side add via increment_domain_counts(increments) instead of
+  // a read-modify-write .update() — see the function comment in the
+  // migration SQL for why a blind overwrite loses updates when two cron runs
+  // overlap. domainCountsCache here is ONLY this run's delta (see comment on
+  // its declaration), which is exactly what an additive RPC needs.
+  const { error } = await db.rpc("increment_domain_counts", {
+    increments: domainCountsCache as unknown as Json,
+  });
   if (error) {
-    console.error("[ats-utils] flushDomainCountsToDB update failed:", error.message);
+    console.error("[ats-utils] flushDomainCountsToDB rpc failed:", error.message);
+    return; // keep the unflushed delta around so a retry on a warm process can still send it
   }
+  domainCountsCache = null;
 }
 
 export async function flushWorkable429sToDB(): Promise<void> {
