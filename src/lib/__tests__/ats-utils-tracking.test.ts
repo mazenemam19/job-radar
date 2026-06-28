@@ -43,7 +43,7 @@ describe("Teamtailor/Breezy domain_counts tracking", () => {
     );
 
     const { fetchTeamtailor, flushDomainCountsToDB } = await import("../sources/ats-utils");
-    await fetchTeamtailor(baseCompany, "global", false);
+    await fetchTeamtailor(baseCompany, "global");
     await flushDomainCountsToDB();
 
     expect(mockDb.rpc).toHaveBeenCalledWith("increment_domain_counts", {
@@ -58,7 +58,7 @@ describe("Teamtailor/Breezy domain_counts tracking", () => {
     );
 
     const { fetchBreezy, flushDomainCountsToDB } = await import("../sources/ats-utils");
-    await fetchBreezy({ ...baseCompany, ats: "breezy" }, "global", false);
+    await fetchBreezy({ ...baseCompany, ats: "breezy" }, "global");
     await flushDomainCountsToDB();
 
     expect(mockDb.rpc).toHaveBeenCalledWith("increment_domain_counts", {

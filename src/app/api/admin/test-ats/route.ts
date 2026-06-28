@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
     country: sub.country,
     country_flag: sub.country_flag,
     city: sub.city,
-    pipeline_visa: sub.pipeline_visa,
     pipeline_local: sub.pipeline_local,
     pipeline_global: sub.pipeline_global,
     is_active: true,
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Pick a mode to test with (any enabled pipeline)
-  const mode = sub.pipeline_visa ? "visa" : sub.pipeline_local ? "local" : "global";
+  const mode = sub.pipeline_local ? "local" : "global";
 
   // Run the actual fetch (test-only, nothing is stored)
   const result = await fetchCompany(mockRow, mode);

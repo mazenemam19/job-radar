@@ -11,35 +11,84 @@
 //         fails the skill gate gets recencyScore computed (not forced to 0) and
 //         then the job is simply not stored (total_score gate applied at merge time).
 //
-// REGEX:  STAFF_KEYWORDS uses proper word boundaries on both ends:
-//         /\b(lead|staff|principal|architect|director|vp|head)\b/i
+// TIER 5b+5c: Seniority is now multi-label set-overlap, not single-winner precedence.
+//             Four editable term arrays replace the four hardcoded regexes.
+//             Junior is no longer a hard reject — just another selectable level.
 
-import type { RawJob, ResolvedSettings, ScoredJob } from "./types";
+import type { RawJob, ResolvedSettings, ScoredJob, SeniorityLevel } from "./types";
 
-// ── Seniority gate regex ─────────────────────────────────────
+// ── Seniority: term-array classification (Tier 5c, B2) ───────
 
-/** Fixed regex: word boundaries protect ALL terms, not just lead/head. */
-export const STAFF_KEYWORDS = /\b(lead|staff|principal|architect|director|vp|head)\b/i;
+/** Ordinal rank for display badge purposes only (highest-wins). */
+const SENIORITY_RANK: SeniorityLevel[] = ["junior", "mid", "senior", "staff"];
 
-const SENIOR_KEYWORDS = /\b(senior|sr\.?|principal|staff|lead)\b/i;
-const MID_KEYWORDS = /\b(mid[-\s]?level|mid[-\s]?senior|intermediate)\b/i;
-const JUNIOR_KEYWORDS = /\b(junior|jr\.?|entry[\s-]?level|intern|graduate)\b/i;
+const VISA_SPONSORSHIP_PATTERN = /visa\s+sponsorship|relocation|work\s+permit/i;
+
+/**
+ * Build a word-boundary regex from a term array. Each term is escaped;
+ * the resulting pattern matches any term as a whole word.
+ *
+ * Note on \b word boundaries: \b matches adjacent to word characters [A-Za-z0-9_].
+ * Terms starting/ending with non-word chars (e.g. ".NET", "C++") will NOT match
+ * as expected because \b requires a word character at the boundary. This is standard
+ * regex behavior — document it so users know to use "dotnet" or "csharp" aliases
+ * for such terms, or the system could be extended to use lookahead/lookbehind
+ * assertions for non-word-boundary terms in future.
+ */
+function buildLevelRegex(terms: string[]): RegExp {
+  const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`\\b(${escaped.join("|")})\\b`, "i");
+}
+
+/**
+ * Returns the set of seniority levels a job's text matches.
+ * Multi-label: a job can match zero, one, or several levels simultaneously
+ * (e.g. "Senior Staff Engineer" matches both Senior and Staff).
+ */
+export function getMatchedLevels(job: RawJob, settings: ResolvedSettings): SeniorityLevel[] {
+  const text = `${job.title} ${job.description}`;
+  const levels: SeniorityLevel[] = [];
+  if (buildLevelRegex(settings.junior_keywords).test(text)) levels.push("junior");
+  if (buildLevelRegex(settings.mid_keywords).test(text)) levels.push("mid");
+  if (buildLevelRegex(settings.senior_keywords).test(text)) levels.push("senior");
+  if (buildLevelRegex(settings.staff_keywords).test(text)) levels.push("staff");
+  return levels;
+}
+
+/**
+ * Gate logic: pass if any matched level is in the user's selected levels.
+ * Unlabelled jobs (no level matches) always pass — unchanged behavior.
+ */
+export function passesSeniorityGate(job: RawJob, settings: ResolvedSettings): boolean {
+  const matched = getMatchedLevels(job, settings);
+  if (matched.length === 0) return true; // unlabelled — unchanged behavior
+  return matched.some((l) => settings.seniority_levels.includes(l));
+}
+
+/**
+ * Display-only: returns the highest-ranked matched seniority level for the badge.
+ * Fixed ordinal rank, NOT user-editable — only decides badge text, never gating.
+ * Returns null if the job matches no level (unlabelled).
+ */
+export function getDisplaySeniorityBadge(
+  job: RawJob,
+  settings: ResolvedSettings,
+): SeniorityLevel | null {
+  const matched = getMatchedLevels(job, settings);
+  if (matched.length === 0) return null;
+  // Iterate from highest rank downward, return first match found
+  for (let i = SENIORITY_RANK.length - 1; i >= 0; i--) {
+    if (matched.includes(SENIORITY_RANK[i])) return SENIORITY_RANK[i];
+  }
+  return null;
+}
 
 // ── Boilerplate-aware keyword matching (Bug 2, gemini-filter-audit.md) ──
 
 /**
  * Many ATS postings open with a long "About [Company]" boilerplate
  * paragraph that mentions the company's own product/stack regardless of
- * the specific role — e.g. every Vercel posting (Account Executive,
- * Senior HRBP, Partner Operations Lead, ...) opens with "the team behind
- * Next.js". A naive "does this keyword appear anywhere" check treats that
- * boilerplate identically to a real requirements section, which produced
- * a 100% false-positive rate for non-engineering Vercel roles — confirmed
- * against live raw_jobs data. See
- * docs/plans/2026-06-24-bug2-boilerplate-keyword-gate.md.
- *
- * 600 chars comfortably covers the confirmed Vercel intro (~788 chars,
- * only match at ~190).
+ * the specific role.
  */
 const BOILERPLATE_WINDOW_CHARS = 600;
 
@@ -51,9 +100,7 @@ function wordBoundaryPattern(word: string): string {
 /**
  * Returns true if `keywords` has a "meaningful" match in `text`: either a
  * match past the boilerplate-prone opening window, or two or more distinct
- * keywords matched anywhere (breadth). Texts at or under the window size
- * are exempt from the position check — too short for a real "intro vs.
- * body" split, so a single early match is trusted as before.
+ * keywords matched anywhere (breadth).
  */
 export function hasMeaningfulKeywordMatch(text: string, keywords: string[]): boolean {
   if (text.length <= BOILERPLATE_WINDOW_CHARS) {
@@ -72,7 +119,7 @@ export function hasMeaningfulKeywordMatch(text: string, keywords: string[]): boo
       if (m.index >= BOILERPLATE_WINDOW_CHARS) {
         matchOutsideWindow = true;
       }
-      if (m.index === regex.lastIndex) regex.lastIndex++; // guard against zero-length matches
+      if (m.index === regex.lastIndex) regex.lastIndex++;
     }
     if (matchedThisWord) distinctMatchCount++;
   }
@@ -85,15 +132,6 @@ export function hasMeaningfulKeywordMatch(text: string, keywords: string[]): boo
 /**
  * Compute recency score LIVE from a date string.
  * FIX #3: Never pass a pre-stored score; always call this with the current clock.
- *
- * Score decays linearly from 100 (just posted) to 0 at 7 days old, then stays 0.
- * Formula: 100 - (ageDays / 7) * 100  — mirrors the original constants.ts formula exactly.
- *
- * Examples:
- *   0 days old  → 100
- *   3.5 days    →  50
- *   7 days      →   0
- *   14 days     →   0
  */
 export function computeRecencyScore(postedAt: string): number {
   const ms = Date.parse(postedAt);
@@ -112,10 +150,6 @@ export function matchSkills(description: string, skills: string[]): string[] {
 
 /**
  * Compute raw skill match score.
- *
- * Expert skills each count as 3 points.
- * Secondary skills each count as 1 point.
- * Score is divided by score_denominator and capped at 100.
  */
 export function computeSkillMatchScore(
   description: string,
@@ -135,36 +169,12 @@ export function computeSkillMatchScore(
 
 // ── Relocation bonus ─────────────────────────────────────────
 
-const RELOCATION_PATTERN = /\b(relocation|relo\b|visa\s+sponsorship|work\s+permit)\b/i;
-
 export function hasRelocationSupport(job: RawJob): boolean {
   return (
     job.visa_sponsorship ||
-    RELOCATION_PATTERN.test(job.description) ||
-    RELOCATION_PATTERN.test(job.title)
+    VISA_SPONSORSHIP_PATTERN.test(job.description) ||
+    VISA_SPONSORSHIP_PATTERN.test(job.title)
   );
-}
-
-// ── Seniority gate ───────────────────────────────────────────
-
-/**
- * Returns true if the job should be kept based on seniority gates.
- *
- * - If seniority_allow_mid = false: only Senior+ titles pass.
- * - If seniority_allow_mid = true: Mid-Senior and above pass.
- * - Junior/intern always rejected.
- * - Unlabelled jobs: allowed (Gemini will evaluate further).
- */
-export function passesSeniorityGate(job: RawJob, allowMid: boolean): boolean {
-  const text = `${job.title} ${job.description}`;
-
-  if (JUNIOR_KEYWORDS.test(text)) return false;
-  if (STAFF_KEYWORDS.test(text)) return true; // Staff/lead = senior
-  if (SENIOR_KEYWORDS.test(text)) return true;
-  if (MID_KEYWORDS.test(text)) return allowMid;
-
-  // No seniority signal – pass through to Gemini
-  return true;
 }
 
 // ── Settings gate & Pre-filters ──────────────────────────────
@@ -175,7 +185,7 @@ export function passesSeniorityGate(job: RawJob, allowMid: boolean): boolean {
  */
 export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boolean {
   // 1. Seniority Gate
-  if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
+  if (!passesSeniorityGate(job, settings)) {
     return false;
   }
 
@@ -184,7 +194,7 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
   const locLower = job.location.toLowerCase();
   const textCombined = `${titleLower} ${descLower} ${locLower}`;
 
-  // 2. Excluded Keywords (Dynamic role gate matching against job title)
+  // 2. Excluded Keywords
   if (settings.excluded_keywords && settings.excluded_keywords.length > 0) {
     const hasExcluded = settings.excluded_keywords.some((word) => {
       const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
@@ -196,8 +206,7 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
     }
   }
 
-  // 3. Required Keywords (Dynamic tech/role gate matching against job title/description)
-  // We use settings.required_keywords if provided, otherwise fallback to settings.expert_skills
+  // 3. Required Keywords
   const techKeywords =
     settings.required_keywords && settings.required_keywords.length > 0
       ? settings.required_keywords
@@ -209,7 +218,7 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
     }
   }
 
-  // 4. Blacklisted Locations (Dynamic location/clearance blacklist matching against title/description/location)
+  // 4. Blacklisted Locations
   if (settings.blacklisted_locations && settings.blacklisted_locations.length > 0) {
     const hasBlacklisted = settings.blacklisted_locations.some((word) => {
       const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
@@ -221,9 +230,7 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
     }
   }
 
-  // 5. Skill Match Check: Ensure there is at least one *meaningful* skill
-  // match from the user's stack to keep relevancy high (Bug 2: boilerplate-
-  // aware — see hasMeaningfulKeywordMatch above).
+  // 5. Skill Match Check
   if (
     !hasMeaningfulKeywordMatch(job.description, [
       ...settings.expert_skills,
@@ -240,16 +247,10 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
 
 /**
  * Evaluates whether a job passes the user's global mode timezone/region filter.
- * Replaces the old hardcoded isTimezoneIncompatible() in ats-utils.ts.
- *
- * A job is rejected if:
- *   - Its title/description/location matches any blocked region keyword, AND
- *   - It does NOT match any allowed location keyword (allowed list overrides blocked list).
  */
 export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): boolean {
   const text = `${job.title} ${job.description} ${job.location}`.toLowerCase();
 
-  // Allowed locations always pass (overrides blocked list)
   if (settings.global_mode_allowed_locations?.length) {
     const isAllowed = settings.global_mode_allowed_locations.some((loc) =>
       text.includes(loc.toLowerCase()),
@@ -257,7 +258,6 @@ export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): b
     if (isAllowed) return true;
   }
 
-  // Check blocked regions
   if (settings.global_mode_blocked_regions?.length) {
     const isBlocked = settings.global_mode_blocked_regions.some((region) => {
       const escaped = region.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
@@ -274,7 +274,6 @@ export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): b
 
 /**
  * Returns true if the job is within the configured age window.
- * Uses posted_at (or fetched_at for date_unknown jobs – FIX #5).
  */
 export function passesDateGate(job: RawJob, maxAgeDays: number): boolean {
   const dateStr = job.date_unknown ? job.fetched_at : job.posted_at;
@@ -288,12 +287,6 @@ export function passesDateGate(job: RawJob, maxAgeDays: number): boolean {
 
 /**
  * Score a raw job against user settings.
- *
- * FIX #6: recencyScore is computed regardless of skill gate result.
- * The caller (runner) decides whether to store the job based on total_score > 0.
- *
- * Returns null if the seniority gate fails (hard reject, no score).
- * Returns a ScoredJob (with total_score possibly = 0) if skill gate fails.
  */
 export function scoreJob(
   job: RawJob,
@@ -304,12 +297,10 @@ export function scoreJob(
   geminiQuotaExhausted = false,
 ): ScoredJob | null {
   // Seniority hard gate – null means "do not store at all"
-  if (!passesSeniorityGate(job, settings.seniority_allow_mid)) {
+  if (!passesSeniorityGate(job, settings)) {
     return null;
   }
 
-  // FIX #6: compute recency independently – never forced to 0
-  // FIX #3: always compute live (not from a stored value)
   const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
   const recency_score = computeRecencyScore(dateForRecency);
 
@@ -318,11 +309,7 @@ export function scoreJob(
     settings,
   );
 
-  // Bonus skills are informational only — shown to the user, never scored.
-  // (Matches the original single-tenant behavior: nice-to-have skills like
-  // Node/Docker/AWS surfaced separately from the pass/fail skill match.)
   const bonus_skills = matchSkills(job.description, settings.bonus_skills);
-
   const relocation_bonus = hasRelocationSupport(job) ? 100 : 0;
 
   const { skill, recency, relocation } = settings.scoring_weights;
@@ -350,19 +337,12 @@ export function scoreJob(
 /**
  * Merges new scored jobs into an existing array.
  * Deduplication by job.id (URL hash).
- *
- * FIX #6: totalScore > 0 gate applied HERE before storing.
- *         Jobs with total_score = 0 (skill mismatch) are dropped.
- *
- * Returns jobs sorted descending by total_score.
  */
 export function mergeJobs(existing: ScoredJob[], incoming: ScoredJob[]): ScoredJob[] {
   const map = new Map(existing.map((j) => [j.id, j]));
 
   for (const job of incoming) {
-    // FIX #6: gate on total_score > 0
     if (job.total_score <= 0) continue;
-    // Newer entry wins (fetched_at comparison)
     const prev = map.get(job.id);
     if (!prev || job.fetched_at > prev.fetched_at) {
       map.set(job.id, job);

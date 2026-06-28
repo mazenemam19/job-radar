@@ -31,7 +31,7 @@ function makeJob(overrides: Partial<RawJob> = {}): RawJob {
     date_unknown: false,
     is_remote: false,
     salary: null,
-    mode: "visa",
+    mode: "global",
     visa_sponsorship: false,
     source_name: "Acme",
     ats_type: "greenhouse",

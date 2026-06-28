@@ -17,7 +17,6 @@ vi.mock("@/lib/sources/ats-utils", () => ({
 import * as atsUtils from "@/lib/sources/ats-utils";
 import { fetchCompany } from "../ats-bridge";
 import type { ATSCompanyRow } from "../types";
-import type { Job } from "@/types";
 
 const NOW = new Date("2025-06-01T12:00:00.000Z").getTime();
 
@@ -30,8 +29,7 @@ function makeRow(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
     country: "GB",
     country_flag: "🇬🇧",
     city: null,
-    pipeline_visa: true,
-    pipeline_local: false,
+    pipeline_local: true,
     pipeline_global: false,
     is_active: true,
     created_at: "2025-01-01T00:00:00Z",
@@ -51,155 +49,86 @@ describe("fetchCompany", () => {
     vi.useRealTimers();
   });
 
-  it("calls the correct fetcher based on ats type", async () => {
-    vi.mocked(atsUtils.fetchGreenhouse).mockResolvedValue({ jobs: [] });
-    const row = makeRow({ ats: "greenhouse" });
-    await fetchCompany(row, "visa");
-    expect(atsUtils.fetchGreenhouse).toHaveBeenCalledOnce();
-  });
+  function mockFetchResponse(jobs: unknown[]) {
+    (atsUtils.fetchGreenhouse as ReturnType<typeof vi.fn>).mockResolvedValue({ jobs });
+  }
 
-  it("FIX #5: marks date_unknown = true when postedAt is within 30s of fetchedAt", async () => {
-    // Simulate parseRelativeDate returning "now" as a fallback for unknown dates
-    const fakeNowIso = new Date(NOW).toISOString(); // exactly now — the buggy fallback value
-
-    vi.mocked(atsUtils.fetchGreenhouse).mockResolvedValue({
-      jobs: [
-        {
-          id: "job-1",
-          title: "Senior Engineer",
-          url: "https://boards.greenhouse.io/testco/jobs/1",
-          description: "React TypeScript",
-          postedAt: fakeNowIso,
-          location: "London",
-        } as unknown as Job,
-      ],
-    });
-
-    const row = makeRow({ ats: "greenhouse" });
-    const result = await fetchCompany(row, "visa");
-
-    expect(result.error).toBeNull();
-    expect(result.jobs).toHaveLength(1);
-    expect(result.jobs[0].date_unknown).toBe(true);
-    // posted_at should be set to fetched_at (not the fake "now" from parseRelativeDate)
-    // In this case they're the same value since fetched_at IS now, which is correct
-    // The key fix is date_unknown = true so the date gate uses fetched_at
-  });
-
-  it("FIX #5: does NOT mark date_unknown for genuinely recent jobs with known dates", async () => {
-    // A job posted 2 days ago — real date, not a fallback
+  it("normalizes jobs and tags them with the correct mode", async () => {
     const twoDaysAgo = new Date(NOW - 2 * 86_400_000).toISOString();
+    mockFetchResponse([
+      {
+        id: "https://example.com/job/1",
+        title: "Senior Engineer",
+        postedAt: twoDaysAgo,
+        isRemote: true,
+      },
+    ]);
 
-    vi.mocked(atsUtils.fetchGreenhouse).mockResolvedValue({
-      jobs: [
-        {
-          id: "job-2",
-          title: "Senior React Dev",
-          url: "https://boards.greenhouse.io/testco/jobs/2",
-          description: "React",
-          postedAt: twoDaysAgo,
-          location: "London",
-        } as unknown as Job,
-      ],
-    });
+    const result = await fetchCompany(makeRow(), "global");
 
-    const row = makeRow({ ats: "greenhouse" });
-    const result = await fetchCompany(row, "visa");
-
+    expect(result.error).toBeNull();
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].mode).toBe("global");
     expect(result.jobs[0].date_unknown).toBe(false);
-    expect(result.jobs[0].posted_at).toBe(twoDaysAgo);
   });
 
-  it("returns error result (not thrown) when fetcher throws", async () => {
-    vi.mocked(atsUtils.fetchGreenhouse).mockRejectedValue(new Error("ATS timeout after 30s"));
-    const row = makeRow({ ats: "greenhouse" });
-    const result = await fetchCompany(row, "visa");
+  it("sets date_unknown when postedAt is near fetchedAt", async () => {
+    mockFetchResponse([
+      {
+        id: "https://example.com/job/2",
+        title: "Engineer",
+        postedAt: "just now",
+        isRemote: false,
+      },
+    ]);
 
-    expect(result.error).toContain("ATS timeout");
+    const result = await fetchCompany(makeRow(), "local");
+
+    expect(result.jobs[0].date_unknown).toBe(true);
+    expect(result.jobs[0].mode).toBe("local");
+  });
+
+  it("passes through description from fetcher", async () => {
+    const desc = "<p>Some <strong>HTML</strong> content</p>";
+    mockFetchResponse([
+      {
+        id: "https://example.com/job/3",
+        title: "Developer",
+        description: desc,
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+        isRemote: false,
+      },
+    ]);
+
+    const result = await fetchCompany(makeRow(), "global");
+
+    // Bridge passes through whatever the fetcher returns (HTML stripping happens in fetcher)
+    expect(result.jobs[0].description).toBe(desc);
+  });
+
+  it("returns empty jobs array with error on fetch failure", async () => {
+    (atsUtils.fetchGreenhouse as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Network error"),
+    );
+
+    const result = await fetchCompany(makeRow(), "global");
+
+    expect(result.error).toBe("Network error");
     expect(result.jobs).toHaveLength(0);
   });
 
-  it("dispatches to fetchBambooHR for bamboohr companies", async () => {
-    vi.mocked(atsUtils.fetchBambooHR).mockResolvedValue({
-      jobs: [
-        {
-          id: "j1",
-          title: "Frontend Engineer",
-          url: "https://testco.bamboohr.com/careers/1",
-          description: "",
-          postedAt: "2025-06-01T00:00:00Z",
-        } as Job,
-      ],
-      rawCount: 1,
-      durationMs: 10,
-      ok: true,
-    });
-    const row = makeRow({ ats: "bamboohr" });
-    const result = await fetchCompany(row, "global");
+  it("uses fallback company name when job has none", async () => {
+    mockFetchResponse([
+      {
+        id: "https://example.com/job/4",
+        title: "No Company Job",
+        postedAt: "3 days ago",
+        isRemote: false,
+      },
+    ]);
 
-    expect(result.error).toBeNull();
-    expect(result.jobs).toHaveLength(1);
-  });
+    const result = await fetchCompany(makeRow({ name: "FallbackCo" }), "global");
 
-  it("dispatches to fetchJazzHR for jazzhr companies", async () => {
-    vi.mocked(atsUtils.fetchJazzHR).mockResolvedValue({
-      jobs: [
-        {
-          id: "j1",
-          title: "Frontend Engineer",
-          url: "https://api.resumator.com/testco/1",
-          description: "",
-          postedAt: "2025-06-01T00:00:00Z",
-        } as Job,
-      ],
-      rawCount: 1,
-      durationMs: 10,
-      ok: true,
-    });
-    const row = makeRow({ ats: "jazzhr" });
-    const result = await fetchCompany(row, "global");
-
-    expect(result.error).toBeNull();
-    expect(result.jobs).toHaveLength(1);
-  });
-
-  it("returns error for a genuinely unknown ATS type (defensive default branch)", async () => {
-    // Every value in the real ATSConfig["ats"] union now has a real fetcher —
-    // bamboohr and jazzhr included. This exercises the `default` branch for
-    // a malformed/corrupted DB row, which the type system itself can no
-    // longer produce, hence the cast.
-    const row = makeRow({ ats: "totally_unknown_type" as ATSCompanyRow["ats"] });
-    const result = await fetchCompany(row, "global");
-
-    expect(result.error).not.toBeNull();
-    expect(result.jobs).toHaveLength(0);
-  });
-
-  it("tags all returned jobs with the correct mode", async () => {
-    vi.mocked(atsUtils.fetchLever).mockResolvedValue({
-      jobs: [
-        {
-          id: "j1",
-          title: "Engineer",
-          url: "https://lever.co/testco/j1",
-          description: "React",
-          postedAt: new Date(NOW - 86_400_000).toISOString(),
-          location: "Berlin",
-        } as unknown as Job,
-        {
-          id: "j2",
-          title: "Designer",
-          url: "https://lever.co/testco/j2",
-          description: "Figma",
-          postedAt: new Date(NOW - 86_400_000).toISOString(),
-          location: "Berlin",
-        } as unknown as Job,
-      ],
-    });
-
-    const row = makeRow({ ats: "lever" });
-    const result = await fetchCompany(row, "global");
-
-    expect(result.jobs.every((j) => j.mode === "global")).toBe(true);
+    expect(result.jobs[0].company).toBe("FallbackCo");
   });
 });

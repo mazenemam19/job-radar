@@ -43,7 +43,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       country: sub.country,
       country_flag: sub.country_flag,
       city: sub.city,
-      pipeline_visa: sub.pipeline_visa,
       pipeline_local: sub.pipeline_local,
       pipeline_global: sub.pipeline_global,
       is_active: true,

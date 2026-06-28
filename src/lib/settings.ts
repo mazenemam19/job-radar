@@ -13,7 +13,13 @@
 
 import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
-import type { DefaultSettings, UserSettingsRow, ResolvedSettings, ScoringWeights } from "./types";
+import type {
+  DefaultSettings,
+  UserSettingsRow,
+  ResolvedSettings,
+  ScoringWeights,
+  SeniorityLevel,
+} from "./types";
 
 // Pure evaluation criteria only — no response-format instructions here.
 // The JSON contract is owned by code (see RESPONSE_FORMAT_INSTRUCTIONS in
@@ -60,10 +66,13 @@ const FALLBACK_DEFAULTS: ResolvedSettings = {
     "Kubernetes",
   ],
   job_age_days: 7,
-  pipeline_visa: true,
   pipeline_local: true,
   pipeline_global: true,
-  seniority_allow_mid: false,
+  junior_keywords: ["junior", "jr", "entry-level", "entry level", "intern", "graduate"],
+  mid_keywords: ["mid-level", "mid level", "mid-senior", "intermediate"],
+  senior_keywords: ["senior", "sr", "lead"],
+  staff_keywords: ["staff", "principal", "architect", "director", "vp", "head"],
+  seniority_levels: ["senior", "staff"],
   gemini_filter_prompt: FALLBACK_PROMPT,
   scoring_weights: { skill: 0.6, recency: 0.3, relocation: 0.1 },
   score_denominator: 18,
@@ -227,10 +236,13 @@ function mergeWithDefaults(
     secondary_skills: user?.secondary_skills ?? defaults.secondary_skills,
     bonus_skills: user?.bonus_skills ?? defaults.bonus_skills,
     job_age_days: user?.job_age_days ?? defaults.job_age_days,
-    pipeline_visa: user?.pipeline_visa ?? defaults.pipeline_visa,
     pipeline_local: user?.pipeline_local ?? defaults.pipeline_local,
     pipeline_global: user?.pipeline_global ?? defaults.pipeline_global,
-    seniority_allow_mid: user?.seniority_allow_mid ?? defaults.seniority_allow_mid,
+    junior_keywords: user?.junior_keywords ?? defaults.junior_keywords,
+    mid_keywords: user?.mid_keywords ?? defaults.mid_keywords,
+    senior_keywords: user?.senior_keywords ?? defaults.senior_keywords,
+    staff_keywords: user?.staff_keywords ?? defaults.staff_keywords,
+    seniority_levels: (user?.seniority_levels ?? defaults.seniority_levels) as SeniorityLevel[],
     gemini_filter_prompt:
       user?.gemini_filter_prompt ?? defaults.gemini_filter_prompt ?? FALLBACK_PROMPT,
     scoring_weights: weights,
@@ -284,10 +296,13 @@ export async function saveUserSettings(
     "secondary_skills",
     "bonus_skills",
     "job_age_days",
-    "pipeline_visa",
     "pipeline_local",
     "pipeline_global",
-    "seniority_allow_mid",
+    "junior_keywords",
+    "mid_keywords",
+    "senior_keywords",
+    "staff_keywords",
+    "seniority_levels",
     "gemini_filter_prompt",
     "scoring_weights",
     "score_denominator",
@@ -342,10 +357,13 @@ export async function initializeUserSettingsForSignup(userId: string): Promise<v
     secondary_skills: defaults.secondary_skills,
     bonus_skills: defaults.bonus_skills,
     job_age_days: defaults.job_age_days,
-    pipeline_visa: defaults.pipeline_visa,
     pipeline_local: defaults.pipeline_local,
     pipeline_global: defaults.pipeline_global,
-    seniority_allow_mid: defaults.seniority_allow_mid,
+    junior_keywords: defaults.junior_keywords,
+    mid_keywords: defaults.mid_keywords,
+    senior_keywords: defaults.senior_keywords,
+    staff_keywords: defaults.staff_keywords,
+    seniority_levels: defaults.seniority_levels,
     gemini_filter_prompt: defaults.gemini_filter_prompt,
     scoring_weights: { ...defaults.scoring_weights },
     score_denominator: defaults.score_denominator,

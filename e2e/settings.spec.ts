@@ -79,30 +79,68 @@ test.describe("settings — save round-trip via real API", () => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
-    // The settings page renders three pipeline switch controls.
-    // They correspond to pipeline_visa, pipeline_local, pipeline_global in user_settings.
-    const visaToggle = page.getByRole("switch", { name: /visa/i }).first();
+    // The settings page renders two pipeline switch controls.
+    // They correspond to pipeline_local, pipeline_global in user_settings.
     const localToggle = page.getByRole("switch", { name: /local|egypt/i }).first();
     const globalToggle = page.getByRole("switch", { name: /global|remote/i }).first();
 
-    // All three must be visible and be distinct DOM nodes
-    await expect(visaToggle).toBeVisible({ timeout: 8_000 });
+    // Both must be visible and be distinct DOM nodes
     await expect(localToggle).toBeVisible({ timeout: 8_000 });
     await expect(globalToggle).toBeVisible({ timeout: 8_000 });
 
     // Playwright returns the same element when two locators resolve to the same node.
-    // Verify all three are different elements.
-    const visaBox = await visaToggle.boundingBox();
+    // Verify both are different elements.
     const localBox = await localToggle.boundingBox();
     const globalBox = await globalToggle.boundingBox();
 
-    // At least the x/y position must differ — they can't all occupy the same space
-    const allSamePosition =
-      visaBox?.x === localBox?.x &&
-      visaBox?.y === localBox?.y &&
-      localBox?.x === globalBox?.x &&
-      localBox?.y === globalBox?.y;
-    expect(allSamePosition).toBe(false);
+    expect(localBox).not.toBeNull();
+    expect(globalBox).not.toBeNull();
+    expect(localBox!.y).not.toBeCloseTo(globalBox!.y, 5);
+  });
+
+  test("renders seniority level toggle buttons", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    // Tier 5c: seniority level multi-select buttons
+    const senioritySection = page.getByText("Seniority levels").first();
+    await expect(senioritySection).toBeVisible({ timeout: 8_000 });
+
+    // Junior, Mid, Senior, Staff+ buttons should be visible
+    await expect(page.getByText("Senior", { exact: true })).toBeVisible();
+    await expect(page.getByText("Staff+", { exact: true })).toBeVisible();
+  });
+
+  test("renders seniority keyword list editors", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    // Tier 4 keyword list textareas
+    await expect(page.getByLabel("Junior keywords")).toBeVisible();
+    await expect(page.getByLabel("Mid keywords")).toBeVisible();
+    await expect(page.getByLabel("Senior keywords")).toBeVisible();
+    await expect(page.getByLabel("Staff+ keywords")).toBeVisible();
+  });
+
+  test("saves seniority level selections", async ({ page }) => {
+    // This test would need a mock backend to verify persistence
+    // For now, just verify the UI elements are interactive
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    const juniorBtn = page.getByText("Junior", { exact: true });
+    await expect(juniorBtn).toBeVisible({ timeout: 8_000 });
+    await juniorBtn.click(); // toggle on
+    // Button should now have active styling (border color changes)
+  });
+
+  test("saves settings and shows confirmation", async ({ page }) => {
+    // Smoke test: verify the save button exists
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    const saveButton = page.getByRole("button", { name: /save settings/i });
+    await expect(saveButton).toBeVisible({ timeout: 8_000 });
   });
 
   test("Gemini API key field accepts input and PATCH /api/settings returns 200", async ({

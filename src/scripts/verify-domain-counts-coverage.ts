@@ -86,11 +86,7 @@ async function withConcurrencyLimit<T>(
 
   const tasks: Array<() => Promise<{ company: string; ats: string; error: string | null }>> = [];
   for (const row of companies as ATSCompanyRow[]) {
-    const mode = row.pipeline_visa
-      ? ("visa" as const)
-      : row.pipeline_local
-        ? ("local" as const)
-        : ("global" as const);
+    const mode: "local" | "global" = row.pipeline_local ? "local" : "global";
     tasks.push(async () => {
       const result = await fetchCompany(row, mode);
       return { company: row.name, ats: row.ats, error: result.error };

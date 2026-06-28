@@ -72,17 +72,28 @@ export async function PUT(request: NextRequest) {
   if ("job_age_days" in body && typeof body.job_age_days === "number") {
     patch.job_age_days = body.job_age_days;
   }
-  if ("pipeline_visa" in body && typeof body.pipeline_visa === "boolean") {
-    patch.pipeline_visa = body.pipeline_visa;
-  }
   if ("pipeline_local" in body && typeof body.pipeline_local === "boolean") {
     patch.pipeline_local = body.pipeline_local;
   }
   if ("pipeline_global" in body && typeof body.pipeline_global === "boolean") {
     patch.pipeline_global = body.pipeline_global;
   }
-  if ("seniority_allow_mid" in body && typeof body.seniority_allow_mid === "boolean") {
-    patch.seniority_allow_mid = body.seniority_allow_mid;
+  if ("junior_keywords" in body && Array.isArray(body.junior_keywords)) {
+    patch.junior_keywords = body.junior_keywords.filter((s): s is string => typeof s === "string");
+  }
+  if ("mid_keywords" in body && Array.isArray(body.mid_keywords)) {
+    patch.mid_keywords = body.mid_keywords.filter((s): s is string => typeof s === "string");
+  }
+  if ("senior_keywords" in body && Array.isArray(body.senior_keywords)) {
+    patch.senior_keywords = body.senior_keywords.filter((s): s is string => typeof s === "string");
+  }
+  if ("staff_keywords" in body && Array.isArray(body.staff_keywords)) {
+    patch.staff_keywords = body.staff_keywords.filter((s): s is string => typeof s === "string");
+  }
+  if ("seniority_levels" in body && Array.isArray(body.seniority_levels)) {
+    patch.seniority_levels = body.seniority_levels.filter(
+      (s): s is string => typeof s === "string",
+    );
   }
   if ("gemini_filter_prompt" in body) {
     patch.gemini_filter_prompt =

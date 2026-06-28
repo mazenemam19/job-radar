@@ -18,7 +18,7 @@ import {
   fetchJazzHR,
 } from "@/lib/sources/ats-utils";
 
-import type { ATSCompanyRow, RawJob } from "./types";
+import type { ATSCompanyRow, RawJob, JobMode } from "./types";
 import type { Job } from "@/types";
 
 import type { ATSConfig } from "@/types";
@@ -38,7 +38,7 @@ function toATSConfig(row: ATSCompanyRow): ATSConfig {
 /** Result from a single company fetch attempt. */
 interface FetchResult {
   company: string;
-  mode: "visa" | "local" | "global";
+  mode: JobMode;
   jobs: RawJob[];
   error: string | null;
 }
@@ -46,67 +46,68 @@ interface FetchResult {
 /**
  * Fetches jobs from a single company using the appropriate ATS fetcher.
  *
- * Jobs are tagged with the mode (visa/local/global) from the pipeline.
+ * Jobs are tagged with the mode (local/global) from the pipeline.
  * Returns raw jobs with date_unknown correctly set:
  *   FIX #5: when postedAt ≈ fetchedAt (fallback date), we set date_unknown=true
  *           and use fetchedAt as posted_at so the job decays normally.
+ *
+ * Tier 5b: mode is "local" | "global" only — "visa" collapsed to "global".
+ * Tier 5c: visa_sponsorship is now computed by each fetcher from content only
+ *          (regex), not from the pipeline flag.
  */
-export async function fetchCompany(
-  row: ATSCompanyRow,
-  mode: "visa" | "local" | "global",
-): Promise<FetchResult> {
+export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<FetchResult> {
   const config = toATSConfig(row);
   const fetchedAt = new Date().toISOString();
   const fetchedMs = Date.parse(fetchedAt);
 
   try {
-    let rawJobs: Job[] = []; // Use the old Job type from types/job.ts
+    let rawJobs: Job[] = [];
 
-    const visaSponsorship = mode === "visa";
-
+    // Tier 5c: all fetchers now compute visa_sponsorship from content internally.
+    // No pipeline-flag shortcut passes through anymore.
     switch (row.ats) {
       case "greenhouse": {
-        const result = await fetchGreenhouse(config, mode, visaSponsorship);
+        const result = await fetchGreenhouse(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "lever": {
-        const result = await fetchLever(config, mode, visaSponsorship);
+        const result = await fetchLever(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "ashby": {
-        const result = await fetchAshby(config, mode, visaSponsorship);
+        const result = await fetchAshby(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "workable": {
-        const result = await fetchWorkable(config, mode, visaSponsorship);
+        const result = await fetchWorkable(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "teamtailor": {
-        const result = await fetchTeamtailor(config, mode, visaSponsorship);
+        const result = await fetchTeamtailor(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "breezy": {
-        const result = await fetchBreezy(config, mode, visaSponsorship);
+        const result = await fetchBreezy(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "smartrecruiters": {
-        const result = await fetchSmartRecruiters(config, mode, visaSponsorship);
+        const result = await fetchSmartRecruiters(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "bamboohr": {
-        const result = await fetchBambooHR(config, mode, visaSponsorship);
+        const result = await fetchBambooHR(config, mode);
         rawJobs = result.jobs;
         break;
       }
       case "jazzhr": {
-        const result = await fetchJazzHR(config, mode, visaSponsorship);
+        const result = await fetchJazzHR(config, mode);
         rawJobs = result.jobs;
         break;
       }
@@ -119,8 +120,6 @@ export async function fetchCompany(
       const postedAt = (j.postedAt ?? fetchedAt) as string;
       const postedMs = Date.parse(postedAt);
 
-      // If posted_at is within 30 seconds of fetchedAt, the original
-      // parseRelativeDate returned "now" as a fallback — mark as unknown.
       const dateUnknown = Number.isNaN(postedMs) || Math.abs(postedMs - fetchedMs) < 30_000;
 
       return {

@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
       country: body.country as string,
       country_flag: (body.country_flag as string) ?? "🌍",
       city: (body.city as string) ?? null,
-      pipeline_visa: Boolean(body.pipeline_visa),
       pipeline_local: Boolean(body.pipeline_local),
       pipeline_global: Boolean(body.pipeline_global),
       is_active: body.is_active !== false,
