@@ -303,10 +303,18 @@ export interface AdminUserListItem {
 
 // ── Cron ────────────────────────────────────────────────────
 
+export interface EmailSendResult {
+  email: string;
+  sent: boolean;
+  error?: string;
+  messageId?: string;
+}
+
 export interface CronRunResult {
   total_fetched: number;
   duration_ms: number;
   errors: string[];
   source_health: Record<string, { fetched: number; errors: number; company: string }>;
   trigger: "github_actions" | "vercel_cron" | "manual";
+  email_results?: EmailSendResult[];
 }

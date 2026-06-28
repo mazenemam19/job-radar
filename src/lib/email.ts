@@ -11,15 +11,35 @@ import type { SalaryReport } from "./types";
 // ── Transporter (shared) ─────────────────────────────────────
 
 function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST!,
-    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure: parseInt(process.env.SMTP_PORT ?? "587", 10) === 465,
-    auth: {
-      user: process.env.SMTP_USER!,
-      pass: process.env.SMTP_PASS!,
-    },
+  const host = process.env.SMTP_HOST!;
+  const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
+  const user = process.env.SMTP_USER!;
+  const secure = port === 465;
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[email transport] host=${host} port=${port} secure=${secure} user=${user}`);
+  }
+
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass: process.env.SMTP_PASS! },
+    logger: process.env.NODE_ENV !== "test",
+    debug: process.env.NODE_ENV !== "test",
   });
+
+  const originalSendMail = transport.sendMail.bind(transport);
+  transport.sendMail = async function patchedSendMail(mailOptions) {
+    console.log(
+      `[smtp send] from=${mailOptions.from} to=${mailOptions.to} subject="${mailOptions.subject}"`,
+    );
+    const info = await originalSendMail(mailOptions);
+    console.log(`[smtp send] ✓ accepted messageId=${info.messageId} response=${info.response}`);
+    return info;
+  };
+
+  return transport;
 }
 
 /**
