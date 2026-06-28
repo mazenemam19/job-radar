@@ -83,9 +83,22 @@ let workableBlockedCache: WorkableCooldownEntry[] = [];
 // successful flush so a warm/reused process doesn't resend an already-
 // persisted delta on its next run.
 let domainCountsCache: DomainCounts | null = null;
+// Set by loadWorkableStateFromDB() once the app_config row has actually been
+// read. loadDomainCounts() relies on call-order (runner.ts always loads state
+// before any fetch happens) — this flag makes that ordering requirement
+// visible instead of silently returning {} if it's ever violated.
+let stateLoaded = false;
 
 function loadDomainCounts(): DomainCounts {
   if (domainCountsCache) return domainCountsCache;
+  if (!stateLoaded) {
+    console.warn(
+      "[ats-utils] loadDomainCounts() called before loadWorkableStateFromDB() — " +
+        "starting this run's delta from zero. Harmless for domain_counts itself " +
+        "(the flush is additive, not an overwrite), but it means Workable cooldown/" +
+        "budget state wasn't loaded either, since both share this same load step.",
+    );
+  }
   return {};
 }
 
@@ -126,11 +139,16 @@ export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): 
 export async function loadWorkableStateFromDB(): Promise<void> {
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  const { data } = await db
+  const { data, error } = await db
     .from("app_config")
     .select("workable_blocked, workable_budget")
     .eq("id", 1)
     .single();
+  if (error) {
+    console.error("[ats-utils] loadWorkableStateFromDB select failed:", error.message);
+    return;
+  }
+  stateLoaded = true;
   if (data?.workable_blocked) {
     workableBlockedCache = (data.workable_blocked as unknown as WorkableCooldownEntry[]).filter(
       (e) => new Date(e.until).getTime() > Date.now(),
@@ -170,13 +188,16 @@ export async function flushWorkable429sToDB(): Promise<void> {
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
-  await db
+  const { error } = await db
     .from("app_config")
     .update({
       workable_blocked: workableBlockedCache as unknown as Json,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);
+  if (error) {
+    console.error("[ats-utils] flushWorkable429sToDB update failed:", error.message);
+  }
 }
 
 function setWorkableBlocked(slug: string, until: Date): void {
@@ -218,13 +239,18 @@ export function stripHtml(html: string): string {
 }
 
 /** Increased timeout to 45s to avoid AbortErrors under load */
-export async function safeFetch(url: string, timeout = 45_000): Promise<Response | null> {
+export async function safeFetch(
+  url: string,
+  timeout = 45_000,
+  extraHeaders?: Record<string, string>,
+): Promise<Response | null> {
   trackDomainRequest(url);
   try {
     return await fetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ...extraHeaders,
       },
       signal: AbortSignal.timeout(timeout),
     });
@@ -635,10 +661,7 @@ export async function fetchTeamtailor(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
-  const res = await fetch(publicUrl, {
-    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
+  const res = await safeFetch(publicUrl, 30_000, { Accept: "application/json" });
 
   if (!res)
     return {
@@ -693,10 +716,7 @@ export async function fetchBreezy(
 ): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
+  const res = await safeFetch(url, 30_000, { Accept: "application/json" });
 
   if (!res)
     return {
