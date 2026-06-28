@@ -25,8 +25,6 @@ function createTransporter() {
     port,
     secure,
     auth: { user, pass: process.env.SMTP_PASS! },
-    logger: process.env.NODE_ENV !== "test",
-    debug: process.env.NODE_ENV !== "test",
   });
 
   const originalSendMail = transport.sendMail.bind(transport);
