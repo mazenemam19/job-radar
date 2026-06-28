@@ -224,7 +224,8 @@ export async function runCronJob(
     const { data: eligibleUsers } = await db
       .from("user_profiles")
       .select("email, user_settings(email_alerts_enabled)")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("onboarding_complete", true); // exclude users who haven't finished setup
 
     if (eligibleUsers?.length) {
       const { sendNewScanNotificationEmail } = await import("@/lib/email");

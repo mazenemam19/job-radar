@@ -14,7 +14,10 @@
  */
 
 import { test, expect, request as pwRequest } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 
+const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const SECRET = process.env.E2E_TEST_SECRET;
 const EMAIL = process.env.TEST_USER_EMAIL;
@@ -37,7 +40,14 @@ async function loginAs(onboardingComplete: boolean) {
 test.describe("onboarding — new user redirect", () => {
   test.afterAll(async () => {
     if (!canRun) return;
-    await loginAs(true); // leave the shared account onboarded for later specs
+    // loginAs() mints a new session via verifyOtp, which invalidates the
+    // previous one. AUTH_FILE must be refreshed here — the same reason
+    // auth.spec.ts's afterAll does it after the blocked-user sign-out.
+    // Without this, every spec that runs after onboarding.spec.ts and loads
+    // AUTH_FILE (pipeline, salary, settings, tracker) gets a dead session
+    // and is redirected to /login.
+    const state = await loginAs(true);
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(state, null, 2));
   });
 
   test("new user submitting defaults lands on /dashboard, not bounced back", async ({ page }) => {

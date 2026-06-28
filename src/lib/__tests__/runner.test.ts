@@ -268,7 +268,8 @@ describe("runCronJob — email notifications", () => {
         return makeChain([
           {
             email: "newuser@example.com",
-            user_settings: null, // no settings row yet
+            onboarding_complete: true,
+            user_settings: null, // no settings row yet — should still default to sending
           },
         ]);
       if (table === "default_settings") return makeChain({});

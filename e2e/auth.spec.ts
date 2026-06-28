@@ -42,10 +42,18 @@
  * Part 1 (unauthenticated redirects) — no auth state, always runs.
  * Part 2 (authenticated non-admin access control) — requires AUTH_FILE.
  * Part 3 (blocked-user redirect) — logs in independently via
- *   /api/test/e2e-login, does NOT use AUTH_FILE. Flips the shared test
- *   account's is_active mid-test, restores it to true in afterAll —
- *   safe only because playwright.config.ts runs workers: 1 /
- *   fullyParallel: false.
+ *   /api/test/e2e-login, does NOT use AUTH_FILE for its own test. Flips the
+ *   shared test account's is_active mid-test, which triggers middleware's
+ *   signOut({ scope: "global" }) — that revokes EVERY session that account
+ *   has, including the one already sitting in AUTH_FILE from global-setup.
+ *   afterAll restores is_active to true AND overwrites AUTH_FILE with a
+ *   freshly-minted session — restoring the flag alone leaves AUTH_FILE
+ *   pointed at a session that's permanently dead, not just blocked, and
+ *   every spec file after this one breaks. (Found out by shipping it
+ *   without that second part and watching 12 unrelated tests fail.) Safe
+ *   only because playwright.config.ts runs workers: 1 / fullyParallel:
+ *   false — nothing else can be mid-flight against this account while
+ *   this runs.
  */
 
 import { test, expect, request as pwRequest } from "@playwright/test";
