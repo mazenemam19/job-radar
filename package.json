@@ -14,6 +14,7 @@
     "verify-domain-counts": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/verify-domain-counts.ts",
     "verify-domain-counts-coverage": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/verify-domain-counts-coverage.ts",
     "salary-reminders": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json scripts/send-salary-reminders.ts",
+    "smoke-test-email": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json scripts/smoke-test-email.ts",
     "format": "prettier --write .",
     "prepare": "husky"
   },
@@ -50,6 +51,7 @@
     "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10",
     "dotenv": "^16.4.5",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "14",
     "eslint-config-prettier": "^10.1.8",
