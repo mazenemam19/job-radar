@@ -7,6 +7,7 @@
 // + the defaults-vs-customize choice, both saved in one PATCH call.
 
 import { useState } from "react";
+import Image from "next/image";
 
 export default function OnboardingFlow() {
   const [apiKey, setApiKey] = useState("");
@@ -63,7 +64,13 @@ export default function OnboardingFlow() {
       <div className="w-full max-w-[520px] rounded-2xl border border-[#1e1e30] bg-[#0d0d1a] px-9 py-10">
         {/* Logo */}
         <div className="mb-7 text-center">
-          <div className="mb-2 text-4xl">🎯</div>
+          <Image
+            src="/icon-192.png"
+            alt=""
+            width={40}
+            height={40}
+            className="mb-2 inline-block h-10 w-10"
+          />
           <h1 className="text-[22px] font-bold text-[#e2e8f0]">Welcome to Job Radar</h1>
           <p className="mt-2 text-sm text-[#64748b]">Your personal AI-powered job feed</p>
         </div>
