@@ -9,6 +9,7 @@ import type { ATSConfig } from "@/types";
 
 const mockDb = {
   from: vi.fn(),
+  rpc: vi.fn(),
 };
 
 vi.mock("../supabase/admin", () => ({
@@ -24,18 +25,11 @@ const baseCompany: ATSConfig = {
   slug: "acme",
 };
 
-function mockUpdate() {
-  const updateMock = vi.fn().mockReturnValue({
-    eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-  });
-  mockDb.from.mockReturnValue({ update: updateMock });
-  return updateMock;
-}
-
 describe("Teamtailor/Breezy domain_counts tracking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockDb.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   afterEach(() => {
@@ -47,15 +41,14 @@ describe("Teamtailor/Breezy domain_counts tracking", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [] }) }),
     );
-    const updateMock = mockUpdate();
 
     const { fetchTeamtailor, flushDomainCountsToDB } = await import("../sources/ats-utils");
     await fetchTeamtailor(baseCompany, "global", false);
     await flushDomainCountsToDB();
 
-    expect(updateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ domain_counts: { "acme.teamtailor.com": 1 } }),
-    );
+    expect(mockDb.rpc).toHaveBeenCalledWith("increment_domain_counts", {
+      increments: { "acme.teamtailor.com": 1 },
+    });
   });
 
   it("tracks the breezy host via safeFetch instead of bypassing it", async () => {
@@ -63,14 +56,13 @@ describe("Teamtailor/Breezy domain_counts tracking", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }),
     );
-    const updateMock = mockUpdate();
 
     const { fetchBreezy, flushDomainCountsToDB } = await import("../sources/ats-utils");
     await fetchBreezy({ ...baseCompany, ats: "breezy" }, "global", false);
     await flushDomainCountsToDB();
 
-    expect(updateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ domain_counts: { "acme.breezy.hr": 1 } }),
-    );
+    expect(mockDb.rpc).toHaveBeenCalledWith("increment_domain_counts", {
+      increments: { "acme.breezy.hr": 1 },
+    });
   });
 });
