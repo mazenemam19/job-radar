@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const onboardingComplete = body?.onboardingComplete ?? true;
+  const isActive = body?.isActive ?? true;
 
   const admin = createAdminClient();
 
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       id: userId,
       email,
       onboarding_complete: onboardingComplete,
-      is_active: true,
+      is_active: isActive,
       last_active_at: new Date().toISOString(),
     },
     { onConflict: "id" },
