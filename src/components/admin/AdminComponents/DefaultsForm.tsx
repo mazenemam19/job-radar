@@ -106,6 +106,102 @@ export function DefaultsForm() {
       </Section2>
 
       <Section2
+        title="Default Seniority levels (multi-select, comma-separated)"
+        htmlFor="default-seniority-levels"
+      >
+        <input
+          id="default-seniority-levels"
+          value={((form.seniority_levels ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "seniority_levels",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          className={`${INPUT_CLASS} w-full`}
+          placeholder="senior, staff"
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Which levels a user sees by default. Users can override.
+        </p>
+      </Section2>
+
+      <Section2 title="Default Junior keywords (comma-separated)" htmlFor="default-junior-keywords">
+        <textarea
+          id="default-junior-keywords"
+          value={((form.junior_keywords ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "junior_keywords",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+      </Section2>
+
+      <Section2 title="Default Mid keywords (comma-separated)" htmlFor="default-mid-keywords">
+        <textarea
+          id="default-mid-keywords"
+          value={((form.mid_keywords ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "mid_keywords",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+      </Section2>
+
+      <Section2 title="Default Senior keywords (comma-separated)" htmlFor="default-senior-keywords">
+        <textarea
+          id="default-senior-keywords"
+          value={((form.senior_keywords ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "senior_keywords",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+      </Section2>
+
+      <Section2 title="Default Staff+ keywords (comma-separated)" htmlFor="default-staff-keywords">
+        <textarea
+          id="default-staff-keywords"
+          value={((form.staff_keywords ?? []) as string[]).join(", ")}
+          onChange={(e) =>
+            setField(
+              "staff_keywords",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
+          }
+          rows={2}
+          className={`${INPUT_CLASS} resize-y`}
+        />
+      </Section2>
+
+      <Section2
         title="Default Excluded keywords (Title blacklist)"
         htmlFor="default-excluded-keywords"
       >

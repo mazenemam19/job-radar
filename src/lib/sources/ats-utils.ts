@@ -275,12 +275,7 @@ function extractEgyptCity(rawLocation: string, companyCity?: string): string {
   return companyCity ?? "Cairo";
 }
 
-export function processJobs(
-  raw: RawJob[],
-  company: BaseCompany,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Job[] {
+export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode): Job[] {
   const now = new Date().toISOString();
   const out: Job[] = [];
 
@@ -291,8 +286,9 @@ export function processJobs(
     // applied downstream in the per-user pipeline (scoring.ts + dashboard route).
     // processJobs() only normalizes raw ATS data into the Job shape.
 
-    const actualSponsorship =
-      visaSponsorship || /visa\s+sponsorship|relocation/i.test(r.description);
+    const actualSponsorship = /visa\s+sponsorship|relocation|work\s+permit/i.test(
+      title + " " + r.description,
+    );
     const isRemote = /remote|work\s+from\s+home/i.test(title + r.location + r.description);
     const countryInfo = detectCountry(r.location, {
       name: company.country,
@@ -350,11 +346,7 @@ export async function pLimit<T>(fns: (() => Promise<T>)[], concurrency = 10): Pr
 
 // ── Greenhouse ─────────────────────────────────────────────────────────────
 
-export async function fetchGreenhouse(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchGreenhouse(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
   const res = await safeFetch(url);
@@ -397,7 +389,6 @@ export async function fetchGreenhouse(
       }),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -413,11 +404,7 @@ export async function fetchGreenhouse(
 
 // ── Lever ──────────────────────────────────────────────────────────────────
 
-export async function fetchLever(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchLever(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
   const res = await safeFetch(url);
@@ -452,7 +439,6 @@ export async function fetchLever(
       })),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -468,11 +454,7 @@ export async function fetchLever(
 
 // ── Ashby ──────────────────────────────────────────────────────────────────
 
-export async function fetchAshby(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchAshby(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}`;
   const res = await safeFetch(url);
@@ -508,7 +490,6 @@ export async function fetchAshby(
       })),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -543,11 +524,7 @@ function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
   return result;
 }
 
-export async function fetchWorkable(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   if (isWorkableBlocked(c.slug))
     return {
@@ -638,7 +615,7 @@ export async function fetchWorkable(
       }),
       5,
     );
-    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
+    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode);
 
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -654,11 +631,7 @@ export async function fetchWorkable(
 
 // ── Teamtailor ─────────────────────────────────────────────────────────────
 
-export async function fetchTeamtailor(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchTeamtailor(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
   const res = await safeFetch(publicUrl, 30_000, { Accept: "application/json" });
@@ -693,7 +666,6 @@ export async function fetchTeamtailor(
       })),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -709,11 +681,7 @@ export async function fetchTeamtailor(
 
 // ── Breezy HR ──────────────────────────────────────────────────────────────
 
-export async function fetchBreezy(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchBreezy(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
   const res = await safeFetch(url, 30_000, { Accept: "application/json" });
@@ -748,7 +716,6 @@ export async function fetchBreezy(
       })),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -764,11 +731,7 @@ export async function fetchBreezy(
 
 // ── SmartRecruiters ───────────────────────────────────────────────────────
 
-export async function fetchSmartRecruiters(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
   const res = await safeFetch(url);
@@ -815,7 +778,6 @@ export async function fetchSmartRecruiters(
       detailedJobs.filter((j): j is RawJob => j !== null),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -831,11 +793,7 @@ export async function fetchSmartRecruiters(
 
 // ── BambooHR ───────────────────────────────────────────────────────────────
 
-export async function fetchBambooHR(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
   const res = await safeFetch(url);
@@ -885,7 +843,7 @@ export async function fetchBambooHR(
       }),
       5,
     );
-    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode, visaSponsorship);
+    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode);
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
@@ -900,11 +858,7 @@ export async function fetchBambooHR(
 
 // ── JazzHR ──────────────────────────────────────────────────────────────────
 
-export async function fetchJazzHR(
-  c: ATSConfig,
-  mode: JobMode,
-  visaSponsorship: boolean,
-): Promise<FetcherResult> {
+export async function fetchJazzHR(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.resumator.com/v1/jobs/board/public/account/${c.slug}`;
   const res = await safeFetch(url, 60_000); // Increased timeout to 60s
@@ -939,7 +893,6 @@ export async function fetchJazzHR(
       })),
       c,
       mode,
-      visaSponsorship,
     );
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {

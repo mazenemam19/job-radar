@@ -5,12 +5,13 @@ import { useState, useEffect, useCallback } from "react";
 import JobCard from "./JobCard";
 import StrategyModal from "./StrategyModal";
 import TrackerModal from "../tracker/TrackerModal";
-import type { ScoredJob, PipelineLog, TrackerEntry } from "@/lib/types";
+import type { ScoredJob, PipelineLog, TrackerEntry, ResolvedSettings } from "@/lib/types";
 
-type FilterMode = "all" | "visa" | "local" | "global";
+type FilterMode = "all" | "local" | "global";
 
 export default function DashboardClient() {
   const [jobs, setJobs] = useState<ScoredJob[]>([]);
+  const [settings, setSettings] = useState<ResolvedSettings | null>(null);
   const [pipelineLog, setPipelineLog] = useState<PipelineLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
@@ -36,6 +37,7 @@ export default function DashboardClient() {
       setJobs(data.data.jobs);
       setPipelineLog(data.data.pipeline_log);
       setFromCache(data.data.from_cache);
+      if (data.data.settings) setSettings(data.data.settings);
 
       if (!data.data.from_cache) setRebuilding(false);
     } catch {
@@ -133,7 +135,6 @@ export default function DashboardClient() {
         {(
           [
             ["all", `All (${jobs.length})`, ""],
-            ["visa", `✈️ Visa (${modeCounts.visa ?? 0})`, "#6366f1"],
             ["local", `🇪🇬 Local (${modeCounts.local ?? 0})`, "#22c55e"],
             ["global", `🌐 Remote (${modeCounts.global ?? 0})`, "#f59e0b"],
           ] as [FilterMode, string, string][]
@@ -178,6 +179,7 @@ export default function DashboardClient() {
               isTracked={trackedIds.has(job.id)}
               onStrategy={(j) => setStrategyJob(j)}
               onTrack={(j) => setTrackerJob(j)}
+              settings={settings ?? undefined}
             />
           ))}
         </div>

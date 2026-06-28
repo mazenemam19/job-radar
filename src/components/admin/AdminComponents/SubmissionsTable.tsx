@@ -79,7 +79,6 @@ export function SubmissionsTable() {
                         </div>
                         <div className="mt-0.5 text-[11px] text-[#475569]">
                           {new Date(sub.submitted_at).toLocaleString()}
-                          {sub.pipeline_visa && " · ✈️ Visa"}
                           {sub.pipeline_local && " · 🇪🇬 Local"}
                           {sub.pipeline_global && " · 🌐 Global"}
                         </div>

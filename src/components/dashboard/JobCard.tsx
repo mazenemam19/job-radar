@@ -8,21 +8,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { computeRecencyScore } from "@/lib/scoring";
+import { computeRecencyScore, getDisplaySeniorityBadge } from "@/lib/scoring";
 import { MODE_COLORS, MODE_LABELS } from "@/lib/constants";
 import ScoreBar from "./ScoreBar";
-import type { ScoredJob } from "@/lib/types";
+import type { ScoredJob, ResolvedSettings } from "@/lib/types";
 
 interface Props {
   job: ScoredJob;
   onTrack?: (job: ScoredJob) => void;
   onStrategy?: (job: ScoredJob) => void;
   isTracked?: boolean;
+  settings?: ResolvedSettings;
 }
 
 const BTN_CLASS = "cursor-pointer rounded-md border-0 px-3.5 py-1.5 text-[13px] font-medium";
 
-export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) {
+export default function JobCard({ job, onTrack, onStrategy, isTracked, settings }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   // FIX #3: compute recency live from the actual posted_at date
@@ -90,6 +91,12 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked }: Props) 
         {job.visa_sponsorship && (
           <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#818cf8]">
             Visa sponsorship
+          </span>
+        )}
+
+        {settings && getDisplaySeniorityBadge(job, settings) && (
+          <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#22d3ee]">
+            {getDisplaySeniorityBadge(job, settings)}
           </span>
         )}
 

@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
     slug?: string;
     country?: string;
     city?: string;
-    pipeline_visa?: boolean;
     pipeline_local?: boolean;
     pipeline_global?: boolean;
     submitter_email?: string;
@@ -89,7 +88,6 @@ export async function POST(request: NextRequest) {
       country: country,
       country_flag: flag,
       city: body.city?.trim() ?? null,
-      pipeline_visa: Boolean(body.pipeline_visa),
       pipeline_local: Boolean(body.pipeline_local),
       pipeline_global: Boolean(body.pipeline_global),
       submitter_email: body.submitter_email?.trim() || null,

@@ -43,6 +43,12 @@ export async function GET() {
     .eq("id", user.id)
     .then(() => {});
 
+  // Load user settings and profile (need API key)
+  const [settings, { data: profile }] = await Promise.all([
+    resolveUserSettings(user.id),
+    db.from("user_profiles").select("gemini_api_key").eq("id", user.id).single(),
+  ]);
+
   // ── Cache check ──────────────────────────────────────────────
   const fresh = await isCacheFresh(user.id);
 
@@ -61,23 +67,17 @@ export async function GET() {
           pipeline_log: cache.pipeline_log as unknown as PipelineLog,
           cached_at: cache.cached_at,
           from_cache: true,
+          settings,
         },
       });
     }
   }
-
-  // Load user settings and profile (need API key)
-  const [settings, { data: profile }] = await Promise.all([
-    resolveUserSettings(user.id),
-    db.from("user_profiles").select("gemini_api_key").eq("id", user.id).single(),
-  ]);
 
   // Feature Request 2 (gemini-filter-audit.md): the Gemini key is now
   // optional — see the Step 4 branch below for what happens without one.
 
   // ── Step 1: Fetch raw jobs for enabled pipelines ─────────────
   const enabledModes: string[] = [];
-  if (settings.pipeline_visa) enabledModes.push("visa");
   if (settings.pipeline_local) enabledModes.push("local");
   if (settings.pipeline_global) enabledModes.push("global");
 
@@ -186,6 +186,7 @@ export async function GET() {
       pipeline_log: pipelineLog,
       cached_at: pipelineLog.cached_at,
       from_cache: false,
+      settings,
     },
   });
 }

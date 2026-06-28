@@ -35,8 +35,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     patch.country_flag = body.country_flag;
   if ("city" in body)
     patch.city = body.city === null || typeof body.city === "string" ? body.city : undefined;
-  if ("pipeline_visa" in body && typeof body.pipeline_visa === "boolean")
-    patch.pipeline_visa = body.pipeline_visa;
   if ("pipeline_local" in body && typeof body.pipeline_local === "boolean")
     patch.pipeline_local = body.pipeline_local;
   if ("pipeline_global" in body && typeof body.pipeline_global === "boolean")

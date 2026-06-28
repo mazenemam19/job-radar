@@ -58,7 +58,6 @@ export default function SubmitPage() {
       slug: fd.get("slug"),
       country: fd.get("country"),
       city: fd.get("city"),
-      pipeline_visa: fd.get("pipeline_visa") === "on",
       pipeline_local: fd.get("pipeline_local") === "on",
       pipeline_global: fd.get("pipeline_global") === "on",
       submitter_email: fd.get("submitter_email"),
@@ -163,11 +162,6 @@ export default function SubmitPage() {
               <legend className={LABEL_CLASS}>Which pipelines should this appear in?</legend>
               <div className="mt-1.5 flex flex-col gap-2.5">
                 {[
-                  [
-                    "pipeline_visa",
-                    "✈️ Visa pipeline",
-                    "We offer visa sponsorship for international candidates",
-                  ],
                   ["pipeline_local", "🇪🇬 Local pipeline", "We're based in Egypt or hire locally"],
                   ["pipeline_global", "🌐 Remote pipeline", "We hire fully remote worldwide"],
                 ].map(([name, label, desc]) => (

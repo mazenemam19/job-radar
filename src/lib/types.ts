@@ -15,6 +15,12 @@ export type ATSType =
   | "bamboohr"
   | "jazzhr";
 
+/** Pipeline mode for job fetching. "visa" collapsed to "global" in Tier 5b. */
+export type JobMode = "local" | "global";
+
+/** Seniority levels, ordinal-ranked for display purposes. */
+export type SeniorityLevel = "junior" | "mid" | "senior" | "staff";
+
 /** Row from public.ats_companies */
 export interface ATSCompanyRow {
   id: string;
@@ -24,7 +30,6 @@ export interface ATSCompanyRow {
   country: string;
   country_flag: string;
   city: string | null;
-  pipeline_visa: boolean;
   pipeline_local: boolean;
   pipeline_global: boolean;
   is_active: boolean;
@@ -48,7 +53,7 @@ export interface RawJob {
   date_unknown: boolean;
   is_remote: boolean;
   salary: string | null;
-  mode: "visa" | "local" | "global";
+  mode: JobMode;
   visa_sponsorship: boolean;
   source_name: string | null;
   ats_type: string | null;
@@ -94,7 +99,7 @@ export interface TrackerJobSnapshot {
   location: string;
   country: string;
   country_flag: string;
-  mode: "visa" | "local" | "global";
+  mode: JobMode;
   total_score: number;
   matched_skills: string[];
   posted_at: string;
@@ -108,10 +113,13 @@ export interface DefaultSettings {
   secondary_skills: string[];
   bonus_skills: string[];
   job_age_days: number;
-  pipeline_visa: boolean;
   pipeline_local: boolean;
   pipeline_global: boolean;
-  seniority_allow_mid: boolean;
+  junior_keywords: string[];
+  mid_keywords: string[];
+  senior_keywords: string[];
+  staff_keywords: string[];
+  seniority_levels: SeniorityLevel[];
   gemini_filter_prompt: string | null;
   scoring_weights: ScoringWeights;
   score_denominator: number;
@@ -131,10 +139,13 @@ export interface UserSettingsRow {
   secondary_skills: string[] | null;
   bonus_skills: string[] | null;
   job_age_days: number | null;
-  pipeline_visa: boolean | null;
   pipeline_local: boolean | null;
   pipeline_global: boolean | null;
-  seniority_allow_mid: boolean | null;
+  junior_keywords: string[] | null;
+  mid_keywords: string[] | null;
+  senior_keywords: string[] | null;
+  staff_keywords: string[] | null;
+  seniority_levels: SeniorityLevel[] | null;
   gemini_filter_prompt: string | null;
   scoring_weights: ScoringWeights | null;
   score_denominator: number | null;
@@ -154,10 +165,13 @@ export interface ResolvedSettings {
   secondary_skills: string[];
   bonus_skills: string[];
   job_age_days: number;
-  pipeline_visa: boolean;
   pipeline_local: boolean;
   pipeline_global: boolean;
-  seniority_allow_mid: boolean;
+  junior_keywords: string[];
+  mid_keywords: string[];
+  senior_keywords: string[];
+  staff_keywords: string[];
+  seniority_levels: SeniorityLevel[];
   gemini_filter_prompt: string;
   scoring_weights: ScoringWeights;
   score_denominator: number;
@@ -264,7 +278,6 @@ export interface ATSSubmission {
   country: string;
   country_flag: string;
   city: string | null;
-  pipeline_visa: boolean;
   pipeline_local: boolean;
   pipeline_global: boolean;
   submitter_email: string | null;

@@ -54,10 +54,13 @@ const DEFAULT_ROW = {
   secondary_skills: ["Jest", "GraphQL"],
   bonus_skills: ["Node.js"],
   job_age_days: 7,
-  pipeline_visa: true,
   pipeline_local: true,
   pipeline_global: true,
-  seniority_allow_mid: false,
+  junior_keywords: ["junior", "jr", "entry-level", "intern", "graduate"],
+  mid_keywords: ["mid-level", "mid level", "intermediate"],
+  senior_keywords: ["senior", "sr", "lead"],
+  staff_keywords: ["staff", "principal", "architect", "director", "vp", "head"],
+  seniority_levels: ["senior", "staff"],
   gemini_filter_prompt: "Default prompt text",
   scoring_weights: { skill: 0.6, recency: 0.3, relocation: 0.1 },
   score_denominator: 18,
@@ -113,10 +116,13 @@ describe("resolveUserSettings", () => {
       secondary_skills: null, // inherit default
       bonus_skills: null,
       job_age_days: 14, // overridden
-      pipeline_visa: false, // overridden
       pipeline_local: null,
       pipeline_global: null,
-      seniority_allow_mid: null,
+      junior_keywords: null,
+      mid_keywords: null,
+      senior_keywords: null,
+      staff_keywords: null,
+      seniority_levels: null,
       gemini_filter_prompt: null,
       scoring_weights: null,
       score_denominator: null,
@@ -139,7 +145,7 @@ describe("resolveUserSettings", () => {
     // User-overridden fields
     expect(result.expert_skills).toEqual(["Vue", "Svelte"]);
     expect(result.job_age_days).toBe(14);
-    expect(result.pipeline_visa).toBe(false);
+    expect(result.seniority_levels).toEqual(DEFAULT_ROW.seniority_levels);
 
     // Null user fields → inherit defaults
     expect(result.secondary_skills).toEqual(DEFAULT_ROW.secondary_skills);
@@ -157,10 +163,9 @@ describe("resolveUserSettings", () => {
       secondary_skills: null,
       bonus_skills: null,
       job_age_days: null,
-      pipeline_visa: null,
       pipeline_local: null,
       pipeline_global: null,
-      seniority_allow_mid: null,
+      seniority_levels: null,
       gemini_filter_prompt: null,
       score_denominator: null,
       // Weights that don't sum to 1 (sum = 1.5)

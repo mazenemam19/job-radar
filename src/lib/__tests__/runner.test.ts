@@ -80,7 +80,6 @@ function makeCompanyRow(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
     country: "GB",
     country_flag: "🇬🇧",
     city: "London",
-    pipeline_visa: true,
     pipeline_local: false,
     pipeline_global: false,
     is_active: true,
@@ -105,7 +104,7 @@ function makeRawJob(id: string, overrides: Partial<RawJob> = {}): RawJob {
     date_unknown: false,
     is_remote: false,
     salary: null,
-    mode: "visa",
+    mode: "global",
     visa_sponsorship: false,
     source_name: "Test Corp",
     ats_type: "greenhouse",
@@ -135,7 +134,6 @@ describe("runCronJob", () => {
 
   it("calls fetchCompany for each enabled pipeline", async () => {
     const company = makeCompanyRow({
-      pipeline_visa: true,
       pipeline_local: true,
       pipeline_global: false,
     });
@@ -152,7 +150,7 @@ describe("runCronJob", () => {
 
     vi.mocked(fetchCompany).mockResolvedValue({
       company: "Test Corp",
-      mode: "visa",
+      mode: "global",
       jobs,
       error: null,
     });
@@ -160,14 +158,13 @@ describe("runCronJob", () => {
     const { runCronJob } = await import("../runner");
     await runCronJob("manual");
 
-    // Should be called twice (visa + local pipelines)
-    expect(fetchCompany).toHaveBeenCalledTimes(2);
-    expect(fetchCompany).toHaveBeenCalledWith(company, "visa");
+    // Should be called once (local pipeline only)
+    expect(fetchCompany).toHaveBeenCalledTimes(1);
     expect(fetchCompany).toHaveBeenCalledWith(company, "local");
   });
 
   it("records fetch errors in source_health without crashing", async () => {
-    const company = makeCompanyRow({ pipeline_visa: true });
+    const company = makeCompanyRow({ pipeline_global: true });
 
     mockDb.from.mockImplementation((table: string) => {
       if (table === "ats_companies") return makeChain([company]);
@@ -176,7 +173,7 @@ describe("runCronJob", () => {
 
     vi.mocked(fetchCompany).mockResolvedValue({
       company: "Test Corp",
-      mode: "visa",
+      mode: "global",
       jobs: [],
       error: "ATS timeout",
     });
@@ -184,7 +181,7 @@ describe("runCronJob", () => {
     const { runCronJob } = await import("../runner");
     const result = await runCronJob("manual");
 
-    expect(result.errors).toContain("Test Corp (visa): ATS timeout");
+    expect(result.errors).toContain("Test Corp (global): ATS timeout");
     expect(result.total_fetched).toBe(0);
   });
 });
@@ -195,7 +192,7 @@ describe("runCronJob — email notifications", () => {
   });
 
   it("sends scan notification to eligible users after successful scrape", async () => {
-    const company = makeCompanyRow({ pipeline_visa: true });
+    const company = makeCompanyRow();
     const jobs = [makeRawJob("j1")];
 
     mockDb.from.mockImplementation((table: string) => {
@@ -216,7 +213,7 @@ describe("runCronJob — email notifications", () => {
 
     vi.mocked(fetchCompany).mockResolvedValue({
       company: "Test Corp",
-      mode: "visa",
+      mode: "global",
       jobs,
       error: null,
     });
@@ -229,7 +226,7 @@ describe("runCronJob — email notifications", () => {
   });
 
   it("skips users with email_alerts_enabled=false", async () => {
-    const company = makeCompanyRow({ pipeline_visa: true });
+    const company = makeCompanyRow();
     const jobs = [makeRawJob("j1")];
 
     mockDb.from.mockImplementation((table: string) => {
@@ -247,7 +244,7 @@ describe("runCronJob — email notifications", () => {
 
     vi.mocked(fetchCompany).mockResolvedValue({
       company: "Test Corp",
-      mode: "visa",
+      mode: "global",
       jobs,
       error: null,
     });
@@ -259,7 +256,7 @@ describe("runCronJob — email notifications", () => {
   });
 
   it("defaults to sending when user has no user_settings row", async () => {
-    const company = makeCompanyRow({ pipeline_visa: true });
+    const company = makeCompanyRow();
     const jobs = [makeRawJob("j1")];
 
     mockDb.from.mockImplementation((table: string) => {
@@ -278,7 +275,7 @@ describe("runCronJob — email notifications", () => {
 
     vi.mocked(fetchCompany).mockResolvedValue({
       company: "Test Corp",
-      mode: "visa",
+      mode: "global",
       jobs,
       error: null,
     });

@@ -17,7 +17,7 @@ import {
   flushWorkable429sToDB,
   flushDomainCountsToDB,
 } from "./sources/ats-utils";
-import type { ATSCompanyRow, CronRunResult, RawJob } from "./types";
+import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "./types";
 
 const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
 
@@ -100,14 +100,13 @@ export async function runCronJob(
   const tasks: Array<
     () => Promise<{
       company: string;
-      mode: "visa" | "local" | "global";
+      mode: JobMode;
       jobs: RawJob[];
       error: string | null;
     }>
   > = [];
 
   for (const row of companies as ATSCompanyRow[]) {
-    if (row.pipeline_visa) tasks.push(() => fetchCompany(row, "visa"));
     if (row.pipeline_local) tasks.push(() => fetchCompany(row, "local"));
     if (row.pipeline_global) tasks.push(() => fetchCompany(row, "global"));
   }

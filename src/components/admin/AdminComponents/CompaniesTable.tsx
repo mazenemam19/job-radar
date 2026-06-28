@@ -15,7 +15,6 @@ const EMPTY_FORM: CompanyForm = {
   country: "",
   country_flag: "🌍",
   city: "",
-  pipeline_visa: false,
   pipeline_local: false,
   pipeline_global: false,
   is_active: true,
@@ -84,7 +83,6 @@ export function CompaniesTable() {
       country: c.country,
       country_flag: c.country_flag,
       city: c.city ?? "",
-      pipeline_visa: c.pipeline_visa,
       pipeline_local: c.pipeline_local,
       pipeline_global: c.pipeline_global,
       is_active: c.is_active,
@@ -162,9 +160,6 @@ export function CompaniesTable() {
                     {c.country_flag} {c.country}
                   </td>
                   <td className={TD_CLASS}>
-                    {c.pipeline_visa && (
-                      <span className="mr-1 text-[10px] text-[#818cf8]">✈️Visa</span>
-                    )}
                     {c.pipeline_local && (
                       <span className="mr-1 text-[10px] text-[#22c55e]">🇪🇬Local</span>
                     )}
@@ -255,7 +250,6 @@ function CompanyFormPanel({
           <div className="mt-1 flex gap-3">
             {(
               [
-                ["pipeline_visa", "✈️ Visa"],
                 ["pipeline_local", "🇪🇬 Local"],
                 ["pipeline_global", "🌐 Global"],
               ] as [keyof CompanyForm, string][]

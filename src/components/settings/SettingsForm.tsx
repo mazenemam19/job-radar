@@ -2,7 +2,7 @@
 // src/components/settings/SettingsForm.tsx
 
 import { useState, useEffect, type ReactNode } from "react";
-import type { ResolvedSettings, UserSettingsRow } from "@/lib/types";
+import type { ResolvedSettings, UserSettingsRow, SeniorityLevel } from "@/lib/types";
 import DeleteAccountSection from "@/components/settings/DeleteAccountSection";
 
 interface SettingsData {
@@ -13,6 +13,13 @@ interface SettingsData {
 
 const INPUT_CLASS =
   "w-full rounded-lg border border-[#1e1e30] bg-[#0a0a18] px-3 py-2.5 text-sm text-[#e2e8f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]";
+
+const SENIORITY_LEVELS: { key: SeniorityLevel; label: string }[] = [
+  { key: "junior", label: "Junior" },
+  { key: "mid", label: "Mid" },
+  { key: "senior", label: "Senior" },
+  { key: "staff", label: "Staff+" },
+];
 
 export default function SettingsForm() {
   const [data, setData] = useState<SettingsData | null>(null);
@@ -26,10 +33,15 @@ export default function SettingsForm() {
   const [expertSkills, setExpertSkills] = useState("");
   const [secSkills, setSecSkills] = useState("");
   const [jobAgeDays, setJobAgeDays] = useState(7);
-  const [visa, setVisa] = useState(true);
   const [local, setLocal] = useState(true);
-  const [global, setGlobal] = useState(true);
-  const [allowMid, setAllowMid] = useState(false);
+  const [global_, setGlobal] = useState(true);
+  const [seniorityLevels, setSeniorityLevels] = useState<Set<SeniorityLevel>>(
+    new Set(["senior", "staff"]),
+  );
+  const [juniorKeywords, setJuniorKeywords] = useState("");
+  const [midKeywords, setMidKeywords] = useState("");
+  const [seniorKeywords, setSeniorKeywords] = useState("");
+  const [staffKeywords, setStaffKeywords] = useState("");
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [salaryReminders, setSalaryReminders] = useState(true);
   const [prompt, setPrompt] = useState("");
@@ -52,10 +64,15 @@ export default function SettingsForm() {
         setExpertSkills((r.expert_skills ?? []).join(", "));
         setSecSkills((r.secondary_skills ?? []).join(", "));
         setJobAgeDays(r.job_age_days ?? 7);
-        setVisa(r.pipeline_visa ?? true);
         setLocal(r.pipeline_local ?? true);
         setGlobal(r.pipeline_global ?? true);
-        setAllowMid(r.seniority_allow_mid ?? false);
+        setSeniorityLevels(
+          new Set((r.seniority_levels ?? ["senior", "staff"]) as SeniorityLevel[]),
+        );
+        setJuniorKeywords((r.junior_keywords ?? []).join(", "));
+        setMidKeywords((r.mid_keywords ?? []).join(", "));
+        setSeniorKeywords((r.senior_keywords ?? []).join(", "));
+        setStaffKeywords((r.staff_keywords ?? []).join(", "));
         setEmailAlerts(r.email_alerts_enabled ?? true);
         setSalaryReminders(r.salary_reminder_enabled ?? true);
         setPrompt(r.gemini_filter_prompt ?? "");
@@ -73,6 +90,15 @@ export default function SettingsForm() {
     })();
   }, []);
 
+  function toggleLevel(level: SeniorityLevel) {
+    setSeniorityLevels((prev) => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      return next;
+    });
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -87,10 +113,25 @@ export default function SettingsForm() {
 
     const body: Record<string, unknown> = {
       job_age_days: jobAgeDays,
-      pipeline_visa: visa,
       pipeline_local: local,
-      pipeline_global: global,
-      seniority_allow_mid: allowMid,
+      pipeline_global: global_,
+      seniority_levels: Array.from(seniorityLevels),
+      junior_keywords: juniorKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      mid_keywords: midKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      senior_keywords: seniorKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      staff_keywords: staffKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
       email_alerts_enabled: emailAlerts,
       salary_reminder_enabled: salaryReminders,
       expert_skills: expertSkills
@@ -219,19 +260,13 @@ export default function SettingsForm() {
       {/* Pipelines */}
       <Section title="Pipelines">
         <Toggle
-          checked={visa}
-          onChange={setVisa}
-          label="✈️ Visa pipeline"
-          description="EU/UK companies offering visa sponsorship"
-        />
-        <Toggle
           checked={local}
           onChange={setLocal}
           label="🇪🇬 Local pipeline"
           description="Egypt-based companies"
         />
         <Toggle
-          checked={global}
+          checked={global_}
           onChange={setGlobal}
           label="🌐 Global pipeline"
           description="Worldwide remote companies"
@@ -239,13 +274,86 @@ export default function SettingsForm() {
       </Section>
 
       {/* Seniority */}
-      <Section title="Seniority">
-        <Toggle
-          checked={allowMid}
-          onChange={setAllowMid}
-          label="Allow mid-level roles"
-          description="By default only Senior+ roles pass the gate"
+      <Section title="Seniority levels">
+        <p className="mb-3 text-[13px] text-[#64748b]">
+          Select which seniority levels to include. Jobs matching none always pass (unlabelled).
+        </p>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {SENIORITY_LEVELS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              role="switch"
+              aria-checked={seniorityLevels.has(key)}
+              onClick={() => toggleLevel(key)}
+              className="cursor-pointer rounded-full px-4 py-1.5 text-[13px] transition-colors"
+              style={{
+                border: `1px solid ${seniorityLevels.has(key) ? "#6366f1" : "#1e1e30"}`,
+                background: seniorityLevels.has(key) ? "rgba(99,102,241,0.15)" : "transparent",
+                color: seniorityLevels.has(key) ? "#818cf8" : "#64748b",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* Seniority keyword lists */}
+      <Section title="Junior keywords" htmlFor="junior-keywords">
+        <textarea
+          id="junior-keywords"
+          value={juniorKeywords}
+          onChange={(e) => setJuniorKeywords(e.target.value)}
+          rows={2}
+          placeholder="junior, jr, entry-level, intern, graduate..."
+          className={`${INPUT_CLASS} resize-y`}
         />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated terms that label a job as junior.
+        </p>
+      </Section>
+
+      <Section title="Mid keywords" htmlFor="mid-keywords">
+        <textarea
+          id="mid-keywords"
+          value={midKeywords}
+          onChange={(e) => setMidKeywords(e.target.value)}
+          rows={2}
+          placeholder="mid-level, mid-senior, intermediate..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated terms that label a job as mid-level.
+        </p>
+      </Section>
+
+      <Section title="Senior keywords" htmlFor="senior-keywords">
+        <textarea
+          id="senior-keywords"
+          value={seniorKeywords}
+          onChange={(e) => setSeniorKeywords(e.target.value)}
+          rows={2}
+          placeholder="senior, sr, principal, staff, lead..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated terms that label a job as senior.
+        </p>
+      </Section>
+
+      <Section title="Staff+ keywords" htmlFor="staff-keywords">
+        <textarea
+          id="staff-keywords"
+          value={staffKeywords}
+          onChange={(e) => setStaffKeywords(e.target.value)}
+          rows={2}
+          placeholder="lead, staff, principal, architect, director, vp, head..."
+          className={`${INPUT_CLASS} resize-y`}
+        />
+        <p className="mt-1 text-[11px] text-[#475569]">
+          Comma-separated terms that label a job as staff+.
+        </p>
       </Section>
 
       {/* Email Alerts */}
