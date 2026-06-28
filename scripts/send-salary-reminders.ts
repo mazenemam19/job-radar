@@ -1,13 +1,16 @@
 #!/usr/bin/env tsx
 // scripts/send-salary-reminders.ts
 //
-// Sends monthly salary update reminders to users whose last report
-// is >28 days old. Run this as a separate cron job (e.g., monthly GitHub Action).
+// Sends monthly salary reminders to all users who have salary_reminder_enabled.
+// Eligibility is driven by the user preference — not by whether they already
+// have a salary_reports entry.
+//
+// - Users WITH an existing (stale) report → specific "time to update" email.
+// - Users with NO report yet              → generic "share your salary data" prompt.
 //
 // Respects each user's `salary_reminder_enabled` setting (separate from
 // `email_alerts_enabled`, which only gates job-match alerts — see
-// docs/plans/2026-06-25-email-toggle-split-and-review-badge.md for why
-// these were split into two toggles).
+// docs/plans/2026-06-25-email-toggle-split-and-review-badge.md).
 //
 // Run with:
 //   pnpm exec tsx scripts/send-salary-reminders.ts
@@ -25,13 +28,11 @@ const REMIND_AFTER_DAYS = parseInt(process.env.REMIND_AFTER_DAYS ?? "28", 10);
 
 async function run() {
   const cutoff = new Date(Date.now() - REMIND_AFTER_DAYS * 86_400_000).toISOString();
+  const salaryUrl = `${APP_URL}/salary`;
 
-  // Default fallback for users with no user_settings row, or a null value
-  // in it — mirrors lib/settings.ts's resolveUserSettings merge rule for
-  // this field (user value wins when non-null, default otherwise). Can't
-  // reuse resolveUserSettings directly: it calls createServerClient(),
-  // which reads next/headers cookies() and throws outside a request
-  // context — this script runs standalone via tsx, not as a route handler.
+  // Step 1: Platform default for salary_reminder_enabled.
+  // Can't reuse resolveUserSettings() — it calls createServerClient() which reads
+  // next/headers cookies() and throws outside a request context.
   const { data: defaultRow } = await supabase
     .from("default_settings")
     .select("salary_reminder_enabled")
@@ -39,88 +40,91 @@ async function run() {
     .single();
   const defaultSalaryReminderEnabled = defaultRow?.salary_reminder_enabled ?? true;
 
-  // Step 1: Fetch stale salary reports with user_profiles join.
-  // Note: salary_reports has no FK to user_settings, so we can't join
-  // user_settings here. We fetch settings separately in Step 2.
-  const { data: reports, error } = await supabase
-    .from("salary_reports")
-    .select(
-      `
-      id, user_id, role_title, last_updated_at, reminder_sent_at,
-      user_profiles!inner(email, is_active)
-    `,
-    )
-    .lt("last_updated_at", cutoff)
-    .or(`reminder_sent_at.is.null,reminder_sent_at.lt.${cutoff}`)
-    .not("user_id", "is", null)
-    .order("last_updated_at", { ascending: true });
+  // Step 2: All active, onboarded users with their notification preference.
+  const { data: users, error: usersError } = await supabase
+    .from("user_profiles")
+    .select("id, email, user_settings(salary_reminder_enabled)")
+    .eq("is_active", true)
+    .eq("onboarding_complete", true);
 
-  if (error) {
-    console.error("Failed to fetch reports:", error.message);
+  if (usersError) {
+    console.error("Failed to fetch users:", usersError.message);
     process.exit(1);
   }
 
-  if (!reports?.length) {
-    console.log("No reminders to send.");
+  if (!users?.length) {
+    console.log("No active users found.");
     return;
   }
 
-  // Step 2: Fetch user_settings for the affected users.
-  // salary_reports and user_settings are both children of user_profiles,
-  // so we query settings separately and merge in code.
-  const userIds = [...new Set(reports.map((r) => r.user_id))];
-  const { data: settingsRows } = await supabase
-    .from("user_settings")
-    .select("user_id, salary_reminder_enabled")
-    .in("user_id", userIds);
-  const settingsMap = new Map(
-    (settingsRows ?? []).map((s) => [s.user_id, s.salary_reminder_enabled]),
-  );
-
-  // Step 3: Deduplicate and filter — one reminder per user (their most-recent report)
-  const seenUsers = new Set<string>();
-  const toRemind = reports.filter((r) => {
-    const profile = (r as Record<string, unknown>).user_profiles as {
-      email: string;
-      is_active: boolean;
-    } | null;
-    if (!r.user_id || !profile?.email || !profile.is_active) return false;
-    if (seenUsers.has(r.user_id)) return false;
-
-    const salaryReminderEnabled = settingsMap.get(r.user_id) ?? defaultSalaryReminderEnabled;
-    if (!salaryReminderEnabled) return false;
-
-    seenUsers.add(r.user_id);
-    return true;
+  // Step 3: Keep only users who want salary reminders.
+  // Supabase types the joined user_settings as an array (FK from parent side),
+  // so we cast through unknown and handle both shapes defensively.
+  const eligible = users.filter((u) => {
+    const raw = u.user_settings as unknown as
+      | { salary_reminder_enabled: boolean | null }[]
+      | { salary_reminder_enabled: boolean | null }
+      | null;
+    const settings = Array.isArray(raw) ? (raw[0] ?? null) : raw;
+    return settings?.salary_reminder_enabled ?? defaultSalaryReminderEnabled;
   });
 
-  console.log(`Sending ${toRemind.length} salary reminders...`);
-  let sent = 0;
+  if (!eligible.length) {
+    console.log("No users with salary reminders enabled.");
+    return;
+  }
 
-  for (const r of toRemind) {
-    const profile = (r as Record<string, unknown>).user_profiles as { email: string };
+  // Step 4: Fetch the most-recent salary report for each eligible user (if any).
+  const eligibleIds = eligible.map((u) => u.id);
+  const { data: allReports } = await supabase
+    .from("salary_reports")
+    .select("id, user_id, role_title, last_updated_at, reminder_sent_at")
+    .in("user_id", eligibleIds)
+    .order("last_updated_at", { ascending: false });
 
-    try {
-      await sendSalaryReminderEmail(
-        r as unknown as SalaryReport,
-        profile.email,
-        `${APP_URL}/salary`,
-      );
-
-      // Update reminder_sent_at
-      await supabase
-        .from("salary_reports")
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", r.id);
-
-      sent++;
-      console.log(`  ✓ Reminded ${profile.email}`);
-    } catch (err) {
-      console.error(`  ✗ Failed for ${profile.email}:`, err);
+  type ReportEntry = NonNullable<typeof allReports>[number];
+  const reportByUser = new Map<string, ReportEntry>();
+  for (const r of allReports ?? []) {
+    if (r.user_id && !reportByUser.has(r.user_id)) {
+      reportByUser.set(r.user_id, r);
     }
   }
 
-  console.log(`\nDone. ${sent}/${toRemind.length} reminders sent.`);
+  // Step 5: Send.
+  console.log(`Processing ${eligible.length} eligible users...`);
+  let sent = 0;
+
+  for (const user of eligible) {
+    if (!user.email) continue;
+
+    const report = reportByUser.get(user.id) ?? null;
+
+    if (report) {
+      // Has a report: skip if still fresh or reminded recently.
+      const reportStale = report.last_updated_at < cutoff;
+      const reminderStale = !report.reminder_sent_at || report.reminder_sent_at < cutoff;
+      if (!reportStale || !reminderStale) continue;
+    }
+    // No report: always send — monthly nudge until they submit their first entry.
+
+    try {
+      await sendSalaryReminderEmail(report as SalaryReport | null, user.email, salaryUrl);
+
+      if (report) {
+        await supabase
+          .from("salary_reports")
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .eq("id", report.id);
+      }
+
+      sent++;
+      console.log(`  ✓ ${user.email}${report ? "" : " (first-time prompt)"}`);
+    } catch (err) {
+      console.error(`  ✗ Failed for ${user.email}:`, err);
+    }
+  }
+
+  console.log(`\nDone. ${sent}/${eligible.length} reminders sent.`);
 }
 
 run().catch((err) => {

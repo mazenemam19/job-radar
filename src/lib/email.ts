@@ -110,7 +110,55 @@ export async function sendNewScanNotificationEmail(
 
 // ── Salary reminder email ─────────────────────────────────────
 
-function buildSalaryReminderHtml(report: SalaryReport, updateUrl: string): string {
+// ── PATCH: replace the two existing salary-reminder functions in src/lib/email.ts ──
+// Do NOT copy this whole file. Find `function buildSalaryReminderHtml` and
+// `export async function sendSalaryReminderEmail` in your local email.ts and
+// replace both with what's below.
+
+function buildSalaryReminderHtml(report: SalaryReport | null, updateUrl: string): string {
+  // No existing report — generic first-time prompt.
+  if (!report) {
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#08080f;font-family:Inter,system-ui,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:32px 16px">
+        <table width="500" cellpadding="0" cellspacing="0"
+               style="background:#0d0d1a;border-radius:12px;overflow:hidden;border:1px solid #1e1e30">
+          <tr>
+            <td style="padding:32px;text-align:center">
+              <p style="margin:0 0 8px;font-size:32px">💼</p>
+              <h2 style="margin:0 0 12px;color:#e2e8f0;font-size:20px">
+                Share your salary data
+              </h2>
+              <p style="margin:0 0 24px;color:#94a3b8;font-size:14px;line-height:1.6">
+                You haven't submitted a salary report yet.
+                It takes less than a minute and helps every developer in the community
+                get compensated fairly.
+              </p>
+              <a href="${updateUrl}"
+                 style="display:inline-block;padding:12px 28px;background:#6366f1;
+                        color:#fff;text-decoration:none;border-radius:8px;
+                        font-weight:600;font-size:14px">
+                Add my salary →
+              </a>
+              <p style="margin:24px 0 0;color:#475569;font-size:12px">
+                All salary data is anonymous and helps calibrate the community benchmark.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  // Existing stale report — specific "time to update" prompt.
   const monthsAgo = Math.round(
     (Date.now() - Date.parse(report.last_updated_at)) / (1000 * 60 * 60 * 24 * 30),
   );
@@ -156,23 +204,25 @@ function buildSalaryReminderHtml(report: SalaryReport, updateUrl: string): strin
 }
 
 /**
- * Sends a monthly salary update reminder to a user.
- *
- * @param report     Their most recent salary report
- * @param email      User's email address
- * @param updateUrl  Link to the salary update page
+ * Sends a monthly salary reminder to a user.
+ * - `report` is their most recent salary report, or null if they haven't submitted one yet.
+ * - When null, the email is a generic first-time prompt; when present, it references
+ *   the specific report and how long ago it was submitted.
  */
 export async function sendSalaryReminderEmail(
-  report: SalaryReport,
+  report: SalaryReport | null,
   email: string,
   updateUrl: string,
 ): Promise<void> {
   const transporter = createTransporter();
+  const subject = report
+    ? "💼 Update your salary data — help others get paid fairly"
+    : "💼 Add your salary data — help others get paid fairly";
 
   await transporter.sendMail({
     from: `"Job Radar" <${process.env.SMTP_USER}>`,
     to: email,
-    subject: "💼 Update your salary data — help others get paid fairly",
+    subject,
     html: buildSalaryReminderHtml(report, updateUrl),
   });
 }
