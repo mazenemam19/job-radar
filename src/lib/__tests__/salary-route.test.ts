@@ -308,4 +308,22 @@ describe("POST /api/salary", () => {
     const json = await res.json();
     expect(json.ok).toBe(false);
   });
+
+  it("returns 500 when Supabase insert fails", async () => {
+    mockServerDb.from.mockReturnValue(mockQuery(null, { message: "connection reset" }));
+
+    const { POST } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary", {
+      method: "POST",
+      body: JSON.stringify({
+        role_title: "Frontend Engineer",
+        years_experience: 4,
+        currency: "EGP",
+        salary_egp: 35000,
+      }),
+    });
+    const res = await POST(req as unknown as NextRequest);
+
+    expect(res.status).toBe(500);
+  });
 });
