@@ -196,7 +196,7 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
     }
 
     // Any job whose idx never appeared in a valid decision → fail open,
-    // but loudly. This used to be silent.
+    // but loudly (logged to console.error).
     const missing = jobs.filter((j) => !resultMap.has(j.id));
     if (missing.length > 0) {
       console.error(

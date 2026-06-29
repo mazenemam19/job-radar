@@ -5,7 +5,7 @@
 // date_unknown jobs use fetched_at as postedAt so recency decays from fetch time.
 // Recency is computed independently of the skill gate.
 // Seniority is multi-label set-overlap with four editable term arrays.
-//             Junior is no longer a hard reject — just another selectable level.
+//             Junior is just another selectable level.
 
 import type { RawJob, ResolvedSettings, ScoredJob, SeniorityLevel } from "./types";
 
