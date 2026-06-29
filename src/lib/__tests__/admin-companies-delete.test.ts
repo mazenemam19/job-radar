@@ -27,7 +27,9 @@ vi.mock("next/headers", () => ({
 
 // Helper to create a mock Supabase query chain
 function mockQuery(returnData: unknown, returnError: unknown = null) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {
+  const chain: Record<string, unknown> = {
+    error: returnError,
+    data: returnData,
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
@@ -93,6 +95,53 @@ describe("DELETE /api/admin/companies/[id]", () => {
     expect(companyDeleteQuery.eq).toHaveBeenCalledWith("id", "abc-123");
   });
 
-  it.skip("skips raw_jobs cleanup if company not found");
-  it.skip("returns 500 on DB error during company delete");
+  it("skips raw_jobs cleanup if company not found", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    // Call 1: user_profiles (requireAdmin)
+    // Call 2: select company → null (not found)
+    // Call 3: delete from ats_companies (still runs, just no-op for missing row)
+    const companyQuery = mockQuery(null);
+    const companyDeleteQuery = mockQuery(null, null);
+
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" }))
+      .mockReturnValueOnce(companyQuery)
+      .mockReturnValueOnce(companyDeleteQuery);
+
+    const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/ghost-id", { method: "DELETE" });
+    const res = await DELETE(req as unknown as NextRequest, { params: { id: "ghost-id" } });
+
+    // Deleting a non-existent company is idempotent → 200
+    expect(res.status).toBe(200);
+    // raw_jobs table should never have been touched (only 3 calls, no raw_jobs)
+    const fromCalls = (mockAdminDb.from as ReturnType<typeof vi.fn>).mock.calls;
+    const tablesCalled = fromCalls.map((c: string[]) => c[0]);
+    expect(tablesCalled).not.toContain("raw_jobs");
+  });
+
+  it("returns 500 on DB error during company delete", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    const companyQuery = mockQuery({ name: "Acme Corp", ats: "greenhouse" });
+    const rawJobsDeleteQuery = mockQuery(null, null);
+    const companyDeleteQuery = mockQuery(null, { message: "connection reset" });
+
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" })) // user_profiles (requireAdmin)
+      .mockReturnValueOnce(companyQuery) // select company
+      .mockReturnValueOnce(rawJobsDeleteQuery) // delete raw_jobs
+      .mockReturnValueOnce(companyDeleteQuery); // delete company → fails
+
+    const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/abc-123", { method: "DELETE" });
+    const res = await DELETE(req as unknown as NextRequest, { params: { id: "abc-123" } });
+
+    expect(res.status).toBe(500);
+  });
 });
