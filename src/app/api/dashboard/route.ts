@@ -34,7 +34,6 @@ export async function GET() {
   const db = createServerClient();
   // raw_jobs and app_config are global, not user-owned — RLS wasn't
   // checked/granted for them, so they stay on the service-role client.
-  // See docs/plans/2026-06-23-phase4-data-access-migration.md, task 8.
   const adminDb = createAdminClient();
 
   // Update last_active_at (fire and forget)
@@ -73,8 +72,8 @@ export async function GET() {
     }
   }
 
-  // Feature Request 2 (gemini-filter-audit.md): the Gemini key is now
-  // optional — see the Step 4 branch below for what happens without one.
+  // The Gemini key is now optional — see the Step 4 branch below for
+  // what happens without one.
 
   // ── Step 1: Fetch raw jobs for enabled pipelines ─────────────
   const enabledModes: string[] = [];

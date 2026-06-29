@@ -819,7 +819,7 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
     const jobs = data.result ?? [];
     const rawCount = jobs.length;
     // BambooHR's list endpoint never includes a description (Bug 4,
-    // gemini-filter-audit.md) — fetch each job's detail page for the real
+    // Fetch each job's detail page for the real description.
     // description, mirroring fetchWorkable's detail-fetch pattern.
     const withDesc = await pLimit(
       jobs.map((r) => async () => {

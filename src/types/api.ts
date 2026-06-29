@@ -133,7 +133,7 @@ export interface BambooJob {
 }
 
 /** Shape of GET https://{slug}.bamboohr.com/careers/{id}/detail (Bug 4,
- * gemini-filter-audit.md). Only the field this codebase actually reads. */
+ * Only the field this codebase actually reads. */
 export interface BambooDetail {
   result?: {
     jobOpening?: {

@@ -80,8 +80,7 @@ export interface ScoredJob extends RawJob {
   gemini_reason: string | null;
   /** true only when Gemini returned a real, matched decision for this job;
    *  false when it fell through a fail-open path (missing idx or batch
-   *  failure) — see Feature Request 1 in
-   *  docs/plans/2026-06-24-gemini-reviewed-indicator.md. */
+   *  failure). */
   gemini_reviewed: boolean;
   /** true only when gemini_reviewed is false specifically because every
    *  model in the queue was quota-exhausted, not some other failure mode.

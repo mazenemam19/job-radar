@@ -83,7 +83,7 @@ export function getDisplaySeniorityBadge(
   return null;
 }
 
-// ── Boilerplate-aware keyword matching (Bug 2, gemini-filter-audit.md) ──
+// ── Boilerplate-aware keyword matching ──────────────────────
 
 /**
  * Many ATS postings open with a long "About [Company]" boilerplate

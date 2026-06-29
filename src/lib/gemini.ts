@@ -19,8 +19,7 @@ const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the lar
 
 // Fixed, code-owned response-format contract. Deliberately NOT part of
 // gemini_filter_prompt (which is user-editable) — see Bug 1 in
-// docs/plans/2026-06-24-gemini-index-based-matching.md for why a stored,
-// user-editable JSON contract is how this broke in the first place.
+// A stored, user-editable JSON contract is how this broke in the first place.
 // Index-based (not job.id) because asking a model to echo back long,
 // opaque composite ID strings character-for-character is fragile; a short
 // integer it can't mangle is not.
@@ -59,7 +58,7 @@ interface FilterResult {
   // true only when Gemini returned a real, matched decision for this job's
   // idx. false for both fail-open paths (missing idx in an otherwise-valid
   // response, or total batch failure). See Feature Request 1 in
-  // docs/plans/2026-06-24-gemini-reviewed-indicator.md.
+
   reviewed: boolean;
   // true only when the batch failed open specifically because every model
   // was quota-exhausted (see GeminiQuotaExhaustedError). Optional because
@@ -144,7 +143,7 @@ async function filterBatch(
     title: j.title,
     company: j.company,
     location: j.location,
-    // 10,000 chars (data-driven — see docs/plans/2026-06-25-jd-truncation-resolution.md).
+    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k).
     // Real raw_jobs distribution showed 91% of jobs fully covered at 10k vs.
     // 48.8% at the old 6000-char ingestion ceiling; pushing past 10k buys only
     // 8.2% more coverage (up to 15k) for a disproportionate token-cost increase.
