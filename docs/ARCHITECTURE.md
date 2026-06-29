@@ -482,7 +482,7 @@ Vitest specs live in `src/lib/__tests__/`, covering the scoring/gating logic, se
 
 ## 12. Migration model
 
-The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were left untouched; the multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `middleware.ts`) that import and adapt the old logic. `ats-bridge.ts` exists to reshape data between the old fetcher signatures and the new DB-backed types.
+The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were extended with new features (per-user seniority config, atomic domain counts, Teamtailor/Breezy tracking, Supabase-backed rate limiting) rather than replaced. The multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `middleware.ts`) that import and adapt the fetchers. `ats-bridge.ts` reshapes data between the fetcher signatures and the new DB-backed types.
 
 ---
 
