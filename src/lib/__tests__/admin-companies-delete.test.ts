@@ -26,6 +26,7 @@ vi.mock("next/headers", () => ({
 }));
 
 // Helper to create a mock Supabase query chain
+// The chain is thenable so `await` resolves to { data, error } realistically.
 function mockQuery(returnData: unknown, returnError: unknown = null) {
   const chain: Record<string, unknown> = {
     error: returnError,
@@ -34,6 +35,10 @@ function mockQuery(returnData: unknown, returnError: unknown = null) {
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data: returnData, error: returnError }),
     delete: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    then: (onfulfilled: (val: { data: unknown; error: unknown }) => unknown) =>
+      Promise.resolve({ data: returnData, error: returnError }).then(onfulfilled),
   };
   return chain;
 }
@@ -143,5 +148,113 @@ describe("DELETE /api/admin/companies/[id]", () => {
     const res = await DELETE(req as unknown as NextRequest, { params: { id: "abc-123" } });
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe("PUT /api/admin/companies/[id]", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 403 when user is not admin", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    const { PUT } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/123", {
+      method: "PUT",
+      body: JSON.stringify({ name: "New Name" }),
+    });
+    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 for invalid JSON", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    // requireAdmin: role check via adminDb
+    mockAdminDb.from = vi.fn().mockReturnValueOnce(mockQuery({ role: "admin" })); // user_profiles (requireAdmin)
+
+    const { PUT } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/123", {
+      method: "PUT",
+      body: "not json",
+    });
+    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid ATS type", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    // requireAdmin: role check via adminDb
+    mockAdminDb.from = vi.fn().mockReturnValueOnce(mockQuery({ role: "admin" })); // user_profiles (requireAdmin)
+
+    const { PUT } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/123", {
+      method: "PUT",
+      body: JSON.stringify({ ats: "invalid_ats" }),
+    });
+    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    expect(res.status).toBe(400);
+  });
+
+  it("updates company fields and returns 200", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    const updatedRow = {
+      id: "comp-123",
+      name: "Updated Corp",
+      ats: "greenhouse",
+      slug: "updated-corp",
+      country: "US",
+      is_active: true,
+    };
+    const updateQuery = mockQuery(updatedRow);
+
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" })) // user_profiles (requireAdmin)
+      .mockReturnValueOnce(updateQuery); // update company
+
+    const { PUT } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/comp-123", {
+      method: "PUT",
+      body: JSON.stringify({ name: "Updated Corp", country: "US" }),
+    });
+    const res = await PUT(req as unknown as NextRequest, { params: { id: "comp-123" } });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.data.name).toBe("Updated Corp");
+    expect(updateQuery.update).toHaveBeenCalled();
+    expect(updateQuery.eq).toHaveBeenCalledWith("id", "comp-123");
+  });
+
+  it("returns 404 when company not found after update", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+
+    const updateQuery = mockQuery(null, null); // no row returned → 404
+
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" }))
+      .mockReturnValueOnce(updateQuery);
+
+    const { PUT } = await import("../../app/api/admin/companies/[id]/route");
+    const req = new Request("http://localhost/api/admin/companies/ghost-id", {
+      method: "PUT",
+      body: JSON.stringify({ name: "Ghost" }),
+    });
+    const res = await PUT(req as unknown as NextRequest, { params: { id: "ghost-id" } });
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.ok).toBe(false);
   });
 });

@@ -143,6 +143,40 @@ describe("GET /api/salary", () => {
 
     expect(queryMock.eq).toHaveBeenCalledWith("pipeline", "global");
   });
+
+  // I4: Single-row groups are suppressed (privacy: need 2+ to aggregate)
+  it("suppresses aggregation groups with fewer than 2 entries", async () => {
+    const rows = [
+      {
+        role_title: "Rare Role",
+        years_experience: 3,
+        currency: "EGP",
+        salary_egp: 99999,
+        salary_usd: null,
+        pipeline: "local",
+      },
+    ];
+    mockServerDb.from.mockReturnValue(mockQuery(rows));
+
+    const { GET } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary");
+    const res = await GET(req as unknown as NextRequest);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data).toEqual([]); // single entry → suppressed
+  });
+
+  // I5: Supabase error → 500
+  it("returns 500 when Supabase query fails", async () => {
+    mockServerDb.from.mockReturnValue(mockQuery(null, { message: "connection reset" }));
+
+    const { GET } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary");
+    const res = await GET(req as unknown as NextRequest);
+
+    expect(res.status).toBe(500);
+  });
 });
 
 describe("POST /api/salary", () => {
@@ -222,5 +256,56 @@ describe("POST /api/salary", () => {
     expect(res.status).toBe(201);
     expect(json.ok).toBe(true);
     expect(json.data.role_title).toBe("Frontend Engineer");
+  });
+
+  // I2: Verify role_title is trimmed before insert
+  it("trims whitespace from role_title before insert", async () => {
+    const insertedRow = {
+      id: "r1",
+      user_id: "user-123",
+      role_title: "Frontend Engineer",
+      years_experience: 4,
+      currency: "EGP",
+      salary_egp: 35000,
+      salary_usd: null,
+      employment_type: null,
+      work_arrangement: null,
+      pipeline: null,
+      reported_at: "2025-06-01T00:00:00Z",
+      last_updated_at: "2025-06-01T00:00:00Z",
+    };
+    const queryMock = mockQuery(insertedRow);
+    mockServerDb.from.mockReturnValue(queryMock);
+
+    const { POST } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary", {
+      method: "POST",
+      body: JSON.stringify({
+        role_title: "  Frontend Engineer  ",
+        years_experience: 4,
+        currency: "EGP",
+        salary_egp: 35000,
+      }),
+    });
+    const res = await POST(req as unknown as NextRequest);
+    const json = await res.json();
+
+    expect(res.status).toBe(201);
+    // The route trims role_title before insert
+    expect(json.data.role_title).toBe("Frontend Engineer");
+  });
+
+  // I3: Invalid JSON body → 400
+  it("returns 400 for invalid JSON body", async () => {
+    const { POST } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary", {
+      method: "POST",
+      body: "not valid json {{{",
+    });
+    const res = await POST(req as unknown as NextRequest);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.ok).toBe(false);
   });
 });
