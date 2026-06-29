@@ -167,6 +167,19 @@ describe("GET /api/salary", () => {
     expect(json.data).toEqual([]); // single entry → suppressed
   });
 
+  it("returns 200 with empty data when no salary rows exist", async () => {
+    mockServerDb.from.mockReturnValue(mockQuery([]));
+
+    const { GET } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary");
+    const res = await GET(req as unknown as NextRequest);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.data).toEqual([]);
+  });
+
   // I5: Supabase error → 500
   it("returns 500 when Supabase query fails", async () => {
     mockServerDb.from.mockReturnValue(mockQuery(null, { message: "connection reset" }));
