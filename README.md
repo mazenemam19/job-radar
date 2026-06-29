@@ -39,13 +39,12 @@ data, mobile, or any other role, and the same scoring/Gemini pipeline applies.
 
 ## 🛤️ Pipelines
 
-Three pipelines, each independently toggleable per user in `/settings`:
+Two pipelines, each independently toggleable per user in `/settings`:
 
-| Pipeline             | What it finds                             |
-| -------------------- | ----------------------------------------- |
-| ✈️ **Visa**          | Companies that sponsor visas / relocation |
-| 🇪🇬 **Local**         | Egypt-based companies                     |
-| 🌐 **Global Remote** | Worldwide remote-friendly companies       |
+| Pipeline      | What it finds                       |
+| ------------- | ----------------------------------- |
+| 🇪🇬 **Local**  | Egypt-based companies               |
+| 🌐 **Global** | Worldwide remote-friendly companies |
 
 Companies are sourced via Greenhouse, Lever, Ashby, Workable, Teamtailor,
 Breezy, SmartRecruiters, BambooHR, and JazzHR. New companies can be submitted

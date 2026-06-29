@@ -476,25 +476,13 @@ scripts/send-salary-reminders.ts    # Local/CI entrypoint for the monthly remind
 
 ## 11. Testing
 
-Vitest specs live in `src/lib/__tests__/`: `ats-bridge.test.ts`, `runner.test.ts`,
-`scoring.test.ts`, `settings.test.ts`, with a shared `setup.ts`. These cover the pipeline
-adapter, the cron orchestrator, the scoring/gating logic, and settings resolution —
-notably the parts of the system with the most behavioral nuance (live recency
-computation, fail-open Gemini behavior, per-field settings merge).
+Vitest specs live in `src/lib/__tests__/`, covering the scoring/gating logic, settings resolution, the ATS bridge adapter, the cron orchestrator, Gemini filtering, email notifications, domain-counts persistence, account deletion, and salary route handling. Run with `pnpm test`.
 
 ---
 
 ## 12. Migration model
 
-Comments throughout the new files (`runner.ts`, `ats-bridge.ts`, `middleware.ts`)
-describe a deliberate strategy for this rewrite: **add, don't modify**. The original
-single-user ingestion fetchers (`sources/ats-utils.ts`) and the route-matching for old
-public pages are left untouched; the multi-tenant layer is built as new files
-(`runner.ts`, `ats-bridge.ts`, new `/api/cron`, `/api/dashboard`, `middleware.ts`) that
-import and adapt the old logic rather than rewriting it in place. This keeps the
-original single-user behavior intact as a fallback/reference while the multi-tenant
-surface is layered on top, at the cost of some indirection (e.g. `ats-bridge.ts` exists
-purely to reshape data between the old fetcher signatures and the new DB-backed types).
+The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were left untouched; the multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `middleware.ts`) that import and adapt the old logic. `ats-bridge.ts` exists to reshape data between the old fetcher signatures and the new DB-backed types.
 
 ---
 
