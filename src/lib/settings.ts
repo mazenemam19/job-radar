@@ -330,7 +330,7 @@ export async function saveUserSettings(
  * signup. This is the ONLY place default values get copied into a user's
  * profile. After this call, the row is the user's own data — later admin
  * edits to default_settings must never touch it again (that's the bug this
- * function replaces: the old `uses_defaults` flag re-read defaults live on
+ * Replaces the previous `uses_defaults` approach (which re-read defaults on
  * every request instead of copying them once).
  *
  * Safe to call more than once: if the user already has a row (e.g. this

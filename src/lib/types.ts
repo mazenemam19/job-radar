@@ -1,6 +1,6 @@
 // src/lib/types.ts
 // All shared TypeScript types for the SaaS layer.
-// These are NEW types – they do not replace or extend the old Job type.
+// Domain types for the SaaS layer.
 
 // ── ATS & Raw Jobs ──────────────────────────────────────────
 

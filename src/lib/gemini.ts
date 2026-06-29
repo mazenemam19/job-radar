@@ -144,12 +144,10 @@ async function filterBatch(
     company: j.company,
     location: j.location,
     // 10,000 chars (data-driven: 91% of jobs fully covered at 10k).
-    // Real raw_jobs distribution showed 91% of jobs fully covered at 10k vs.
-    // 48.8% at the old 6000-char ingestion ceiling; pushing past 10k buys only
-    // 8.2% more coverage (up to 15k) for a disproportionate token-cost increase.
-    // There is no longer an ingestion ceiling to stay under (ats-utils.ts's
-    // processJobs stores the full description) — this number is now set by
-    // Gemini coverage/cost tradeoff alone, not by matching a storage limit.
+    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs.
+    // 48.8% at the previous 6000-char ceiling; pushing past 10k buys only
+    // 8.2% more coverage for a disproportionate token-cost increase).
+    // No ingestion ceiling — processJobs stores the full description.
     description: j.description.slice(0, 10000),
   }));
 
