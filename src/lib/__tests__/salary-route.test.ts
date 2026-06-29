@@ -144,7 +144,7 @@ describe("GET /api/salary", () => {
     expect(queryMock.eq).toHaveBeenCalledWith("pipeline", "global");
   });
 
-  // I4: Single-row groups are suppressed (privacy: need 2+ to aggregate)
+  // Aggregation suppresses groups with fewer than 2 entries (privacy guard)
   it("suppresses aggregation groups with fewer than 2 entries", async () => {
     const rows = [
       {
@@ -180,7 +180,7 @@ describe("GET /api/salary", () => {
     expect(json.data).toEqual([]);
   });
 
-  // I5: Supabase error → 500
+  // Supabase query failure returns 500
   it("returns 500 when Supabase query fails", async () => {
     mockServerDb.from.mockReturnValue(mockQuery(null, { message: "connection reset" }));
 
@@ -271,7 +271,7 @@ describe("POST /api/salary", () => {
     expect(json.data.role_title).toBe("Frontend Engineer");
   });
 
-  // I2: Verify role_title is trimmed before insert
+  // role_title is trimmed before insert
   it("trims whitespace from role_title before insert", async () => {
     const insertedRow = {
       id: "r1",
@@ -308,7 +308,7 @@ describe("POST /api/salary", () => {
     expect(json.data.role_title).toBe("Frontend Engineer");
   });
 
-  // I3: Invalid JSON body → 400
+  // Malformed JSON body returns 400
   it("returns 400 for invalid JSON body", async () => {
     const { POST } = await import("../../app/api/salary/route");
     const req = new Request("http://localhost/api/salary", {
