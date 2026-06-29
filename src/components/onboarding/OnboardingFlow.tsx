@@ -1,7 +1,7 @@
 "use client";
 // src/components/onboarding/OnboardingFlow.tsx
 //
-// Feature Request 2 (gemini-filter-audit.md): the Gemini key is optional
+// The Gemini key is now optional.
 // now, which removes the only reason this was ever a 2-step flow (gate
 // Step 2 behind a required Step 1). Single screen: key field (skippable)
 // + the defaults-vs-customize choice, both saved in one PATCH call.

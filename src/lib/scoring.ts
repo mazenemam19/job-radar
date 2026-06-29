@@ -1,23 +1,15 @@
 // src/lib/scoring.ts
-// Bug fixes vs old code (src/lib/scoring.ts):
+// Job scoring: recency, skill match, seniority gating, and merging.
 //
-// FIX #3: recencyScore is always computed LIVE from postedAt (never stored/frozen).
-//         The exported computeRecencyScore() function is used both here and in the UI.
-//
-// FIX #5: date_unknown jobs use fetched_at as postedAt. Their recency decays
-//         normally from fetch time rather than being permanently "now".
-//
-// FIX #6: recencyScore is computed independently of the skill gate. A job that
-//         fails the skill gate gets recencyScore computed (not forced to 0) and
-//         then the job is simply not stored (total_score gate applied at merge time).
-//
-// TIER 5b+5c: Seniority is now multi-label set-overlap, not single-winner precedence.
-//             Four editable term arrays replace the four hardcoded regexes.
-//             Junior is no longer a hard reject — just another selectable level.
+// Recency is always computed live from postedAt (never stored/frozen).
+// date_unknown jobs use fetched_at as postedAt so recency decays from fetch time.
+// Recency is computed independently of the skill gate.
+// Seniority is multi-label set-overlap with four editable term arrays.
+//             Junior is just another selectable level.
 
 import type { RawJob, ResolvedSettings, ScoredJob, SeniorityLevel } from "./types";
 
-// ── Seniority: term-array classification (Tier 5c, B2) ───────
+// ── Seniority: term-array classification ─────────────────────
 
 /** Ordinal rank for display badge purposes only (highest-wins). */
 const SENIORITY_RANK: SeniorityLevel[] = ["junior", "mid", "senior", "staff"];
@@ -83,7 +75,7 @@ export function getDisplaySeniorityBadge(
   return null;
 }
 
-// ── Boilerplate-aware keyword matching (Bug 2, gemini-filter-audit.md) ──
+// ── Boilerplate-aware keyword matching ──────────────────────
 
 /**
  * Many ATS postings open with a long "About [Company]" boilerplate
@@ -131,7 +123,8 @@ export function hasMeaningfulKeywordMatch(text: string, keywords: string[]): boo
 
 /**
  * Compute recency score LIVE from a date string.
- * FIX #3: Never pass a pre-stored score; always call this with the current clock.
+ * Recency is always computed live from postedAt.
+ * Never pass a pre-stored score; always call this with the current clock.
  */
 export function computeRecencyScore(postedAt: string): number {
   const ms = Date.parse(postedAt);

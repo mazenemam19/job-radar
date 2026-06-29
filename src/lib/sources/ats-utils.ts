@@ -129,9 +129,8 @@ export function setWorkableBudgetConfig(config: Partial<WorkableBudgetConfig>): 
   resetWorkableUsed();
 }
 
-// ── Workable rate-limit state (Supabase-backed) ─────────────────────────────
-// This used to live in /tmp JSON files and a plain in-memory variable, which
-// does not survive across serverless invocations (Vercel functions and
+// Workable rate-limit state (Supabase-backed).
+// Persisted to app_config so the limiter survives across serverless invocations.
 // GitHub Actions runs are both stateless per run) — meaning blocks and budget
 // config silently reset to defaults on every single cron run. Persisting to
 // app_config makes this actually work across runs.
@@ -309,9 +308,7 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode):
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      // Full description stored — no ceiling. The old 6000-char slice (Bug 3,
-      // raised from 3000) was still truncating a significant portion of live jobs.
-      // Real ceiling determined by Gemini window in gemini.ts's filterBatch.
+      // Full description stored — no ceiling.
       description: r.description,
       isRemote,
       postedAt: r.postedAt || now,
@@ -583,8 +580,8 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
     const data = (await res.json()) as { jobs?: WorkableJob[] };
     const rawJobs = data.jobs || [];
     const rawCount = rawJobs.length;
-    // NOTE: this used to pre-filter by title via the old hardcoded scoring.ts
-    // before even fetching job details, as a Workable API budget optimization.
+    // NOTE: title pre-filtering was removed — all jobs now flow through
+    // to the per-user scoring pipeline where filtering actually belongs.
     // Removed for the same reason as processJobs — role filtering is the
     // user's call via /settings now, not a hardcoded gate. If Workable detail-fetch
     // volume becomes a real budget concern, that's a separate, deliberate decision —
@@ -818,9 +815,9 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
     const data = (await res.json()) as { result?: BambooJob[] };
     const jobs = data.result ?? [];
     const rawCount = jobs.length;
-    // BambooHR's list endpoint never includes a description (Bug 4,
-    // gemini-filter-audit.md) — fetch each job's detail page for the real
-    // description, mirroring fetchWorkable's detail-fetch pattern.
+    // BambooHR's list endpoint never includes a description.
+    // Fetch each job's detail page for the real description,
+    // mirroring fetchWorkable's detail-fetch pattern.
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         let description = "";

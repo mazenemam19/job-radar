@@ -1,14 +1,6 @@
 // src/lib/runner.ts
-// New cron orchestrator for Job Radar.
-//
-// Key differences from old runner.ts (src/lib/runner.ts):
-//  1. Reads company list from public.ats_companies DB table (not hardcoded ALL_COMPANIES)
-//  2. Writes jobs to public.raw_jobs (not the old `storage` table)
-//  3. After a successful run, bumps app_config.last_cron_at so all user caches
-//     are invalidated and rebuilt lazily on next dashboard load
-//  4. All bug fixes (#3-#6) are applied in scoring.ts; runner is just the orchestrator
-//
-// This file is IMPORTED by /api/cron/route.ts and never modifies old files.
+// Cron orchestrator: fetches jobs from all ATS sources, scores them,
+// persists to raw_jobs, and sends scan-complete emails.
 
 import { createAdminClient } from "./supabase/admin";
 import { fetchCompany } from "./ats-bridge";

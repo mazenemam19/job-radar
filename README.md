@@ -5,17 +5,10 @@ skill list, seniority preferences, and filtering rules, and get a personalized
 feed of roles scraped across hundreds of ATS-listed companies — scored
 against _their_ settings, not a hardcoded profile.
 
-This was originally a personal single-user tool built around one hardcoded
-profile (a Senior React/Next.js engineer); it's been rebuilt as a SaaS-style
-platform. **Role filtering is no longer baked into ingestion at all** — the
-scraper pulls every job a company posts, of any discipline, into the shared
+The scraper pulls every job a company posts, of any discipline, into the shared
 pool. Every filtering decision (skills, seniority, excluded/required
-keywords, blacklisted locations, Gemini's filter prompt) now lives in
-`/settings`, per user. The app ships with a Senior React/Next.js profile as
-the _default_ starting point (a holdover from its single-user origins,
-visible during onboarding), but that default is just data in
-`default_settings` — any user can repoint their own `/settings` at backend,
-data, mobile, or any other role, and the same scoring/Gemini pipeline applies.
+keywords, blacklisted locations, Gemini's filter prompt) lives in
+`/settings`, per user.
 
 > 📐 For the full system breakdown — data model, request flows (auth, cron
 > ingestion, per-user dashboard rebuild), the ATS ingestion layer, and the
@@ -39,13 +32,12 @@ data, mobile, or any other role, and the same scoring/Gemini pipeline applies.
 
 ## 🛤️ Pipelines
 
-Three pipelines, each independently toggleable per user in `/settings`:
+Two pipelines, each independently toggleable per user in `/settings`:
 
-| Pipeline             | What it finds                             |
-| -------------------- | ----------------------------------------- |
-| ✈️ **Visa**          | Companies that sponsor visas / relocation |
-| 🇪🇬 **Local**         | Egypt-based companies                     |
-| 🌐 **Global Remote** | Worldwide remote-friendly companies       |
+| Pipeline      | What it finds                       |
+| ------------- | ----------------------------------- |
+| 🇪🇬 **Local**  | Egypt-based companies               |
+| 🌐 **Global** | Worldwide remote-friendly companies |
 
 Companies are sourced via Greenhouse, Lever, Ashby, Workable, Teamtailor,
 Breezy, SmartRecruiters, BambooHR, and JazzHR. New companies can be submitted
@@ -97,9 +89,9 @@ For local/manual runs: `pnpm run cron` and `pnpm run salary-reminders`.
 
 Per-user opt-in (`/settings` → Email Alerts), two templates:
 
-- **New match found** — fires when a user's dashboard recomputes and finds
-  jobs they haven't seen before. Never fires on a user's very first load
-  (nothing to compare against yet).
+- **Scan complete** — sent after each cron run to eligible users. Generic
+  notification that new jobs are available; no job listings included (users
+  open the dashboard to see their personalized results).
 - **Monthly salary reminder** — nudges users whose salary report is stale.
 
 ---

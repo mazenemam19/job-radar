@@ -1,6 +1,6 @@
 // src/lib/types.ts
 // All shared TypeScript types for the SaaS layer.
-// These are NEW types – they do not replace or extend the old Job type.
+// Domain types for the SaaS layer.
 
 // ── ATS & Raw Jobs ──────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export type ATSType =
   | "bamboohr"
   | "jazzhr";
 
-/** Pipeline mode for job fetching. "visa" collapsed to "global" in Tier 5b. */
+/** Pipeline mode for job fetching. "visa" was collapsed to "global". */
 export type JobMode = "local" | "global";
 
 /** Seniority levels, ordinal-ranked for display purposes. */
@@ -80,8 +80,7 @@ export interface ScoredJob extends RawJob {
   gemini_reason: string | null;
   /** true only when Gemini returned a real, matched decision for this job;
    *  false when it fell through a fail-open path (missing idx or batch
-   *  failure) — see Feature Request 1 in
-   *  docs/plans/2026-06-24-gemini-reviewed-indicator.md. */
+   *  failure). */
   gemini_reviewed: boolean;
   /** true only when gemini_reviewed is false specifically because every
    *  model in the queue was quota-exhausted, not some other failure mode.

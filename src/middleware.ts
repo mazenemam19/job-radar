@@ -1,6 +1,4 @@
 // src/middleware.ts
-// NEW FILE — does not exist in the original codebase.
-//
 // Redirects unauthenticated users to /login, and signs out + redirects
 // blocked users, for all protected routes.
 //

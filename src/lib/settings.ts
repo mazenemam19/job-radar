@@ -8,8 +8,7 @@
 // below only covers genuinely-missing data (e.g. a row that predates this
 // snapshot, or a field added after the user signed up) — it must never be
 // relied on as an ongoing sync path. An admin changing default_settings
-// must not change what an existing user sees. See
-// docs/plans/2026-06-28-defaults-snapshot-on-signup.md.
+// must not change what an existing user sees.
 
 import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
@@ -24,7 +23,7 @@ import type {
 // Pure evaluation criteria only — no response-format instructions here.
 // The JSON contract is owned by code (see RESPONSE_FORMAT_INSTRUCTIONS in
 // gemini.ts) precisely so a user editing this field can never again break
-// the parser. See docs/plans/2026-06-24-gemini-index-based-matching.md.
+// the parser.
 const FALLBACK_PROMPT = `You are a job filter for a Senior React/Next.js engineer. Evaluate each job listing on whether it's a genuine fit for this profile, based on seniority, relevant tech stack, and role type.`;
 
 const FALLBACK_DEFAULTS: ResolvedSettings = {
@@ -331,7 +330,7 @@ export async function saveUserSettings(
  * signup. This is the ONLY place default values get copied into a user's
  * profile. After this call, the row is the user's own data — later admin
  * edits to default_settings must never touch it again (that's the bug this
- * function replaces: the old `uses_defaults` flag re-read defaults live on
+ * Replaces the previous `uses_defaults` approach (which re-read defaults on
  * every request instead of copying them once).
  *
  * Safe to call more than once: if the user already has a row (e.g. this

@@ -34,7 +34,6 @@ export async function GET() {
   const db = createServerClient();
   // raw_jobs and app_config are global, not user-owned — RLS wasn't
   // checked/granted for them, so they stay on the service-role client.
-  // See docs/plans/2026-06-23-phase4-data-access-migration.md, task 8.
   const adminDb = createAdminClient();
 
   // Update last_active_at (fire and forget)
@@ -73,8 +72,8 @@ export async function GET() {
     }
   }
 
-  // Feature Request 2 (gemini-filter-audit.md): the Gemini key is now
-  // optional — see the Step 4 branch below for what happens without one.
+  // The Gemini key is now optional — see the Step 4 branch below for
+  // what happens without one.
 
   // ── Step 1: Fetch raw jobs for enabled pipelines ─────────────
   const enabledModes: string[] = [];
@@ -114,9 +113,9 @@ export async function GET() {
   // dashboard (the old behavior). An invalid/exhausted key already failed
   // open silently and showed everything anyway, so the strictest outcome
   // was backwards: reserved for the one case where the user did
-  // everything right. Missing-key jobs get the same fail-open shape Bug
-  // 1's matching already produces, so Feature Request 1's "Not
-  // AI-reviewed" badge covers this for free.
+  // everything right. Missing-key jobs get the same fail-open shape
+  // the strict matching already produces, so the "Not AI-reviewed" badge
+  // covers this for free.
   const geminiFiltered = profile?.gemini_api_key
     ? await filterJobsWithGemini(profile.gemini_api_key, afterGlobalModeFilter, settings)
     : afterGlobalModeFilter.map((j) => ({

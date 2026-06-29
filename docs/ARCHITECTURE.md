@@ -4,15 +4,7 @@ Job Radar is a multi-tenant job-hunting SaaS. It scrapes every job posted by
 hundreds of ATS-listed companies — **ingestion is role-agnostic**, pulling
 whatever each company has open, not just frontend roles — then filters and
 scores each job **per user**, against that user's own skills, seniority
-preference, keyword rules, and Gemini prompt — instead of one hardcoded
-profile. The app ships with a Senior React/Next.js engineer profile as the
-_default_ `default_settings` row (a holdover from its single-user origins;
-surfaced to new users during onboarding), but that's just data — any user can
-repoint their own `/settings` at any role/stack, and the same pipeline
-applies unchanged. This document describes how the
-system is put together on this branch, which rebuilds the original single-user tool
-into a multi-tenant platform without modifying the original ingestion/scoring code in
-place (see [Migration model](#12-migration-model)).
+preference, keyword rules, and Gemini prompt.
 
 ---
 
@@ -113,20 +105,17 @@ hardcoded constants and into per-user, database-backed settings, while keeping t
   against _their own_ `user_settings` row, producing a personal `user_jobs_cache` entry.
   This avoids re-scraping per user while keeping every user's results fully personalized.
 
-- **Ingestion is role-agnostic by design.** `processJobs()` in
-  `sources/ats-utils.ts` carries an explicit comment: title-based "too senior" /
-  "non-frontend" filtering used to happen at ingestion, and was **deliberately removed**
-  when the app went multi-tenant. The only filtering left at ingestion time is
-  geographic/timezone eligibility for the `global` pipeline — not role, seniority, or
-  skill. Every job a company posts, of any discipline, lands in `raw_jobs`; role
-  filtering is entirely a downstream, per-user decision made in the settings/scoring
-  gates (§6).
+- **Ingestion is role-agnostic.** `processJobs()` in
+  `sources/ats-utils.ts` performs only geography/timezone eligibility (for the
+  `global` pipeline) and a hard 30-day age cap — not role, seniority, or skill
+  filtering. Every job a company posts, of any discipline, lands in `raw_jobs`;
+  role filtering is entirely a downstream, per-user decision made in the
+  settings/scoring gates (§6).
 
 - **Per-field settings inheritance.** `resolveUserSettings()` (`src/lib/settings.ts`)
   merges `user_settings` over `default_settings`, field by field — a user can override
-  just `job_age_days` while still inheriting the admin's `expert_skills` list, etc. If
-  `uses_defaults = true`, skills/prompt always come from defaults, but pipeline toggles,
-  seniority, keyword lists, and weights remain user-controlled.
+  just `job_age_days` while still inheriting the admin's `expert_skills` list, etc.
+  Pipeline toggles, seniority, keyword lists, and weights are always user-controlled.
 
 - **Per-user AI key.** Each user supplies their own Gemini API key
   (`user_profiles.gemini_api_key`). Gemini filtering, and Gemini token cost, is fully
@@ -216,12 +205,10 @@ GET /api/dashboard
          d. Pull raw_jobs for the user's enabled pipelines (cap: 2000 rows)
          e. passesDateGate()      — drop jobs older than job_age_days
          f. passesSettingsGate()  — seniority / excluded / required / blacklist / skill-match regex
-         g. filterJobsWithGemini()— user's own key + custom prompt, batched 30/call, fail-open
+         g. filterJobsWithGemini()— user's own key + custom prompt, batched 15/call, fail-open
          h. scoreJob() per surviving job — skill match, live recency, relocation bonus
          i. mergeJobs([], scored) — drop total_score ≤ 0, sort desc
          j. Upsert user_jobs_cache (jobs, pipeline_log, cached_at, raw_pool_version)
-         k. If not first-ever load and alerts enabled: diff against
-            previous IDs → sendJobAlertEmail() for genuinely new jobs (fire-and-forget)
   3. Return { jobs, pipeline_log, cached_at, from_cache }
 ```
 
@@ -302,9 +289,10 @@ survived the free stages:
    being treated as permanently fresh.
 2. **Settings gate** (`passesSettingsGate`) — regex-based, all driven by the user's
    resolved settings, never hardcoded:
-   - **Seniority gate**: rejects junior/intern titles outright; staff/lead/principal
-     always pass; mid-level passes only if `seniority_allow_mid`; unlabelled titles pass
-     through to Gemini.
+   - **Seniority gate**: checks if the job's title matches any seniority
+     keyword (junior/mid/senior/staff) and whether that level is in the user's
+     selected `seniority_levels`. Unlabelled titles pass through. The user
+     selects which levels they want in `/settings`.
    - **Excluded keywords** — reject if the title matches any (word-boundary regex).
    - **Required keywords** — reject unless title+description+location matches at least
      one (falls back to `expert_skills` if the user hasn't set explicit required
@@ -313,7 +301,7 @@ survived the free stages:
      specific countries, "no visa sponsorship," "must be a US citizen").
    - **Skill match floor** — reject if zero expert _or_ secondary skills are found in
      the description at all.
-3. **Gemini gate** (`filterJobsWithGemini`) — batches of 30 jobs sent to the user's own
+3. **Gemini gate** (`filterJobsWithGemini`) — batches of 15 jobs sent to the user's own
    Gemini key with their custom evaluation criteria (`gemini_filter_prompt` — criteria
    only; the JSON response contract is fixed and code-owned, appended at call time, not
    stored in user-editable text). Each job is identified to Gemini by its position in
@@ -411,12 +399,11 @@ Both can also be run locally/manually: `pnpm run cron`, `pnpm run salary-reminde
 
 Two email types, both sent via Nodemailer/SMTP (`src/lib/email.ts`):
 
-- **New match alert** — fired from inside the `/api/dashboard` rebuild path whenever a
-  user's recompute surfaces jobs not present in their previous cache, grouped by
-  pipeline in the email body. Explicitly skipped on a user's very first-ever load (no
-  baseline to diff against) and gated by `email_alerts_enabled` per user.
-- **Monthly salary reminder** — sent to users whose most recent `salary_reports` entry is
-  stale, via the standalone monthly script/workflow above.
+- **Scan complete** — sent after each cron run to eligible users
+  (`email_alerts_enabled = true`). Generic notification that new jobs are
+  available; no job listings included. Gated by `companiesScanned > 0`.
+- **Monthly salary reminder** — sent to users whose most recent `salary_reports`
+  entry is stale, via the standalone monthly script/workflow above.
 
 ---
 
@@ -476,25 +463,13 @@ scripts/send-salary-reminders.ts    # Local/CI entrypoint for the monthly remind
 
 ## 11. Testing
 
-Vitest specs live in `src/lib/__tests__/`: `ats-bridge.test.ts`, `runner.test.ts`,
-`scoring.test.ts`, `settings.test.ts`, with a shared `setup.ts`. These cover the pipeline
-adapter, the cron orchestrator, the scoring/gating logic, and settings resolution —
-notably the parts of the system with the most behavioral nuance (live recency
-computation, fail-open Gemini behavior, per-field settings merge).
+Vitest specs live in `src/lib/__tests__/`, covering the scoring/gating logic, settings resolution, the ATS bridge adapter, the cron orchestrator, Gemini filtering, email notifications, domain-counts persistence, account deletion, and salary route handling. Run with `pnpm test`.
 
 ---
 
 ## 12. Migration model
 
-Comments throughout the new files (`runner.ts`, `ats-bridge.ts`, `middleware.ts`)
-describe a deliberate strategy for this rewrite: **add, don't modify**. The original
-single-user ingestion fetchers (`sources/ats-utils.ts`) and the route-matching for old
-public pages are left untouched; the multi-tenant layer is built as new files
-(`runner.ts`, `ats-bridge.ts`, new `/api/cron`, `/api/dashboard`, `middleware.ts`) that
-import and adapt the old logic rather than rewriting it in place. This keeps the
-original single-user behavior intact as a fallback/reference while the multi-tenant
-surface is layered on top, at the cost of some indirection (e.g. `ats-bridge.ts` exists
-purely to reshape data between the old fetcher signatures and the new DB-backed types).
+The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were extended with new features (per-user seniority config, atomic domain counts, Teamtailor/Breezy tracking, Supabase-backed rate limiting) rather than replaced. The multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `middleware.ts`) that import and adapt the fetchers. `ats-bridge.ts` reshapes data between the fetcher signatures and the new DB-backed types.
 
 ---
 

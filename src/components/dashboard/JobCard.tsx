@@ -1,10 +1,6 @@
 "use client";
 // src/components/dashboard/JobCard.tsx
-//
-// FIX #3: recencyScore is ALWAYS computed live from job.posted_at using
-//         computeRecencyScore(). Never reads job.recency_score from the
-//         stored/frozen value. This means the score shown in the UI reflects
-//         actual age at render time, not at insertion time.
+// Displays a single job card with live-computed recency score.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -26,7 +22,7 @@ const BTN_CLASS = "cursor-pointer rounded-md border-0 px-3.5 py-1.5 text-[13px] 
 export default function JobCard({ job, onTrack, onStrategy, isTracked, settings }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  // FIX #3: compute recency live from the actual posted_at date
+  // Compute recency live from posted_at for display accuracy
   const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
   const liveRecencyScore = computeRecencyScore(dateForRecency);
 

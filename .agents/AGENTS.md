@@ -5,13 +5,26 @@
 - Next.js 14 + Supabase ATS aggregator
 - Multi-tenant: shared raw_jobs → per-user pipeline (date filter → settings → Gemini → score)
 - Cron scrapes ATS APIs → raw_jobs table → users see personalized results on dashboard
-- I am strictly forbidden from using `any` (or `as any`) anywhere in the codebase. All typings must be strict. If third-party libraries require a generic, I must define proper interfaces or use `unknown` and type guards.
+- Two pipelines: "local" (Egypt) and "global" (worldwide remote). "visa" was collapsed to "global".
+
+## Code Quality Rules
+
+- **NEVER use `any` (or `as any`)** anywhere in the codebase. All typings must be strict. Use `unknown` and type guards.
+- Comments describe **current behavior**, not history. No "FIX #", "Bug N", "Feature Request N", or "Tier N" labels.
+- No self-referential comment tags like "I1:", "I2:" etc — describe what the test/code does.
 
 ## Git Rules
 
 - **NEVER push without explicit user confirmation**
-- Always run `pnpm run test` and `pnpm run build` before committing
-- Use worktree for parallel work
+- Always run `pnpm run test`, `pnpm run lint`, and `pnpm run build` before committing
+- Use worktree for parallel work: `git worktree add -b <branch> ../<dir> main`
+- Run `pnpm install` in each worktree before building/testing
+
+## Testing
+
+- Unit tests: `src/lib/__tests__/*.test.ts` — mock Supabase, test route handlers directly via HTTP Request objects
+- Run: `pnpm test`
+- Mock pattern: helper returns a thenable chain; `await` resolves to `{ data, error }`
 
 ## Windows Quirks
 
