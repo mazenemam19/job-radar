@@ -72,7 +72,8 @@ const DEFAULT_SETTINGS: ResolvedSettings = {
   salary_reminder_enabled: true,
 };
 
-// ── computeRecencyScore (FIX #3) ──────────────────────────────
+// ── computeRecencyScore ───────────────────────────────────────
+// Recency is always computed live from job.posted_at, never cached.
 
 describe("computeRecencyScore", () => {
   beforeEach(() => {
@@ -105,7 +106,7 @@ describe("computeRecencyScore", () => {
     expect(computeRecencyScore("not-a-date")).toBe(0);
   });
 
-  it("FIX #3: is always computed live (calling twice at different times gives different results)", () => {
+  it("is computed live at call time (calling twice at different times gives different results)", () => {
     const postedAt = new Date(NOW - 86_400_000).toISOString();
     const score1 = computeRecencyScore(postedAt);
     vi.setSystemTime(NOW + 7 * 86_400_000);
@@ -298,7 +299,8 @@ describe("passesSeniorityGate", () => {
   });
 });
 
-// ── passesDateGate (FIX #5) ───────────────────────────────────
+// ── passesDateGate ───────────────────────────────────────────
+// Date gate uses fetched_at as fallback when date_unknown = true.
 
 describe("passesDateGate", () => {
   beforeEach(() => {
@@ -319,7 +321,7 @@ describe("passesDateGate", () => {
     expect(passesDateGate(job, 7)).toBe(false);
   });
 
-  it("FIX #5: uses fetched_at when date_unknown = true", () => {
+  it("uses fetched_at when date_unknown = true", () => {
     const fetchedAt = new Date(NOW - 2 * 86_400_000).toISOString();
     const job = makeJob({
       posted_at: new Date(NOW).toISOString(),
@@ -329,7 +331,7 @@ describe("passesDateGate", () => {
     expect(passesDateGate(job, 7)).toBe(true);
   });
 
-  it("FIX #5: date_unknown job expires based on fetched_at", () => {
+  it("date_unknown job expires based on fetched_at", () => {
     const fetchedAt = new Date(NOW - 10 * 86_400_000).toISOString();
     const job = makeJob({
       posted_at: new Date(NOW).toISOString(),
@@ -340,7 +342,9 @@ describe("passesDateGate", () => {
   });
 });
 
-// ── scoreJob (FIX #6) ────────────────────────────────────────
+// ── scoreJob ─────────────────────────────────────────────────
+// Skill match and recency are scored independently; recency is
+// counted even when skill match is zero.
 
 describe("scoreJob", () => {
   beforeEach(() => {
@@ -368,7 +372,7 @@ describe("scoreJob", () => {
     expect(result!.matched_skills).toContain("TypeScript");
   });
 
-  it("FIX #6: recency_score is computed even when skill score is 0", () => {
+  it("recency_score is computed even when skill score is 0", () => {
     const job = makeJob({
       title: "Senior Developer",
       description: "Python Django backend only, no frontend skills mentioned",
@@ -413,7 +417,9 @@ describe("scoreJob", () => {
   });
 });
 
-// ── mergeJobs (FIX #6) ───────────────────────────────────────
+// ── mergeJobs ────────────────────────────────────────────────
+// Merges old and new jobs, deduplicates by id (keeping fresher),
+// and drops zero-score entries.
 
 describe("mergeJobs", () => {
   function makeScoredJob(id: string, score: number, fetchedAt = NOW) {
@@ -431,7 +437,7 @@ describe("mergeJobs", () => {
     };
   }
 
-  it("FIX #6: excludes jobs with total_score = 0", () => {
+  it("excludes jobs with total_score = 0", () => {
     const jobs = [makeScoredJob("a", 50), makeScoredJob("b", 0), makeScoredJob("c", 30)];
     const result = mergeJobs([], jobs);
     expect(result.map((j) => j.id)).not.toContain("b");

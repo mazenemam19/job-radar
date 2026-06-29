@@ -1,8 +1,6 @@
 // src/lib/__tests__/gemini.test.ts
-//
-// Regression coverage for Bug 1 (gemini-filter-audit.md): index-based
-// matching replacing the fragile ID-echo contract. See
-// docs/plans/2026-06-24-gemini-index-based-matching.md.
+// Coverage for index-based matching: Gemini responses are matched to
+// jobs by positional index, not by echoing the job ID.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { filterJobsWithGemini } from "../gemini";

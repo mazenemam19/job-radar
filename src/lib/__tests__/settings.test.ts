@@ -1,18 +1,13 @@
 // src/lib/__tests__/settings.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// Tests the settings merge logic: per-field user value wins over
+// defaults; null fields fall back to the signup snapshot (not live).
 
-// We test the private mergeWithDefaults logic by testing resolveUserSettings
-// with mocked Supabase clients. The key behaviour to verify:
-//   1. Per-field: user value if non-null, else default
-//   2. Weights are normalised if they don't sum to 1
-//   3. Defaults are a one-time signup snapshot (initializeUserSettingsForSignup),
-//      never a live, ongoing override of existing user data.
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mock Supabase clients ──────────────────────────────────────
 // getDefaultSettings() reads default_settings via the service-role client
 // (global config, not user-owned). getUserSettingsRow()/saveUserSettings()
 // read/write user_settings via the auth-aware client (RLS own-row policy).
-// See docs/plans/2026-06-23-phase4-data-access-migration.md, task 7.
 
 const mockAdminDb = {
   from: vi.fn(),
