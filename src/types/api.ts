@@ -132,7 +132,7 @@ export interface BambooJob {
   datePosted: string;
 }
 
-/** Shape of GET https://{slug}.bamboohr.com/careers/{id}/detail (Bug 4,
+/** Shape of GET https://{slug}.bamboohr.com/careers/{id}/detail.
  * Only the field this codebase actually reads. */
 export interface BambooDetail {
   result?: {

@@ -15,7 +15,7 @@ export type ATSType =
   | "bamboohr"
   | "jazzhr";
 
-/** Pipeline mode for job fetching. "visa" collapsed to "global" in Tier 5b. */
+/** Pipeline mode for job fetching. "visa" was collapsed to "global". */
 export type JobMode = "local" | "global";
 
 /** Seniority levels, ordinal-ranked for display purposes. */

@@ -309,7 +309,7 @@ export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode):
       country: countryInfo.name,
       countryFlag: countryInfo.flag,
       url: r.url,
-      // Full description stored — no ceiling. The old 6000-char slice (Bug 3,
+      // Full description stored — no ceiling. The old 6000-char slice
       // raised from 3000) was still truncating a significant portion of live jobs.
       // Real ceiling determined by Gemini window in gemini.ts's filterBatch.
       description: r.description,
@@ -818,9 +818,9 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
     const data = (await res.json()) as { result?: BambooJob[] };
     const jobs = data.result ?? [];
     const rawCount = jobs.length;
-    // BambooHR's list endpoint never includes a description (Bug 4,
-    // Fetch each job's detail page for the real description.
-    // description, mirroring fetchWorkable's detail-fetch pattern.
+    // BambooHR's list endpoint never includes a description.
+    // Fetch each job's detail page for the real description,
+    // mirroring fetchWorkable's detail-fetch pattern.
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         let description = "";

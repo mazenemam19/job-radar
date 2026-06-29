@@ -113,9 +113,9 @@ export async function GET() {
   // dashboard (the old behavior). An invalid/exhausted key already failed
   // open silently and showed everything anyway, so the strictest outcome
   // was backwards: reserved for the one case where the user did
-  // everything right. Missing-key jobs get the same fail-open shape Bug
-  // 1's matching already produces, so Feature Request 1's "Not
-  // AI-reviewed" badge covers this for free.
+  // everything right. Missing-key jobs get the same fail-open shape
+  // the strict matching already produces, so the "Not AI-reviewed" badge
+  // covers this for free.
   const geminiFiltered = profile?.gemini_api_key
     ? await filterJobsWithGemini(profile.gemini_api_key, afterGlobalModeFilter, settings)
     : afterGlobalModeFilter.map((j) => ({

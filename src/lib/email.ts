@@ -1,9 +1,5 @@
 // src/lib/email.ts
-// FIX #4: Email alerts fire for ALL new jobs regardless of mode.
-//         Old code only sent alerts for mode === "visa".
-//
-// Also handles monthly salary reminder emails.
-// Uses the same SMTP env vars as the old email.ts.
+// Sends scan-complete notifications and monthly salary reminder emails.
 
 import nodemailer from "nodemailer";
 import type { SalaryReport } from "./types";

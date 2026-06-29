@@ -48,12 +48,12 @@ interface FetchResult {
  *
  * Jobs are tagged with the mode (local/global) from the pipeline.
  * Returns raw jobs with date_unknown correctly set:
- *   FIX #5: when postedAt ≈ fetchedAt (fallback date), we set date_unknown=true
- *           and use fetchedAt as posted_at so the job decays normally.
+ * date_unknown is set when postedAt ≈ fetchedAt (fallback date);
+ * fetchedAt is then used as posted_at so the job decays normally.
  *
- * Tier 5b: mode is "local" | "global" only — "visa" collapsed to "global".
- * Tier 5c: visa_sponsorship is now computed by each fetcher from content only
- *          (regex), not from the pipeline flag.
+ * Mode is "local" | "global" only.
+ * visa_sponsorship is computed by each fetcher from content (regex),
+ * not from the pipeline flag.
  */
 export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<FetchResult> {
   const config = toATSConfig(row);
@@ -63,8 +63,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
   try {
     let rawJobs: Job[] = [];
 
-    // Tier 5c: all fetchers now compute visa_sponsorship from content internally.
-    // No pipeline-flag shortcut passes through anymore.
+    // All fetchers compute visa_sponsorship from content internally.
     switch (row.ats) {
       case "greenhouse": {
         const result = await fetchGreenhouse(config, mode);
@@ -115,7 +114,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
         throw new Error(`Unknown ATS type: ${row.ats}`);
     }
 
-    // Normalise and apply FIX #5 (date_unknown detection)
+    // Normalise and detect date_unknown (fallback date)
     const jobs: RawJob[] = rawJobs.map((j) => {
       const postedAt = (j.postedAt ?? fetchedAt) as string;
       const postedMs = Date.parse(postedAt);

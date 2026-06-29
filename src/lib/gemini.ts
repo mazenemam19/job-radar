@@ -18,7 +18,7 @@ const MODEL_QUEUE = [
 const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the larger per-job char window below)
 
 // Fixed, code-owned response-format contract. Deliberately NOT part of
-// gemini_filter_prompt (which is user-editable) — see Bug 1 in
+// gemini_filter_prompt (which is user-editable).
 // A stored, user-editable JSON contract is how this broke in the first place.
 // Index-based (not job.id) because asking a model to echo back long,
 // opaque composite ID strings character-for-character is fragile; a short
@@ -57,7 +57,7 @@ interface FilterResult {
   reason: string | null;
   // true only when Gemini returned a real, matched decision for this job's
   // idx. false for both fail-open paths (missing idx in an otherwise-valid
-  // response, or total batch failure). See Feature Request 1 in
+  // response, or total batch failure).
 
   reviewed: boolean;
   // true only when the batch failed open specifically because every model
@@ -198,7 +198,7 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
     }
 
     // Any job whose idx never appeared in a valid decision → fail open,
-    // but loudly. This used to be silent — that silence is Bug 1.
+    // but loudly. This used to be silent.
     const missing = jobs.filter((j) => !resultMap.has(j.id));
     if (missing.length > 0) {
       console.error(
@@ -298,8 +298,7 @@ export interface StrategyResult {
  * Generates a 4-6 bullet application strategy for a specific job.
  * Uses the user's own Gemini API key.
  *
- * FIX #4: (Email) – strategy generation is not tied to email; this is
- * called on-demand from the dashboard UI.
+ * Strategy generation is called on-demand from the dashboard UI.
  */
 export async function generateApplicationStrategy(
   apiKey: string,
