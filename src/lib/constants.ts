@@ -120,13 +120,11 @@ export const COUNTRY_FLAGS: Record<string, string> = {
 };
 
 export const MODE_COLORS: Record<string, string> = {
-  visa: "#6366f1",
   local: "#22c55e",
   global: "#f59e0b",
 };
 
 export const MODE_LABELS: Record<string, string> = {
-  visa: "✈️ Visa",
   local: "🇪🇬 Local",
   global: "🌐 Remote",
 };
