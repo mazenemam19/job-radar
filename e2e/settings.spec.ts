@@ -7,6 +7,7 @@ test.describe("settings — save round-trip via real API", () => {
     const [response] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes("/api/settings") && r.request().method() === "GET",
+        { timeout: 30_000 },
       ),
       page.goto("/settings"),
     ]);
@@ -19,32 +20,14 @@ test.describe("settings — save round-trip via real API", () => {
     ).not.toBeVisible();
   });
 
-  // ─── FIX for failing tests 14 & 15 ─────────────────────────────────────────
-  //
-  // Root cause — test 14:
-  //   getByRole('switch', { name: /job alert/i }) found nothing.
-  //   The `email_alerts_enabled` setting is rendered with the accessible label
-  //   "Email Alerts" (or similar), NOT "job alert". The regex must be broadened.
-  //
-  // Root cause — test 15:
-  //   There is no "salary reminder" toggle in user_settings.
-  //   Monthly salary reminders are sent automatically based on stale
-  //   `salary_reports` rows — they are NOT an opt-in/opt-out toggle in the
-  //   settings form. The previous test was asserting a control that does not
-  //   exist. Replaced with a test for the pipeline toggles (visa / local /
-  //   global), which ARE per-user boolean settings in user_settings and have
-  //   distinct switch controls in the UI.
-  //
-  // ──────────────────────────────────────────────────────────────────────────
-
   test("job alerts toggle changes state and PATCH /api/settings returns 200", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
     // The email-alerts toggle is a button[role=switch].
-    // Accessible name is "Email Alerts" (field: email_alerts_enabled).
+    // Accessible name is "Email alerts. Get notified when new matching jobs are found after each dashboard refresh"
     // We accept several plausible label variants to survive minor copy changes.
-    const toggle = page.getByRole("switch", { name: /email.?alert|job.?alert|alert/i }).first();
+    const toggle = page.getByRole("switch", { name: /email alerts/i }).first();
 
     await expect(toggle).toBeVisible({ timeout: 8_000 });
 
@@ -74,15 +57,17 @@ test.describe("settings — save round-trip via real API", () => {
     await restorePromise;
   });
 
-  // Replaces the removed "salary reminder" test — see comment above.
-  test("pipeline toggles are independent controls (visa / local / global)", async ({ page }) => {
+  test("pipeline toggles are independent controls (local / global)", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
     // The settings page renders two pipeline switch controls.
     // They correspond to pipeline_local, pipeline_global in user_settings.
-    const localToggle = page.getByRole("switch", { name: /local|egypt/i }).first();
-    const globalToggle = page.getByRole("switch", { name: /global|remote/i }).first();
+    // Accessible names: "🇪🇬 Local pipeline. Egypt-based companies" and "🌐 Global pipeline. Worldwide remote companies"
+    const localToggle = page.getByRole("switch", { name: /local pipeline|egypt-based/i }).first();
+    const globalToggle = page
+      .getByRole("switch", { name: /global pipeline|worldwide remote/i })
+      .first();
 
     // Both must be visible and be distinct DOM nodes
     await expect(localToggle).toBeVisible({ timeout: 8_000 });
@@ -158,7 +143,7 @@ test.describe("settings — save round-trip via real API", () => {
     await expect(keyField).toBeVisible({ timeout: 8_000 });
 
     // Fill with a dummy key that passes basic format validation
-    const dummyKey = "AIzaSyTESTKEY_e2e_placeholder_0000000000001";
+    const dummyKey = "«redacted:AIza…»";
     await keyField.fill(dummyKey);
 
     const patchPromise = page.waitForResponse(
