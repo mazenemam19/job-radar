@@ -1,10 +1,9 @@
 // src/lib/sources/ats-utils.ts
 import type {
   Job,
-  JobMode,
   BaseCompany,
   ATSConfig,
-  RawJob,
+  ATSRawInput,
   FetcherResult,
   GreenhouseJob,
   LeverJob,
@@ -22,6 +21,7 @@ import type {
   WorkableCooldownEntry,
   WorkableBudgetConfig,
 } from "@/types";
+import type { JobMode } from "@/lib/types";
 import { COUNTRY_MAP } from "../constants";
 import type { Json } from "@/lib/database.types";
 
@@ -111,14 +111,13 @@ function trackDomainRequest(url: string): void {
   } catch {}
 }
 
-const DEFAULT_BUDGET: WorkableBudgetConfig = { visa: 999, global: 999, local: 999 };
+const DEFAULT_BUDGET: WorkableBudgetConfig = { global: 999, local: 999 };
 let workableBudget: WorkableBudgetConfig = { ...DEFAULT_BUDGET };
-const workableUsedByMode: Record<JobMode, number> = { visa: 0, global: 0, local: 0 };
+const workableUsedByMode: Record<JobMode, number> = { global: 0, local: 0 };
 
 export function resetWorkableUsed(mode?: JobMode): void {
   if (mode) workableUsedByMode[mode] = 0;
   else {
-    workableUsedByMode.visa = 0;
     workableUsedByMode.global = 0;
     workableUsedByMode.local = 0;
   }
@@ -274,7 +273,7 @@ function extractEgyptCity(rawLocation: string, companyCity?: string): string {
   return companyCity ?? "Cairo";
 }
 
-export function processJobs(raw: RawJob[], company: BaseCompany, mode: JobMode): Job[] {
+export function processJobs(raw: ATSRawInput[], company: BaseCompany, mode: JobMode): Job[] {
   const now = new Date().toISOString();
   const out: Job[] = [];
 
@@ -612,7 +611,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
       }),
       5,
     );
-    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode);
+    const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
 
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
@@ -772,7 +771,7 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise
       }),
     );
     const processed = processJobs(
-      detailedJobs.filter((j): j is RawJob => j !== null),
+      detailedJobs.filter((j): j is ATSRawInput => j !== null),
       c,
       mode,
     );
@@ -840,7 +839,7 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
       }),
       5,
     );
-    const processed = processJobs(withDesc.filter(Boolean) as RawJob[], c, mode);
+    const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
     return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {

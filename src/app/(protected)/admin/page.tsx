@@ -34,10 +34,9 @@ export default async function AdminIndexPage() {
     (appConfig?.workable_blocked as { slug: string; until: string }[] | null) ?? [];
   const activeBlocks = workableBlocked.filter((e) => new Date(e.until).getTime() > Date.now());
   const workableBudget = appConfig?.workable_budget as {
-    visa: number;
     global: number;
     local: number;
-  } | null;
+  };
 
   const stats = [
     { label: "Users", value: userCount ?? 0, href: "/admin/users", icon: "👥" },
@@ -85,7 +84,6 @@ export default async function AdminIndexPage() {
         <h2 className="m-0 mb-3 text-sm text-slate-400">Workable rate-limit status</h2>
         {workableBudget && (
           <div className={`flex flex-wrap gap-6 ${activeBlocks.length ? "mb-3.5" : ""}`}>
-            <Stat label="Visa budget" value={String(workableBudget.visa)} />
             <Stat label="Local budget" value={String(workableBudget.local)} />
             <Stat label="Global budget" value={String(workableBudget.global)} />
           </div>

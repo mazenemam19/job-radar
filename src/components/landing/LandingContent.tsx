@@ -19,7 +19,7 @@ const DEMO_JOBS = [
     flag: "🇩🇪",
     score: 87,
     skills: ["React", "TypeScript", "CSS"],
-    mode: "visa" as const,
+    mode: "global" as const,
   },
   {
     title: "Senior UI Engineer",
@@ -27,7 +27,7 @@ const DEMO_JOBS = [
     flag: "🇸🇪",
     score: 82,
     skills: ["React", "Redux", "TypeScript"],
-    mode: "visa" as const,
+    mode: "global" as const,
   },
   {
     title: "Frontend Lead",
@@ -79,10 +79,9 @@ const FEATURES = [
   },
 ];
 
-const MODE_COLOR: Record<string, string> = { global: "#f59e0b", visa: "#6366f1", local: "#22c55e" };
+const MODE_COLOR: Record<string, string> = { global: "#f59e0b", local: "#22c55e" };
 const MODE_LABEL: Record<string, string> = {
   global: "🌐 Remote",
-  visa: "✈️ Visa",
   local: "🇪🇬 Local",
 };
 
