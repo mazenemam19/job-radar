@@ -13,7 +13,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/lib/__tests__/setup.ts"],
-    include: ["src/lib/__tests__/**/*.test.ts"],
+    include: ["src/lib/__tests__/**/*.test.ts", "src/app/api/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
