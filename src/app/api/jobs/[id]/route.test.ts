@@ -37,7 +37,7 @@ describe("GET /api/jobs/[id]", () => {
 
   it("returns 401 when unauthenticated", async () => {
     const { getUser } = await import("@/lib/supabase/server");
-    (getUser as any).mockResolvedValue(null);
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
     const { GET } = await import("./route");
     const req = new Request("http://localhost/api/jobs/job_abc");

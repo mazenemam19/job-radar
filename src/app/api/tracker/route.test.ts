@@ -14,7 +14,7 @@ vi.mock("next/headers", () => ({
 }));
 
 function mockQuery(data: unknown, error: unknown = null) {
-  const chain: Record<string, any> = {
+  const chain: Record<string, unknown> = {
     data,
     error,
     select: vi.fn().mockReturnThis(),
@@ -38,12 +38,12 @@ describe("GET /api/tracker", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { getUser } = await import("@/lib/supabase/server");
-    (getUser as any).mockResolvedValue(mockUser);
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
   });
 
   it("returns 401 when unauthenticated", async () => {
     const { getUser } = await import("@/lib/supabase/server");
-    (getUser as any).mockResolvedValue(null);
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
     const { GET } = await import("./route");
     const res = await GET();
@@ -77,12 +77,12 @@ describe("POST /api/tracker", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { getUser } = await import("@/lib/supabase/server");
-    (getUser as any).mockResolvedValue(mockUser);
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
   });
 
   it("returns 401 when unauthenticated", async () => {
     const { getUser } = await import("@/lib/supabase/server");
-    (getUser as any).mockResolvedValue(null);
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
     const { POST } = await import("./route");
     const req = new Request("http://localhost/api/tracker", {
