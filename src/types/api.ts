@@ -21,7 +21,7 @@ export interface ATSConfig extends BaseCompany {
   slug: string;
 }
 
-export interface RawJob {
+export interface ATSRawInput {
   id: string;
   title: string;
   location: string;
@@ -168,4 +168,4 @@ export interface WorkableCooldownEntry {
   until: string;
 }
 
-export type WorkableBudgetConfig = { visa: number; global: number; local: number };
+export type WorkableBudgetConfig = { global: number; local: number };

@@ -15,7 +15,6 @@ export type ATSType =
   | "bamboohr"
   | "jazzhr";
 
-/** Pipeline mode for job fetching. "visa" was collapsed to "global". */
 export type JobMode = "local" | "global";
 
 /** Seniority levels, ordinal-ranked for display purposes. */
@@ -228,7 +227,7 @@ export interface TrackerEntry {
 export type SalaryCurrency = "EGP" | "USD" | "EUR" | "GBP";
 export type EmploymentType = "full-time" | "part-time" | "contract" | "freelance";
 export type WorkArrangement = "onsite" | "remote" | "hybrid";
-export type Pipeline = "local" | "global" | "visa";
+export type Pipeline = "local" | "global";
 
 export interface SalaryReport {
   id: string;

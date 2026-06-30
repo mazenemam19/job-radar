@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { SalaryAggregate, SalaryCurrency, Pipeline } from "@/lib/types";
 
 const CURRENCIES: SalaryCurrency[] = ["EGP", "USD", "EUR", "GBP"];
-const PIPELINES: Pipeline[] = ["local", "global", "visa"];
+const PIPELINES: Pipeline[] = ["local", "global"];
 
 const FIELD_LABEL_CLASS = "mb-1.5 block text-xs text-[#64748b]";
 const FIELD_INPUT_CLASS =
