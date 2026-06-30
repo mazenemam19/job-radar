@@ -1,6 +1,6 @@
 // src/lib/constants.ts
 
-import type { ATSType, TrackerStatus } from "./types";
+import type { ATSType, JobMode, TrackerStatus } from "./types";
 
 // ── Shared Constants ─────────────────────────────────────────────────────
 
@@ -119,12 +119,12 @@ export const COUNTRY_FLAGS: Record<string, string> = {
   AE: "🇦🇪", // previously missing — UAE
 };
 
-export const MODE_COLORS: Record<string, string> = {
+export const MODE_COLORS: Record<JobMode, string> = {
   local: "#22c55e",
   global: "#f59e0b",
 };
 
-export const MODE_LABELS: Record<string, string> = {
+export const MODE_LABELS: Record<JobMode, string> = {
   local: "🇪🇬 Local",
   global: "🌐 Remote",
 };
