@@ -30,6 +30,8 @@ export default function SettingsForm() {
 
   // Form state
   const [geminiKey, setGeminiKey] = useState("");
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [clearGeminiKey, setClearGeminiKey] = useState(false);
   const [expertSkills, setExpertSkills] = useState("");
   const [secSkills, setSecSkills] = useState("");
   const [jobAgeDays, setJobAgeDays] = useState(7);
@@ -60,6 +62,7 @@ export default function SettingsForm() {
       if (json.ok) {
         const d: SettingsData = json.data;
         setData(d);
+        setHasGeminiKey(d.profile.has_gemini_key);
         const r = d.resolved;
         setExpertSkills((r.expert_skills ?? []).join(", "));
         setSecSkills((r.secondary_skills ?? []).join(", "));
@@ -170,7 +173,11 @@ export default function SettingsForm() {
         .filter(Boolean),
     };
 
-    if (geminiKey.trim()) body.gemini_api_key = geminiKey.trim();
+    if (clearGeminiKey) {
+      body.gemini_api_key = "";
+    } else if (geminiKey.trim()) {
+      body.gemini_api_key = geminiKey.trim();
+    }
 
     try {
       const res = await fetch("/api/settings", {
@@ -181,7 +188,13 @@ export default function SettingsForm() {
       const json = await res.json();
       if (json.ok) {
         setSaved(true);
+        if (clearGeminiKey) {
+          setHasGeminiKey(false);
+        } else if (geminiKey.trim()) {
+          setHasGeminiKey(true);
+        }
         setGeminiKey("");
+        setClearGeminiKey(false);
       } else {
         setError(json.error);
       }
@@ -204,18 +217,40 @@ export default function SettingsForm() {
       {/* Gemini API Key */}
       <Section title="Gemini API Key" htmlFor="gemini-key">
         <p className="mb-3 text-[13px] text-[#64748b]">
-          {data?.profile.has_gemini_key
-            ? "✓ API key configured."
-            : "⚠️ No key set. Required for filtering and strategy."}
+          {clearGeminiKey
+            ? "Key will be cleared on save."
+            : hasGeminiKey
+              ? "✓ API key configured."
+              : "⚠️ No key set. Required for filtering and strategy."}
         </p>
         <input
           id="gemini-key"
           type="password"
           value={geminiKey}
+          disabled={clearGeminiKey}
           onChange={(e) => setGeminiKey(e.target.value)}
-          placeholder="Enter new key to replace (leave blank to keep current)"
-          className={INPUT_CLASS}
+          placeholder={
+            clearGeminiKey
+              ? ""
+              : hasGeminiKey
+                ? "•••••••••••••••••• (enter a new key to replace)"
+                : "Enter your Gemini API key"
+          }
+          className={`${INPUT_CLASS} disabled:opacity-50`}
         />
+        {hasGeminiKey && (
+          <label className="mt-2 flex items-center gap-2 text-[12px] text-[#94a3b8]">
+            <input
+              type="checkbox"
+              checked={clearGeminiKey}
+              onChange={(e) => {
+                setClearGeminiKey(e.target.checked);
+                if (e.target.checked) setGeminiKey("");
+              }}
+            />
+            Clear key on save
+          </label>
+        )}
       </Section>
 
       {/* Skills */}
