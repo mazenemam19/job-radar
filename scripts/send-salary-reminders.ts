@@ -15,6 +15,11 @@
 // Run with:
 //   pnpm exec tsx scripts/send-salary-reminders.ts
 
+import { config } from "dotenv";
+import path from "path";
+
+config({ path: path.resolve(process.cwd(), ".env.local") });
+
 import { createClient } from "@supabase/supabase-js";
 import { sendSalaryReminderEmail } from "../src/lib/email";
 import type { SalaryReport } from "../src/lib/types";
