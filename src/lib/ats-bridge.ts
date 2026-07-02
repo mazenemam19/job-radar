@@ -62,52 +62,62 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
 
   try {
     let rawJobs: Job[] = [];
+    let fetchError: string | null = null;
 
     // All fetchers compute visa_sponsorship from content internally.
     switch (row.ats) {
       case "greenhouse": {
         const result = await fetchGreenhouse(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "lever": {
         const result = await fetchLever(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "ashby": {
         const result = await fetchAshby(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "workable": {
         const result = await fetchWorkable(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "teamtailor": {
         const result = await fetchTeamtailor(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "breezy": {
         const result = await fetchBreezy(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "smartrecruiters": {
         const result = await fetchSmartRecruiters(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "bamboohr": {
         const result = await fetchBambooHR(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       case "jazzhr": {
         const result = await fetchJazzHR(config, mode);
         rawJobs = result.jobs;
+        if (result.error) fetchError = result.error;
         break;
       }
       default:
@@ -143,7 +153,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
       };
     });
 
-    return { company: row.name, mode, jobs, error: null };
+    return { company: row.name, mode, jobs, error: fetchError };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     return { company: row.name, mode, jobs: [], error };
