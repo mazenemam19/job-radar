@@ -16,12 +16,13 @@ at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
 ## Findings not yet fixed
 
-- 18/19 components in `src/components` have zero test files. `SettingsForm.tsx` is
-  the exception in substance, not in count: it was split into a thin render layer
-  (`SettingsForm.tsx`, `_shared.tsx`), a stateful hook (`hooks/useSettingsForm.ts`),
-  and pure logic (`lib/settings-form.ts`) — only the last has a test file, but it now
-  holds all the CSV-parsing/hydration/payload-building logic that used to be
-  inline and untested. Neither the component nor the hook has a direct test file;
+- 17/19 components in `src/components` have zero test files. `SettingsForm.tsx` and
+  `DefaultsForm.tsx` are exceptions in substance, not in count: each was split into a
+  thin render layer, a stateful hook (`hooks/useSettingsForm.ts` /
+  `hooks/useDefaultsForm.ts`), and pure logic (`lib/settings-form.ts` /
+  `lib/defaults-form.ts`) — only the lib layer has a test file, but it now holds all
+  the CSV-parsing/hydration/payload-building logic that used to be inline and
+  untested. Neither component nor either hook has a direct test file;
   `vitest.config.ts`'s `include` only covers `src/lib/__tests__/**` and
   `src/app/api/**`, so component/hook-level tests wouldn't even run today without
   a config change — out of scope for this row.
@@ -53,7 +54,7 @@ Status column: `pending` / `in progress` / `done`
 | 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | done    |
 | 5   | `src/lib/runner.ts`                                         | complexity 24, 160-line function                | done    |
 | 6   | `src/lib/settings.ts`                                       | complexity 23 (`mergeWithDefaults`)             | done    |
-| 7   | `src/components/admin/AdminComponents/DefaultsForm.tsx`     | 320 lines, complexity 21, no tests              | pending |
+| 7   | `src/components/admin/AdminComponents/DefaultsForm.tsx`     | 320 lines, complexity 21, no tests              | done    |
 | 8   | `src/lib/ats-bridge.ts`                                     | complexity 21                                   | pending |
 | 9   | `src/components/dashboard/JobCard.tsx`                      | 171 lines, complexity 19, no tests              | pending |
 | 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | pending |
