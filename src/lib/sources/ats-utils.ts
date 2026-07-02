@@ -304,20 +304,31 @@ export async function safeFetch(
   return null; // unreachable — loop always returns
 }
 
+/**
+ * Ordered match table for extractEgyptCity. Order matches the original if-chain
+ * exactly, including a known bug: "cairo" is checked before "new cairo", so any
+ * location containing "new cairo" is caught by the "cairo" pattern first and the
+ * "New Cairo" entry below is currently unreachable. Preserved intentionally —
+ * fixing it is a behavior change, not a complexity refactor. See AUDIT_STATUS.md.
+ */
+const EGYPT_CITY_PATTERNS: ReadonlyArray<{ matches: readonly string[]; result: string }> = [
+  { matches: ["remote"], result: "Remote 🌐" },
+  { matches: ["cairo"], result: "Cairo" },
+  { matches: ["giza"], result: "Giza" },
+  { matches: ["alexandria"], result: "Alexandria" },
+  { matches: ["maadi"], result: "Maadi, Cairo" },
+  { matches: ["nasr city", "nasr-city"], result: "Nasr City, Cairo" },
+  { matches: ["heliopolis"], result: "Heliopolis, Cairo" },
+  { matches: ["new cairo", "new-cairo"], result: "New Cairo" }, // unreachable, see comment above
+  { matches: ["6th", "sheikh zayed"], result: "6th of October" },
+  { matches: ["smart village"], result: "Smart Village, Giza" },
+];
+
 /** For local jobs: extract a specific Egyptian city from the raw location string. */
 function extractEgyptCity(rawLocation: string, companyCity?: string): string {
   const loc = (rawLocation || "").toLowerCase();
-  if (loc.includes("remote")) return "Remote 🌐";
-  if (loc.includes("cairo")) return "Cairo";
-  if (loc.includes("giza")) return "Giza";
-  if (loc.includes("alexandria")) return "Alexandria";
-  if (loc.includes("maadi")) return "Maadi, Cairo";
-  if (loc.includes("nasr city") || loc.includes("nasr-city")) return "Nasr City, Cairo";
-  if (loc.includes("heliopolis")) return "Heliopolis, Cairo";
-  if (loc.includes("new cairo") || loc.includes("new-cairo")) return "New Cairo";
-  if (loc.includes("6th") || loc.includes("sheikh zayed")) return "6th of October";
-  if (loc.includes("smart village")) return "Smart Village, Giza";
-  return companyCity ?? "Cairo";
+  const hit = EGYPT_CITY_PATTERNS.find((p) => p.matches.some((m) => loc.includes(m)));
+  return hit?.result ?? companyCity ?? "Cairo";
 }
 
 export function processJobs(raw: ATSRawInput[], company: BaseCompany, mode: JobMode): Job[] {
