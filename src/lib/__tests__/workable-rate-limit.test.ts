@@ -7,7 +7,7 @@
 //      fetch could hit apply.workable.com at the exact same instant.
 //   2. The detail-page loop bypassed the queue entirely (raw fetch, only a
 //      concurrency cap, no stagger, no retry).
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ATSConfig } from "@/types";
 
 const baseCompany: ATSConfig = {
@@ -27,8 +27,22 @@ function mockListResponse(jobs: unknown[] = []) {
   };
 }
 
+// Fake timers: these tests assert on the queue's *logical* behavior (did the
+// second call wait behind the first, did N calls queue instead of firing at
+// once) not on literal wall-clock duration. Real setTimeout made that claim
+// true but slow and sandbox-jitter-prone; vi.advanceTimersByTimeAsync proves
+// the same claim deterministically. ADVANCE_MS is a generous upper bound on
+// any test's worst-case total queued delay — Math.random() still picks the
+// real stagger value each run, this just fast-forwards the clock past it.
+const ADVANCE_MS = 20_000;
+
 describe("Workable fetcher rate-limit handling", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.resetModules();
   });
@@ -49,15 +63,17 @@ describe("Workable fetcher rate-limit handling", () => {
     // fire within milliseconds of each other despite both being
     // apply.workable.com. New behavior: one shared host queue, so the
     // second call waits behind the first.
-    await Promise.all([
+    const pending = Promise.all([
       fetchWorkable({ ...baseCompany, slug: "local-co" }, "local"),
       fetchWorkable({ ...baseCompany, slug: "global-co" }, "global"),
     ]);
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await pending;
 
     expect(callTimestamps).toHaveLength(2);
     const spread = Math.max(...callTimestamps) - Math.min(...callTimestamps);
     expect(spread).toBeGreaterThan(1000); // min stagger is 1500ms
-  }, 15_000); // real 1500ms stagger + overhead can exceed vitest's default 5s test timeout under load
+  });
 
   it("queues and staggers detail-page requests instead of firing them unqueued", async () => {
     const callTimestamps: number[] = [];
@@ -86,7 +102,9 @@ describe("Workable fetcher rate-limit handling", () => {
     );
 
     const { fetchWorkable } = await import("../sources/ats/workable");
-    await fetchWorkable({ ...baseCompany, slug: "many-jobs-co" }, "local");
+    const pending = fetchWorkable({ ...baseCompany, slug: "many-jobs-co" }, "local");
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await pending;
 
     // 1 list call + 4 detail calls = 5 total, all through the same queue.
     expect(callTimestamps).toHaveLength(5);
@@ -95,7 +113,7 @@ describe("Workable fetcher rate-limit handling", () => {
     // pLimit(5) concurrency cap, no stagger). New behavior: every one of
     // them queues behind the list call and each other.
     expect(spread).toBeGreaterThan(4000); // 4 queued gaps, min 1500ms each
-  }, 15_000);
+  });
 
   it("retries a 429 on the list endpoint instead of giving up immediately", async () => {
     let calls = 0;
@@ -111,11 +129,13 @@ describe("Workable fetcher rate-limit handling", () => {
     );
 
     const { fetchWorkable } = await import("../sources/ats/workable");
-    const result = await fetchWorkable({ ...baseCompany, slug: "flaky-co" }, "local");
+    const pending = fetchWorkable({ ...baseCompany, slug: "flaky-co" }, "local");
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    const result = await pending;
 
     // Old behavior: first 429 on the list call was terminal — error:
     // "HTTP 429", jobs: []. New behavior: retries and succeeds.
     expect(calls).toBe(2);
     expect(result.ok).toBe(true);
-  }, 15_000);
+  });
 });
