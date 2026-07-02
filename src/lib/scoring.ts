@@ -202,68 +202,71 @@ export function hasRelocationSupport(job: RawJob): boolean {
 
 // ── Settings gate & Pre-filters ──────────────────────────────
 
-/**
- * Evaluates whether a raw job passes all user settings and pre-filter regex gates.
- * Run BEFORE sending jobs to Gemini.
- */
-export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boolean {
-  // 1. Seniority Gate
-  if (!passesSeniorityGate(job, settings)) {
-    return false;
+/** Word-boundary test: does any word in `words` appear as a whole word in `text`? */
+function matchesAnyWholeWord(text: string, words: string[]): boolean {
+  return words.some((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    const regex = new RegExp(`\\b${escaped}\\b`, "i");
+    return regex.test(text);
+  });
+}
+
+/** Gate 2: job title must not contain any excluded keyword. */
+export function passesExcludedKeywordsGate(job: RawJob, settings: ResolvedSettings): boolean {
+  if (!settings.excluded_keywords || settings.excluded_keywords.length === 0) {
+    return true;
   }
+  return !matchesAnyWholeWord(job.title.toLowerCase(), settings.excluded_keywords);
+}
 
-  const titleLower = job.title.toLowerCase();
-  const descLower = job.description.toLowerCase();
-  const locLower = job.location.toLowerCase();
-  const textCombined = `${titleLower} ${descLower} ${locLower}`;
-
-  // 2. Excluded Keywords
-  if (settings.excluded_keywords && settings.excluded_keywords.length > 0) {
-    const hasExcluded = settings.excluded_keywords.some((word) => {
-      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      const regex = new RegExp(`\\b${escaped}\\b`, "i");
-      return regex.test(titleLower);
-    });
-    if (hasExcluded) {
-      return false;
-    }
-  }
-
-  // 3. Required Keywords
+/** Gate 3: title+description+location must meaningfully match required (or fallback expert) keywords. */
+export function passesRequiredKeywordsGate(job: RawJob, settings: ResolvedSettings): boolean {
   const techKeywords =
     settings.required_keywords && settings.required_keywords.length > 0
       ? settings.required_keywords
       : settings.expert_skills;
 
-  if (techKeywords && techKeywords.length > 0) {
-    if (!hasMeaningfulKeywordMatch(textCombined, techKeywords)) {
-      return false;
-    }
+  if (!techKeywords || techKeywords.length === 0) {
+    return true;
   }
 
-  // 4. Blacklisted Locations
-  if (settings.blacklisted_locations && settings.blacklisted_locations.length > 0) {
-    const hasBlacklisted = settings.blacklisted_locations.some((word) => {
-      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-      const regex = new RegExp(`\\b${escaped}\\b`, "i");
-      return regex.test(textCombined) || textCombined.includes(word.toLowerCase());
-    });
-    if (hasBlacklisted) {
-      return false;
-    }
-  }
+  const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
+  return hasMeaningfulKeywordMatch(textCombined, techKeywords);
+}
 
-  // 5. Skill Match Check
-  if (
-    !hasMeaningfulKeywordMatch(job.description, [
-      ...settings.expert_skills,
-      ...settings.secondary_skills,
-    ])
-  ) {
-    return false;
+/** Gate 4: title+description+location must not contain a blacklisted location. */
+export function passesBlacklistedLocationsGate(job: RawJob, settings: ResolvedSettings): boolean {
+  if (!settings.blacklisted_locations || settings.blacklisted_locations.length === 0) {
+    return true;
   }
+  const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
+  const hasBlacklisted = settings.blacklisted_locations.some(
+    (word) =>
+      matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase()),
+  );
+  return !hasBlacklisted;
+}
 
-  return true;
+/** Gate 5: job description must meaningfully match the user's expert or secondary skills. */
+export function passesSkillMatchGate(job: RawJob, settings: ResolvedSettings): boolean {
+  return hasMeaningfulKeywordMatch(job.description, [
+    ...settings.expert_skills,
+    ...settings.secondary_skills,
+  ]);
+}
+
+/**
+ * Evaluates whether a raw job passes all user settings and pre-filter regex gates.
+ * Run BEFORE sending jobs to Gemini.
+ */
+export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boolean {
+  return (
+    passesSeniorityGate(job, settings) &&
+    passesExcludedKeywordsGate(job, settings) &&
+    passesRequiredKeywordsGate(job, settings) &&
+    passesBlacklistedLocationsGate(job, settings) &&
+    passesSkillMatchGate(job, settings)
+  );
 }
 
 // ── Global mode gate ────────────────────────────────────────

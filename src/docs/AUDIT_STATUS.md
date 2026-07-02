@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-02 (row #11 closed)
+Last updated: 2026-07-02 (row #12 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -42,8 +42,9 @@ at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
     DELETE on this route is still untested.)
 - `src/pages/_document.js` — Pages Router leftover in an App Router project.
   Status: unverified whether it's dead code or load-bearing. Check before deleting.
-- Two test files themselves exceed the new size rules (`scoring.test.ts` 468 lines,
-  one 163-line function in `settings.test.ts`). Lower priority than untested files.
+- Two test files themselves exceed the new size rules (`scoring.test.ts` now 520
+  lines after row #12's sub-gate tests, up from 468; one 163-line function in
+  `settings.test.ts`). Lower priority than untested files.
 
 ## Fix queue — priority order (by complexity/size severity)
 
@@ -62,7 +63,7 @@ Status column: `pending` / `in progress` / `done`
 | 9   | `src/components/dashboard/JobCard.tsx`                      | 171 lines, complexity 19, no tests              | done    |
 | 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | done    |
 | 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | done    |
-| 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | pending |
+| 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | done    |
 | 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | pending |
 | 14  | `src/components/dashboard/DashboardClient.tsx`              | 172 lines, complexity 14                        | pending |
 | 15  | `src/lib/gemini.ts`                                         | 3 functions over complexity 10                  | pending |

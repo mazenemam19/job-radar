@@ -8,6 +8,10 @@ import {
   scoreJob,
   mergeJobs,
   passesSettingsGate,
+  passesExcludedKeywordsGate,
+  passesRequiredKeywordsGate,
+  passesBlacklistedLocationsGate,
+  passesSkillMatchGate,
   passesGlobalModeGate,
   getMatchedLevels,
   getDisplaySeniorityBadge,
@@ -524,6 +528,64 @@ describe("passesSettingsGate", () => {
       secondary_skills: ["Vue"],
     };
     expect(passesSettingsGate(job, settings)).toBe(false);
+  });
+});
+
+// ── passesSettingsGate sub-gates (audit row #12) ─────────────
+
+describe("passesExcludedKeywordsGate", () => {
+  it("passes when no excluded_keywords are set", () => {
+    const job = makeJob({ title: "Senior React Engineer" });
+    expect(passesExcludedKeywordsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("fails when the title contains an excluded keyword", () => {
+    const job = makeJob({ title: "Senior Sales Engineer" });
+    const settings = { ...DEFAULT_SETTINGS, excluded_keywords: ["sales"] };
+    expect(passesExcludedKeywordsGate(job, settings)).toBe(false);
+  });
+});
+
+describe("passesRequiredKeywordsGate", () => {
+  it("passes when required_keywords is empty and expert_skills matches", () => {
+    const job = makeJob({ description: "We need React and TypeScript" });
+    expect(passesRequiredKeywordsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("fails when neither title, description, nor location match required_keywords", () => {
+    const job = makeJob({ title: "Backend Engineer", description: "Go and Python" });
+    const settings = { ...DEFAULT_SETTINGS, required_keywords: ["Rust"] };
+    expect(passesRequiredKeywordsGate(job, settings)).toBe(false);
+  });
+});
+
+describe("passesBlacklistedLocationsGate", () => {
+  it("passes when no blacklisted_locations are set", () => {
+    const job = makeJob({ location: "London, UK" });
+    expect(passesBlacklistedLocationsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("fails when the location matches a blacklisted term", () => {
+    const job = makeJob({ location: "San Francisco, US" });
+    const settings = { ...DEFAULT_SETTINGS, blacklisted_locations: ["US"] };
+    expect(passesBlacklistedLocationsGate(job, settings)).toBe(false);
+  });
+});
+
+describe("passesSkillMatchGate", () => {
+  it("passes when the description matches an expert or secondary skill", () => {
+    const job = makeJob({ description: "We use React heavily" });
+    expect(passesSkillMatchGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("fails when the description matches none of the user's skills", () => {
+    const job = makeJob({ description: "We use Angular and Svelte" });
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      expert_skills: ["Vue"],
+      secondary_skills: ["Svelte-kit"],
+    };
+    expect(passesSkillMatchGate(job, settings)).toBe(false);
   });
 });
 

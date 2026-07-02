@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `scoring.ts`: `passesSettingsGate`'s five sequential checks (seniority,
+  excluded keywords, required keywords, blacklisted locations, skill match)
+  split into individually exported, individually testable gate functions
+  composed with `&&` (complexity 14 → resolved, audit row #12)
 - `SubmissionsTable.tsx`: extracted the per-row render (metadata, test-result
   badge, action buttons vs. status badge) into `SubmissionRow.tsx`, dropping
   the `rows.map` callback's branching out of the parent function
@@ -16,6 +20,9 @@ All notable changes to this project are documented in this file.
 
 ### Testing
 
+- Added direct coverage for `passesExcludedKeywordsGate`,
+  `passesRequiredKeywordsGate`, `passesBlacklistedLocationsGate`, and
+  `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)
 - Added `build-submission-patch.test.ts` and `approve-submission.test.ts`
   covering the logic extracted from `admin/submissions/[id]/route.ts`
 
