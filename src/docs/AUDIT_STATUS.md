@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-02 (row #10 closed)
+Last updated: 2026-07-02 (row #11 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -61,7 +61,7 @@ Status column: `pending` / `in progress` / `done`
 | 8   | `src/lib/ats-bridge.ts`                                     | complexity 21                                   | done    |
 | 9   | `src/components/dashboard/JobCard.tsx`                      | 171 lines, complexity 19, no tests              | done    |
 | 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | done    |
-| 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | pending |
+| 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | done    |
 | 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | pending |
 | 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | pending |
 | 14  | `src/components/dashboard/DashboardClient.tsx`              | 172 lines, complexity 14                        | pending |

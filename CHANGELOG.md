@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `SubmissionsTable.tsx`: extracted the per-row render (metadata, test-result
+  badge, action buttons vs. status badge) into `SubmissionRow.tsx`, dropping
+  the `rows.map` callback's branching out of the parent function
+  (complexity 14 → resolved, audit row #11)
 - `admin/submissions/[id]/route.ts`: extracted the approval side-effect into
   `lib/admin/approve-submission.ts` and the update-patch builder into
   `lib/admin/build-submission-patch.ts` (complexity 16 → resolved, audit row #10)
