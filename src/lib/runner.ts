@@ -3,46 +3,15 @@
 // persists to raw_jobs, and sends scan-complete emails.
 
 import { createAdminClient } from "./supabase/admin";
-import { fetchCompany } from "./ats-bridge";
+import { fetchAllCompanyJobs } from "./cron/fetch-jobs";
+import { upsertRawJobs } from "./cron/upsert-raw-jobs";
+import { sendScanNotifications } from "./cron/send-scan-notifications";
 import {
   loadWorkableStateFromDB,
   flushWorkable429sToDB,
   flushDomainCountsToDB,
 } from "./sources/ats-utils";
-import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "./types";
-
-const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
-
-/** Simple concurrency limiter */
-async function withConcurrencyLimit<T>(
-  tasks: Array<() => Promise<T>>,
-  limit: number,
-): Promise<T[]> {
-  const results: T[] = [];
-  const executing: Promise<void>[] = [];
-
-  for (const task of tasks) {
-    const p: Promise<void> = task().then((r) => {
-      results.push(r);
-    });
-    executing.push(p);
-
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-      // Remove settled promises
-      for (let i = executing.length - 1; i >= 0; i--) {
-        const state = await Promise.race([
-          executing[i].then(() => "done").catch(() => "done"),
-          Promise.resolve("pending"),
-        ]);
-        if (state === "done") executing.splice(i, 1);
-      }
-    }
-  }
-
-  await Promise.allSettled(executing);
-  return results;
-}
+import type { ATSCompanyRow, CronRunResult } from "./types";
 
 // ── Main cron function ───────────────────────────────────────
 
@@ -62,8 +31,6 @@ export async function runCronJob(
 ): Promise<CronRunResult> {
   const db = createAdminClient();
   const startMs = Date.now();
-  const errors: string[] = [];
-  const sourceHealth: CronRunResult["source_health"] = {};
 
   // 1. Load active companies
   const { data: companies, error: companiesError } = await db
@@ -78,104 +45,20 @@ export async function runCronJob(
 
   if (companiesError || !companies?.length) {
     const msg = companiesError?.message ?? "No active companies found";
-    errors.push(`Failed to load companies: ${msg}`);
     return {
       total_fetched: 0,
       duration_ms: Date.now() - startMs,
-      errors,
+      errors: [`Failed to load companies: ${msg}`],
       source_health: {},
       trigger,
     };
   }
 
-  // 2. Build fetch tasks — one per (company, pipeline) combination
-  const tasks: Array<
-    () => Promise<{
-      company: string;
-      mode: JobMode;
-      jobs: RawJob[];
-      error: string | null;
-    }>
-  > = [];
+  // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited
+  const { allJobs, sourceHealth, errors } = await fetchAllCompanyJobs(companies as ATSCompanyRow[]);
 
-  for (const row of companies as ATSCompanyRow[]) {
-    if (row.pipeline_local) tasks.push(() => fetchCompany(row, "local"));
-    if (row.pipeline_global) tasks.push(() => fetchCompany(row, "global"));
-  }
-
-  // 3. Execute with concurrency limit
-  const fetchResults = await withConcurrencyLimit(tasks, CONCURRENCY_LIMIT);
-
-  // 4. Aggregate results and track source health
-  const allJobs: RawJob[] = [];
-
-  for (const result of fetchResults) {
-    const healthKey = `${result.company}:${result.mode}`;
-    if (result.error) {
-      errors.push(`${result.company} (${result.mode}): ${result.error}`);
-      sourceHealth[healthKey] = {
-        company: result.company,
-        fetched: 0,
-        errors: 1,
-      };
-    } else {
-      allJobs.push(...result.jobs);
-      sourceHealth[healthKey] = {
-        company: result.company,
-        fetched: result.jobs.length,
-        errors: 0,
-      };
-    }
-  }
-
-  // 5. Upsert into raw_jobs
-  // INSERT ON CONFLICT (id) DO UPDATE — updates fetched_at to keep jobs fresh.
-  // This is the deduplication mechanism: same URL hash = same id.
-  if (allJobs.length > 0) {
-    const rows = allJobs.map((j) => ({
-      id: j.id,
-      title: j.title,
-      company: j.company,
-      location: j.location,
-      country: j.country,
-      country_flag: j.country_flag,
-      url: j.url,
-      description: j.description,
-      posted_at: j.posted_at,
-      fetched_at: j.fetched_at,
-      date_unknown: j.date_unknown,
-      is_remote: j.is_remote,
-      salary: j.salary,
-      mode: j.mode,
-      visa_sponsorship: j.visa_sponsorship,
-      source_name: j.source_name,
-      ats_type: j.ats_type,
-      created_at: j.created_at,
-    }));
-
-    // Batch upsert in chunks of 500 to avoid Supabase row limits.
-    // Deduplicate within each chunk first — different companies can
-    // produce jobs with the same URL hash, and PostgreSQL rejects
-    // ON CONFLICT DO UPDATE if the same key appears twice in one statement.
-    const CHUNK = 500;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
-      const seen = new Set<string>();
-      const deduped = chunk.filter((row) => {
-        if (seen.has(row.id)) return false;
-        seen.add(row.id);
-        return true;
-      });
-      const { error: upsertError } = await db.from("raw_jobs").upsert(deduped, {
-        onConflict: "id",
-        ignoreDuplicates: false, // we want to update fetched_at
-      });
-
-      if (upsertError) {
-        errors.push(`Upsert chunk ${i}-${i + CHUNK}: ${upsertError.message}`);
-      }
-    }
-  }
+  // 5. Upsert into raw_jobs (chunked, deduplicated within each chunk)
+  errors.push(...(await upsertRawJobs(db, allJobs)));
 
   // 6. Bump app_config.last_cron_at → invalidates all user_jobs_cache entries
   const { error: configError } = await db
@@ -207,50 +90,11 @@ export async function runCronJob(
   });
 
   // 8. Send "scan complete" notification to all eligible users.
-  // No job listings included — users open the dashboard to see their
-  // personalized (post-Gemini) results. This avoids the mismatch where
-  // email showed pre-Gemini jobs but the dashboard later filtered them.
-  const companiesScanned = companies?.length ?? 0;
-  const emailResults: { email: string; sent: boolean; error?: string; messageId?: string }[] = [];
-  if (companiesScanned > 0) {
-    const { data: eligibleUsers } = await db
-      .from("user_profiles")
-      .select("email, user_settings(email_alerts_enabled)")
-      .eq("is_active", true)
-      .eq("onboarding_complete", true); // exclude users who haven't finished setup
-
-    if (eligibleUsers?.length) {
-      const { sendNewScanNotificationEmail } = await import("@/lib/email");
-      for (const raw of eligibleUsers) {
-        const u = raw as Record<string, unknown>;
-        const settings = u.user_settings as { email_alerts_enabled: boolean | null } | null;
-        const emailAlertsEnabled = settings?.email_alerts_enabled ?? true;
-
-        if (emailAlertsEnabled && u.email) {
-          try {
-            console.log(`[cron email] → sending scan notification to ${u.email}`);
-            await sendNewScanNotificationEmail(companiesScanned, u.email as string);
-            console.log(`[cron email] ✓ sent to ${u.email}`);
-            emailResults.push({ email: u.email as string, sent: true });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[cron email] ✗ failed for ${u.email}: ${msg}`);
-            emailResults.push({ email: u.email as string, sent: false, error: msg });
-            errors.push(`Email failed for ${u.email}: ${msg}`);
-          }
-        } else {
-          console.log(
-            `[cron email] ⊘ skipped ${u.email ?? "(no email)"} (alerts disabled=${!emailAlertsEnabled})`,
-          );
-        }
-      }
-    } else {
-      console.log("[cron email] 0 eligible users for scan notification");
-    }
-  }
-  console.log(
-    `[cron email] summary: ${emailResults.filter((r) => r.sent).length} sent, ${emailResults.filter((r) => !r.sent).length} failed`,
+  const { emailResults, errors: emailErrors } = await sendScanNotifications(
+    db,
+    companies?.length ?? 0,
   );
+  errors.push(...emailErrors);
 
   return {
     total_fetched: allJobs.length,
