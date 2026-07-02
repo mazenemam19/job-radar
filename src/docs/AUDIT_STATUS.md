@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-02 (row #9 closed)
+Last updated: 2026-07-02 (row #10 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -34,9 +34,12 @@ at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
     `salary` (GET only — POST untested), `admin/companies/[id]` (PUT+DELETE),
     `account` (DELETE only).
   - Still fully untested (verified, not guessed): `admin/companies` (root),
-    `admin/users`, `admin/users/[id]`, `admin/submissions`, `admin/submissions/[id]`,
+    `admin/users`, `admin/users/[id]`, `admin/submissions`,
     `admin/test-ats`, `admin/defaults`, `cron`, `tracker/[id]`, `settings`,
-    `strategy`, `dashboard`.
+    `strategy`, `dashboard`. (`admin/submissions/[id]` PATCH is now covered via
+    `build-submission-patch.test.ts` / `approve-submission.test.ts` — the
+    handler logic that used to live inline is now tested at the lib layer;
+    DELETE on this route is still untested.)
 - `src/pages/_document.js` — Pages Router leftover in an App Router project.
   Status: unverified whether it's dead code or load-bearing. Check before deleting.
 - Two test files themselves exceed the new size rules (`scoring.test.ts` 468 lines,
@@ -57,7 +60,7 @@ Status column: `pending` / `in progress` / `done`
 | 7   | `src/components/admin/AdminComponents/DefaultsForm.tsx`     | 320 lines, complexity 21, no tests              | done    |
 | 8   | `src/lib/ats-bridge.ts`                                     | complexity 21                                   | done    |
 | 9   | `src/components/dashboard/JobCard.tsx`                      | 171 lines, complexity 19, no tests              | done    |
-| 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | pending |
+| 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | done    |
 | 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | pending |
 | 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | pending |
 | 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | pending |

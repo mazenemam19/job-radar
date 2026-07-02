@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
 import { dbErrorResponse } from "@/lib/api-errors";
-import type { Database } from "@/lib/database.types";
+import { buildSubmissionPatch } from "@/lib/admin/build-submission-patch";
+import { approveSubmission } from "@/lib/admin/approve-submission";
 
 // ── PATCH — approve / reject / edit a submission ─────────────
 
@@ -24,42 +25,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // If approving, also write to ats_companies
   if (body.status === "approved") {
-    // Fetch the submission
-    const { data: sub, error: subErr } = await db
-      .from("ats_submissions")
-      .select("*")
-      .eq("id", params.id)
-      .single();
-
-    if (subErr || !sub) {
-      return NextResponse.json({ ok: false, error: "Submission not found" }, { status: 404 });
-    }
-
-    // Create the company
-    await db.from("ats_companies").insert({
-      name: (body.name as string | undefined) ?? sub.company_name,
-      ats: (body.ats_type as string | undefined) ?? sub.ats_type,
-      slug: (body.slug as string | undefined) ?? sub.slug,
-      country: sub.country,
-      country_flag: sub.country_flag,
-      city: sub.city,
-      pipeline_local: sub.pipeline_local,
-      pipeline_global: sub.pipeline_global,
-      is_active: true,
-      created_at: now,
-      updated_at: now,
-    });
+    const result = await approveSubmission(db, params.id, body, now);
+    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 404 });
   }
 
-  // Update submission status
-  const patch: Database["public"]["Tables"]["ats_submissions"]["Update"] = {
-    reviewed_at: now,
-    reviewed_by: admin.id,
-  };
-  if (body.status && typeof body.status === "string") patch.status = body.status;
-  if (body.slug && typeof body.slug === "string") patch.slug = body.slug;
-  if (body.ats_type && typeof body.ats_type === "string") patch.ats_type = body.ats_type;
-
+  const patch = buildSubmissionPatch(body, admin.id, now);
   const { data, error } = await db
     .from("ats_submissions")
     .update(patch)
