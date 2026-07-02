@@ -10,6 +10,23 @@ All notable changes to this project are documented in this file.
   excluded keywords, required keywords, blacklisted locations, skill match)
   split into individually exported, individually testable gate functions
   composed with `&&` (complexity 14 → resolved, audit row #12)
+- `job/[id]/page.tsx`: tags row and score-breakdown JSX (previously inline,
+  duplicating logic already split out of `JobCard.tsx` in row #9) extracted
+  into `JobDetailBadges.tsx` (new — untruncated variant of `JobBadges`, since
+  the detail page has room to show the full skill lists) and the existing
+  `JobScoreBreakdown.tsx` is now reused as-is (232 lines/complexity 14 → 164
+  lines, resolved, audit row #13)
+
+### Testing
+
+- Added direct coverage for `passesExcludedKeywordsGate`,
+  `passesRequiredKeywordsGate`, `passesBlacklistedLocationsGate`, and
+  `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)
+
+## [2.1.1] - 2026-07-02
+
+### Refactoring
+
 - `SubmissionsTable.tsx`: extracted the per-row render (metadata, test-result
   badge, action buttons vs. status badge) into `SubmissionRow.tsx`, dropping
   the `rows.map` callback's branching out of the parent function
@@ -20,9 +37,6 @@ All notable changes to this project are documented in this file.
 
 ### Testing
 
-- Added direct coverage for `passesExcludedKeywordsGate`,
-  `passesRequiredKeywordsGate`, `passesBlacklistedLocationsGate`, and
-  `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)
 - Added `build-submission-patch.test.ts` and `approve-submission.test.ts`
   covering the logic extracted from `admin/submissions/[id]/route.ts`
 

@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-02 (row #12 closed)
+Last updated: 2026-07-02 (row #13 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -64,7 +64,7 @@ Status column: `pending` / `in progress` / `done`
 | 10  | `src/app/api/admin/submissions/[id]/route.ts`               | complexity 16                                   | done    |
 | 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | done    |
 | 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | done    |
-| 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | pending |
+| 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | done    |
 | 14  | `src/components/dashboard/DashboardClient.tsx`              | 172 lines, complexity 14                        | pending |
 | 15  | `src/lib/gemini.ts`                                         | 3 functions over complexity 10                  | pending |
 | 16  | `src/components/landing/LandingContent.tsx`                 | 203 lines                                       | pending |

@@ -11,8 +11,9 @@ import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
 import { computeLiveDisplayScore } from "@/lib/scoring";
 import { formatPostedLabel } from "@/lib/job-display";
-import { MODE_COLORS, MODE_LABELS } from "@/lib/constants";
-import ScoreBar from "@/components/dashboard/ScoreBar";
+import { MODE_COLORS } from "@/lib/constants";
+import JobDetailBadges from "@/components/dashboard/JobDetailBadges";
+import JobScoreBreakdown from "@/components/dashboard/JobScoreBreakdown";
 import type { ScoredJob } from "@/lib/types";
 
 const PAGE_SHELL_CLASS = "mx-auto min-h-screen max-w-[760px] bg-[#08080f] px-6 py-8 font-sans";
@@ -136,79 +137,10 @@ export default function JobDetailPage() {
         </div>
 
         {/* Tags row */}
-        <div className="mt-3.5 flex flex-wrap gap-1.5">
-          <span
-            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-            style={{ background: `${modeColor}20`, color: modeColor }}
-          >
-            {MODE_LABELS[job.mode]}
-          </span>
-
-          {job.visa_sponsorship && (
-            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] text-indigo-400">
-              Visa sponsorship
-            </span>
-          )}
-
-          {job.gemini_quota_exhausted ? (
-            <span
-              title="Gemini's quota was exhausted, so this job is shown by default rather than filtered out."
-              className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-500"
-            >
-              ⚠ Gemini quota exhausted
-            </span>
-          ) : (
-            !job.gemini_reviewed && (
-              <span
-                title="Gemini didn't return a decision for this job, so it's shown by default rather than filtered out."
-                className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-500"
-              >
-                ⚠ Not AI-reviewed
-              </span>
-            )
-          )}
-
-          {job.matched_skills.map((s) => (
-            <span
-              key={s}
-              className="rounded-full bg-slate-900 px-2 py-0.5 text-[11px] text-slate-500"
-            >
-              {s}
-            </span>
-          ))}
-
-          {job.bonus_skills.map((s) => (
-            <span
-              key={s}
-              title="Bonus skill — not part of your scoring, just nice to know it's there"
-              className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-500"
-            >
-              +{s}
-            </span>
-          ))}
-        </div>
+        <JobDetailBadges job={job} modeColor={modeColor} />
 
         {/* Score breakdown */}
-        <div className="mt-4.5 flex flex-col gap-2">
-          <div>
-            <div className="mb-0.5 text-[11px] text-slate-500">Skill match</div>
-            <ScoreBar value={job.skill_match_score} color="#6366f1" />
-          </div>
-          <div>
-            <div className="mb-0.5 text-[11px] text-slate-500">Recency (live)</div>
-            <ScoreBar value={liveRecencyScore} color="#22c55e" />
-          </div>
-          <div>
-            <div className="mb-0.5 text-[11px] text-slate-500">Relocation</div>
-            <ScoreBar value={job.relocation_bonus} color="#f59e0b" />
-          </div>
-        </div>
-
-        {job.gemini_reason && (
-          <div className="mt-4 rounded-lg bg-[#0a0a18] px-3.5 py-2.5 text-[13px] italic text-slate-400">
-            Gemini: {job.gemini_reason}
-          </div>
-        )}
+        <JobScoreBreakdown job={job} liveRecencyScore={liveRecencyScore} />
 
         <a
           href={job.url}
