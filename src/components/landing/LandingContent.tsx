@@ -3,87 +3,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-
-const DEMO_JOBS = [
-  {
-    title: "Senior Frontend Engineer",
-    company: "Vercel",
-    flag: "🇺🇸",
-    score: 94,
-    skills: ["React", "Next.js", "TypeScript"],
-    mode: "global" as const,
-  },
-  {
-    title: "React Developer",
-    company: "N26",
-    flag: "🇩🇪",
-    score: 87,
-    skills: ["React", "TypeScript", "CSS"],
-    mode: "global" as const,
-  },
-  {
-    title: "Senior UI Engineer",
-    company: "Spotify",
-    flag: "🇸🇪",
-    score: 82,
-    skills: ["React", "Redux", "TypeScript"],
-    mode: "global" as const,
-  },
-  {
-    title: "Frontend Lead",
-    company: "Paymob",
-    flag: "🇪🇬",
-    score: 79,
-    skills: ["React", "JavaScript", "Sass"],
-    mode: "local" as const,
-  },
-];
-
-const PIPELINE_STAGES = [
-  { label: "847", sub: "fetched from\n95 companies", color: "#6366f1" },
-  { label: "312", sub: "after\ndate filter", color: "#818cf8" },
-  { label: "89", sub: "after your\nsettings", color: "#a78bfa" },
-  { label: "23", sub: "after your\nGemini filter", color: "#c4b5fd" },
-];
-
-const FEATURES = [
-  {
-    icon: "🧠",
-    title: "AI-powered filtering",
-    desc: "Your own Gemini API key and custom prompt. Job radar passes all fetched jobs through your filter before you ever see them.",
-  },
-  {
-    icon: "🎯",
-    title: "Per-skill scoring",
-    desc: "Expert skills (React, TypeScript) score 3×. Recency and relocation bonus combine into one weighted total. Fully configurable.",
-  },
-  {
-    icon: "🔭",
-    title: "Pipeline transparency",
-    desc: "See exactly how many jobs were fetched, date-filtered, settings-filtered, and AI-filtered. Understand why your feed looks the way it does.",
-  },
-  {
-    icon: "📋",
-    title: "Application tracker",
-    desc: "Track Applied → Interviewing → Offer or Ghosted. All with a job snapshot that persists even after jobs expire from the pool.",
-  },
-  {
-    icon: "💼",
-    title: "Salary crowdsourcing",
-    desc: "Anonymous salary reports from the community. Aggregated by role, experience band, and pipeline. Helps everyone get paid fairly.",
-  },
-  {
-    icon: "⚡",
-    title: "Instant after first load",
-    desc: "Gemini runs once after each cron run and the results are cached. All subsequent dashboard opens are instant.",
-  },
-];
-
-const MODE_COLOR: Record<string, string> = { global: "#f59e0b", local: "#22c55e" };
-const MODE_LABEL: Record<string, string> = {
-  global: "🌐 Remote",
-  local: "🇪🇬 Local",
-};
+import DemoJobCards from "./DemoJobCards";
+import PipelineFunnel from "./PipelineFunnel";
+import FeatureGrid from "./FeatureGrid";
 
 interface LandingContentProps {
   isLoggedIn: boolean;
@@ -160,116 +82,11 @@ export default function LandingContent({ isLoggedIn }: LandingContentProps) {
         </div>
       </section>
 
-      {/* Demo job cards */}
-      <section className="relative z-10 mx-auto max-w-[800px] px-8 pb-20">
-        <div className="mb-7 text-center text-xs uppercase tracking-widest text-slate-600">
-          Sample from today&apos;s feed
-        </div>
-        <div style={{ perspective: 1000 }}>
-          {DEMO_JOBS.map((job, i) => (
-            <div
-              key={i}
-              className="demo-card mb-3 rounded-xl border border-white/[0.06] bg-[#0d0d1a]/70 px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
-              style={{ borderLeft: `3px solid ${MODE_COLOR[job.mode]}`, willChange: "transform" }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[15px] font-semibold text-slate-200">{job.title}</div>
-                  <div className="mt-0.5 text-[13px] text-slate-500">
-                    {job.company} · {job.flag} · {MODE_LABEL[job.mode]}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {job.skills.map((s) => (
-                      <span
-                        key={s}
-                        className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[11px] text-indigo-400"
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div
-                  className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    background: `conic-gradient(${MODE_COLOR[job.mode]} ${job.score * 3.6}deg, #1e1e30 0deg)`,
-                  }}
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d0d1a] text-[13px] font-bold text-slate-200">
-                    {job.score}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 text-center text-xs text-slate-600">
-          Sign in to see real matches filtered for your own skills and preferences
-        </div>
-      </section>
+      <DemoJobCards />
 
-      {/* Pipeline funnel demo */}
-      <section className="relative z-10 border-y border-white/[0.04] bg-[#0d0d1a]/60 px-8 py-16 text-center backdrop-blur-xl">
-        <div className="mb-2 text-xs uppercase tracking-widest text-slate-600">
-          Pipeline transparency
-        </div>
-        <h2
-          className="m-0 mb-10 font-bold text-slate-200"
-          style={{ fontSize: "clamp(20px, 3vw, 28px)" }}
-        >
-          See exactly what happened to every job
-        </h2>
-        <div className="flex flex-wrap items-center justify-center gap-0">
-          {PIPELINE_STAGES.map((stage, i) => (
-            <div key={i} className="flex items-center">
-              {i > 0 && <div className="px-2 text-2xl text-slate-600">→</div>}
-              <div
-                className="funnel-node flex min-w-[110px] flex-col items-center rounded-2xl bg-[#0d0d1a]/80 px-4 py-5 backdrop-blur-md"
-                style={{ border: `1px solid ${stage.color}30`, willChange: "transform" }}
-              >
-                <div
-                  className="flex h-[72px] w-[72px] items-center justify-center rounded-full text-[22px] font-extrabold"
-                  style={{
-                    border: `2px solid ${stage.color}`,
-                    background: `${stage.color}10`,
-                    color: stage.color,
-                  }}
-                >
-                  {stage.label}
-                </div>
-                <div className="mt-2.5 whitespace-pre-line text-center text-[11px] leading-tight text-slate-500">
-                  {stage.sub}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <PipelineFunnel />
 
-      {/* Feature grid */}
-      <section className="relative z-10 mx-auto max-w-[960px] px-8 py-20">
-        <div className="mb-12 text-center">
-          <h2
-            className="m-0 font-bold text-slate-200"
-            style={{ fontSize: "clamp(22px, 3vw, 32px)" }}
-          >
-            Everything you need. Nothing you don&apos;t.
-          </h2>
-        </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-5">
-          {FEATURES.map((f, i) => (
-            <div
-              key={i}
-              className="feat-card rounded-2xl border border-white/5 bg-[#0d0d1a]/60 p-6 shadow-[0_2px_16px_rgba(0,0,0,0.3)] backdrop-blur-xl"
-              style={{ willChange: "transform" }}
-            >
-              <div className="mb-3 text-[28px]">{f.icon}</div>
-              <h3 className="m-0 mb-2 text-base font-semibold text-slate-200">{f.title}</h3>
-              <p className="m-0 text-[13px] leading-relaxed text-slate-500">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <FeatureGrid />
 
       {/* CTA */}
       <section className="relative z-10 bg-gradient-to-b from-transparent to-indigo-500/[0.08] px-8 py-20 text-center">

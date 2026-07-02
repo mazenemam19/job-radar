@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `LandingContent.tsx`: three data-driven sections (demo job cards, pipeline
+  funnel, feature grid) extracted into their own components —
+  `DemoJobCards.tsx`, `PipelineFunnel.tsx`, `FeatureGrid.tsx` — each owning
+  its own static data. No behavior change; page still prerenders static
+  (203 lines/max-lines-per-function warning → resolved, audit row #16)
 - Workable fetcher: single host-keyed request queue (was keyed by job mode,
   letting local/global requests race on the same host) shared by list and
   detail-page calls; detail calls now get the same 429 retry/backoff as the
