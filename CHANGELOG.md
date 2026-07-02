@@ -2,7 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.0.0] - 2025-06-30
+## [2.1.0] - 2025-07-02
+
+### Refactoring
+
+- `ats-bridge.ts`: replaced the 9-branch ATS-type switch with a fetcher lookup
+  map (complexity 21 → resolved, audit row #8)
+
+### Testing
+
+- Added dispatch coverage for all 9 ATS fetcher types and the unknown-ATS
+  error path in `ats-bridge.test.ts`
+
+## [2.0.0] - 2025-07-02
 
 ### Breaking Changes
 

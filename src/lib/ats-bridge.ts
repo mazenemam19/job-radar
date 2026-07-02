@@ -22,7 +22,22 @@ import {
 import type { ATSCompanyRow, RawJob, JobMode } from "./types";
 import type { Job } from "@/types";
 
-import type { ATSConfig } from "@/types";
+import type { ATSConfig, FetcherResult } from "@/types";
+
+// All fetchers share this signature; dispatch is a lookup, not a branch per ATS.
+type Fetcher = (config: ATSConfig, mode: JobMode) => Promise<FetcherResult>;
+
+const FETCHERS: Record<ATSConfig["ats"], Fetcher> = {
+  greenhouse: fetchGreenhouse,
+  lever: fetchLever,
+  ashby: fetchAshby,
+  workable: fetchWorkable,
+  teamtailor: fetchTeamtailor,
+  breezy: fetchBreezy,
+  smartrecruiters: fetchSmartRecruiters,
+  bamboohr: fetchBambooHR,
+  jazzhr: fetchJazzHR,
+};
 
 /** Convert a DB row + pipeline mode to the ATSConfig shape. */
 function toATSConfig(row: ATSCompanyRow): ATSConfig {
@@ -62,68 +77,13 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
   const fetchedMs = Date.parse(fetchedAt);
 
   try {
-    let rawJobs: Job[] = [];
-    let fetchError: string | null = null;
-
     // All fetchers compute visa_sponsorship from content internally.
-    switch (row.ats) {
-      case "greenhouse": {
-        const result = await fetchGreenhouse(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "lever": {
-        const result = await fetchLever(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "ashby": {
-        const result = await fetchAshby(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "workable": {
-        const result = await fetchWorkable(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "teamtailor": {
-        const result = await fetchTeamtailor(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "breezy": {
-        const result = await fetchBreezy(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "smartrecruiters": {
-        const result = await fetchSmartRecruiters(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "bamboohr": {
-        const result = await fetchBambooHR(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      case "jazzhr": {
-        const result = await fetchJazzHR(config, mode);
-        rawJobs = result.jobs;
-        if (result.error) fetchError = result.error;
-        break;
-      }
-      default:
-        throw new Error(`Unknown ATS type: ${row.ats}`);
-    }
+    const fetcher = FETCHERS[row.ats];
+    if (!fetcher) throw new Error(`Unknown ATS type: ${row.ats}`);
+
+    const result = await fetcher(config, mode);
+    const rawJobs: Job[] = result.jobs;
+    const fetchError: string | null = result.error ?? null;
 
     // Normalise and detect date_unknown (fallback date)
     const jobs: RawJob[] = rawJobs.map((j) => {

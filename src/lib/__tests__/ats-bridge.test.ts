@@ -131,4 +131,32 @@ describe("fetchCompany", () => {
 
     expect(result.jobs[0].company).toBe("FallbackCo");
   });
+
+  it.each([
+    ["lever", atsUtils.fetchLever],
+    ["ashby", atsUtils.fetchAshby],
+    ["workable", atsUtils.fetchWorkable],
+    ["teamtailor", atsUtils.fetchTeamtailor],
+    ["breezy", atsUtils.fetchBreezy],
+    ["smartrecruiters", atsUtils.fetchSmartRecruiters],
+    ["bamboohr", atsUtils.fetchBambooHR],
+    ["jazzhr", atsUtils.fetchJazzHR],
+  ] as const)("dispatches %s rows to the matching fetcher", async (ats, fetcherMock) => {
+    (fetcherMock as ReturnType<typeof vi.fn>).mockResolvedValue({ jobs: [] });
+
+    await fetchCompany(makeRow({ ats }), "global");
+
+    expect(fetcherMock).toHaveBeenCalledTimes(1);
+    expect(atsUtils.fetchGreenhouse).not.toHaveBeenCalled();
+  });
+
+  it("returns an error for an unrecognized ATS type instead of throwing", async () => {
+    const result = await fetchCompany(
+      makeRow({ ats: "bogus-ats" as ATSCompanyRow["ats"] }),
+      "global",
+    );
+
+    expect(result.error).toBe("Unknown ATS type: bogus-ats");
+    expect(result.jobs).toHaveLength(0);
+  });
 });
