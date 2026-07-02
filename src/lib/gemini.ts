@@ -33,15 +33,15 @@ interface GeminiDecision {
   reason: string;
 }
 
-// Recognizable shape of a Gemini quota/rate-limit error — shared by callGemini's
-// quota tracking and generateApplicationStrategy's retry logic below.
+// Recognizable shape of a Gemini quota/rate-limit error — shared by the
+// model-fallback loop's quota tracking below.
 function isQuotaError(msg: string): boolean {
   return msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
 }
 
-// Thrown by callGemini only when every model in MODEL_QUEUE failed and every
-// one of those failures was specifically a quota/rate-limit error — as
-// opposed to a network error, bad response, or other transient failure.
+// Thrown by callWithModelFallback only when every model in MODEL_QUEUE failed
+// and every one of those failures was specifically a quota/rate-limit error —
+// as opposed to a network error, bad response, or other transient failure.
 // Lets filterBatch's catch block surface a distinct "quota exhausted" badge
 // instead of the generic "not AI-reviewed" one.
 class GeminiQuotaExhaustedError extends Error {
@@ -66,45 +66,88 @@ interface FilterResult {
   quotaExhausted?: boolean;
 }
 
-// ── Core call with model fallback ────────────────────────────
+// ── Shared model-fallback loop ───────────────────────────────
+// callGemini and generateApplicationStrategy both need "try each model in
+// MODEL_QUEUE, bail immediately on an invalid key, otherwise fall through to
+// the next model, and report whether every failure was quota-related" — that
+// shared shape lived duplicated in both functions and pushed each over the
+// complexity limit on its own. Extracted once here instead.
 
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
+type ModelAttempt<T> = { value: T } | { retry: true; quota: boolean; msg: string };
+
+async function tryModelCall<T>(
+  genAI: GoogleGenAI,
+  model: string,
+  temperature: number,
+  prompt: string,
+  parse: (text: string) => T | null,
+): Promise<ModelAttempt<T>> {
+  try {
+    const response = await genAI.models.generateContent({
+      model,
+      contents: prompt,
+      config: { temperature },
+    });
+    const parsed = parse(response.text ?? "");
+    if (parsed !== null) return { value: parsed };
+    return { retry: true, quota: false, msg: "empty or invalid response" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+
+    // If the API key is completely invalid or unauthorized, fail immediately
+    if (
+      msg.includes("401") ||
+      msg.includes("API_KEY_INVALID") ||
+      msg.includes("INVALID_ARGUMENT")
+    ) {
+      throw err;
+    }
+
+    return { retry: true, quota: isQuotaError(msg), msg };
+  }
+}
+
+/**
+ * Tries each model in MODEL_QUEUE in order against `prompt`, using `parse` to
+ * validate/extract a result from the raw text. Returns the first successful
+ * `{ value, model }` pair. Throws GeminiQuotaExhaustedError if every model
+ * failed and every failure was quota-related, otherwise a generic Error with
+ * `exhaustedMessage`.
+ */
+async function callWithModelFallback<T>(
+  apiKey: string,
+  temperature: number,
+  prompt: string,
+  parse: (text: string) => T | null,
+  label: string,
+  exhaustedMessage: string,
+): Promise<{ value: T; model: string }> {
   const genAI = new GoogleGenAI({ apiKey });
   let allFailuresWereQuota = true;
 
   for (const model of MODEL_QUEUE) {
-    try {
-      const response = await genAI.models.generateContent({
-        model,
-        contents: prompt,
-        config: { temperature: 0 },
-      });
-      const text = response.text ?? "";
-      if (text.trim()) return text;
-      allFailuresWereQuota = false; // an empty response isn't a quota issue
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+    const result = await tryModelCall(genAI, model, temperature, prompt, parse);
+    if ("value" in result) return { value: result.value, model };
 
-      // If the API key is completely invalid or unauthorized, fail immediately
-      if (
-        msg.includes("401") ||
-        msg.includes("API_KEY_INVALID") ||
-        msg.includes("INVALID_ARGUMENT")
-      ) {
-        throw err;
-      }
-
-      if (!isQuotaError(msg)) allFailuresWereQuota = false;
-
-      // For any other errors (429 rate limit, 404 model unsupported, server error), try the next model
-      console.warn(`[gemini] Model ${model} failed, trying next... Error:`, msg);
-      continue;
-    }
+    if (!result.quota) allFailuresWereQuota = false;
+    console.warn(`[gemini] ${label} — model ${model} failed, trying next... Error:`, result.msg);
   }
 
-  throw allFailuresWereQuota
-    ? new GeminiQuotaExhaustedError()
-    : new Error("All Gemini models exhausted");
+  throw allFailuresWereQuota ? new GeminiQuotaExhaustedError() : new Error(exhaustedMessage);
+}
+
+// ── Core call with model fallback ────────────────────────────
+
+async function callGemini(apiKey: string, prompt: string): Promise<string> {
+  const { value } = await callWithModelFallback(
+    apiKey,
+    0,
+    prompt,
+    (text) => (text.trim() ? text : null),
+    "callGemini",
+    "All Gemini models exhausted",
+  );
+  return value;
 }
 
 // ── Parse Gemini JSON response ────────────────────────────────
@@ -127,6 +170,78 @@ function parseDecisions(text: string): GeminiDecision[] {
 
 // ── Batch filtering ───────────────────────────────────────────
 
+// Turns Gemini's raw decisions into a resultMap, validating/deduping idx and
+// logging (loudly) any job that never got a matched decision. Split out of
+// filterBatch so the batch-level try/catch stays simple.
+function buildResultMap(
+  jobs: RawJob[],
+  decisions: GeminiDecision[],
+  raw: string,
+): Map<string, FilterResult> {
+  const resultMap = new Map<string, FilterResult>();
+  const seenIdx = new Set<number>();
+
+  for (const d of decisions) {
+    const idx = d.idx;
+    const isValidIdx =
+      typeof idx === "number" && Number.isInteger(idx) && idx >= 0 && idx < jobs.length;
+
+    if (!isValidIdx) {
+      console.error(
+        `[gemini] Decision with invalid/out-of-range idx (${JSON.stringify(idx)}) for a batch of ${jobs.length}. Raw response:`,
+        raw,
+      );
+      continue;
+    }
+    if (seenIdx.has(idx)) {
+      console.error(
+        `[gemini] Duplicate idx ${idx} in response, ignoring repeat. Raw response:`,
+        raw,
+      );
+      continue;
+    }
+    seenIdx.add(idx);
+
+    const job = jobs[idx];
+    resultMap.set(job.id, {
+      id: job.id,
+      pass: Boolean(d.pass),
+      reason: d.reason ?? null,
+      reviewed: true,
+    });
+  }
+
+  // Any job whose idx never appeared in a valid decision → fail open,
+  // but loudly (logged to console.error).
+  const missing = jobs.filter((j) => !resultMap.has(j.id));
+  if (missing.length > 0) {
+    console.error(
+      `[gemini] ${missing.length}/${jobs.length} jobs had no matching decision in Gemini's response (failing open). Raw response:`,
+      raw,
+    );
+  }
+
+  return resultMap;
+}
+
+// If Gemini fails for the whole batch, every job passes through (fail-open),
+// tagged with why.
+function failOpenResultMap(jobs: RawJob[], err: unknown): Map<string, FilterResult> {
+  console.error("[gemini] Batch filter failed:", err);
+  const quotaExhausted = err instanceof GeminiQuotaExhaustedError;
+  const resultMap = new Map<string, FilterResult>();
+  for (const j of jobs) {
+    resultMap.set(j.id, {
+      id: j.id,
+      pass: true,
+      reason: quotaExhausted ? "gemini-quota-exhausted" : "gemini-unavailable",
+      reviewed: false,
+      quotaExhausted,
+    });
+  }
+  return resultMap;
+}
+
 /**
  * Filters a batch of raw jobs using Gemini with the user's custom prompt.
  * Called once per batch (BATCH_SIZE jobs).
@@ -143,11 +258,10 @@ async function filterBatch(
     title: j.title,
     company: j.company,
     location: j.location,
-    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k).
-    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs.
-    // 48.8% at the previous 6000-char ceiling; pushing past 10k buys only
-    // 8.2% more coverage for a disproportionate token-cost increase).
-    // No ingestion ceiling — processJobs stores the full description.
+    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs. 48.8%
+    // at the previous 6000-char ceiling; pushing past 10k buys only 8.2% more
+    // coverage for a disproportionate token-cost increase). No ingestion
+    // ceiling — processJobs stores the full description.
     description: j.description.slice(0, 10000),
   }));
 
@@ -158,65 +272,12 @@ ${RESPONSE_FORMAT_INSTRUCTIONS}
 Jobs to evaluate:
 ${JSON.stringify(jobSummaries, null, 2)}`;
 
-  const resultMap = new Map<string, FilterResult>();
-
+  let resultMap: Map<string, FilterResult>;
   try {
     const raw = await callGemini(apiKey, prompt);
-    const decisions = parseDecisions(raw);
-    const seenIdx = new Set<number>();
-
-    for (const d of decisions) {
-      const idx = d.idx;
-      const isValidIdx =
-        typeof idx === "number" && Number.isInteger(idx) && idx >= 0 && idx < jobs.length;
-
-      if (!isValidIdx) {
-        console.error(
-          `[gemini] Decision with invalid/out-of-range idx (${JSON.stringify(idx)}) for a batch of ${jobs.length}. Raw response:`,
-          raw,
-        );
-        continue;
-      }
-      if (seenIdx.has(idx)) {
-        console.error(
-          `[gemini] Duplicate idx ${idx} in response, ignoring repeat. Raw response:`,
-          raw,
-        );
-        continue;
-      }
-      seenIdx.add(idx);
-
-      const job = jobs[idx];
-      resultMap.set(job.id, {
-        id: job.id,
-        pass: Boolean(d.pass),
-        reason: d.reason ?? null,
-        reviewed: true,
-      });
-    }
-
-    // Any job whose idx never appeared in a valid decision → fail open,
-    // but loudly (logged to console.error).
-    const missing = jobs.filter((j) => !resultMap.has(j.id));
-    if (missing.length > 0) {
-      console.error(
-        `[gemini] ${missing.length}/${jobs.length} jobs had no matching decision in Gemini's response (failing open). Raw response:`,
-        raw,
-      );
-    }
+    resultMap = buildResultMap(jobs, parseDecisions(raw), raw);
   } catch (err) {
-    // If Gemini fails for this batch, pass all jobs through (fail-open)
-    console.error("[gemini] Batch filter failed:", err);
-    const quotaExhausted = err instanceof GeminiQuotaExhaustedError;
-    for (const j of jobs) {
-      resultMap.set(j.id, {
-        id: j.id,
-        pass: true,
-        reason: quotaExhausted ? "gemini-quota-exhausted" : "gemini-unavailable",
-        reviewed: false,
-        quotaExhausted,
-      });
-    }
+    resultMap = failOpenResultMap(jobs, err);
   }
 
   // Any job not in Gemini's response → default to pass (fail-open)
@@ -292,6 +353,16 @@ export interface StrategyResult {
   model_used: string;
 }
 
+function parseStrategyResponse(text: string): string[] | null {
+  const clean = text.replace(/```json|```/g, "").trim();
+  try {
+    const parsed = JSON.parse(clean);
+    return Array.isArray(parsed) ? (parsed as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generates a 4-6 bullet application strategy for a specific job.
  * Uses the user's own Gemini API key.
@@ -313,47 +384,14 @@ Write 4-6 short, specific, actionable bullet points for a cover letter / intervi
 Focus on: skill alignment, how to position experience, what to emphasise, questions to ask.
 Return ONLY a JSON array of strings (the bullet points). No markdown, no preamble.`;
 
-  const genAI = new GoogleGenAI({ apiKey });
-  let allFailuresWereQuota = true;
+  const { value: strategies, model } = await callWithModelFallback(
+    apiKey,
+    0.3,
+    prompt,
+    parseStrategyResponse,
+    "strategy generation",
+    "Failed to generate strategy: all models exhausted",
+  );
 
-  for (const model of MODEL_QUEUE) {
-    try {
-      const response = await genAI.models.generateContent({
-        model,
-        contents: prompt,
-        config: { temperature: 0.3 },
-      });
-      const text = (response.text ?? "").replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed)) {
-        return { strategies: parsed as string[], model_used: model };
-      }
-      // Non-array response — not a quota issue, try next model
-      allFailuresWereQuota = false;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-
-      // Invalid API key — fail immediately
-      if (
-        msg.includes("401") ||
-        msg.includes("API_KEY_INVALID") ||
-        msg.includes("INVALID_ARGUMENT")
-      ) {
-        throw err;
-      }
-
-      if (!isQuotaError(msg)) allFailuresWereQuota = false;
-
-      // For any other error (429 rate limit, 404 model unsupported, server error, parse error), try next model
-      console.warn(
-        `[gemini] Strategy generation — model ${model} failed, trying next... Error:`,
-        msg,
-      );
-      continue;
-    }
-  }
-
-  throw allFailuresWereQuota
-    ? new GeminiQuotaExhaustedError()
-    : new Error("Failed to generate strategy: all models exhausted");
+  return { strategies, model_used: model };
 }

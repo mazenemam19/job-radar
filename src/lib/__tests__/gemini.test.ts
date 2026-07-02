@@ -3,7 +3,7 @@
 // jobs by positional index, not by echoing the job ID.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { filterJobsWithGemini } from "../gemini";
+import { filterJobsWithGemini, generateApplicationStrategy } from "../gemini";
 import type { RawJob } from "../types";
 
 const { generateContentMock } = vi.hoisted(() => ({ generateContentMock: vi.fn() }));
@@ -163,5 +163,63 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result[0].gemini_pass).toBe(true);
     expect(result[0].gemini_reason).toBeNull();
     expect(result[0].gemini_reviewed).toBe(false);
+  });
+});
+
+describe("generateApplicationStrategy", () => {
+  const job = { title: "Frontend Engineer", company: "Acme", description: "React role" };
+  const skills = ["React", "TypeScript"];
+
+  beforeEach(() => {
+    generateContentMock.mockReset();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns strategies and the model that produced them", async () => {
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify(["Highlight your React experience", "Ask about the team's stack"]),
+    });
+
+    const result = await generateApplicationStrategy("key", job, skills);
+
+    expect(result.strategies).toEqual([
+      "Highlight your React experience",
+      "Ask about the team's stack",
+    ]);
+    expect(result.model_used).toBe("gemini-3.1-pro-preview");
+  });
+
+  it("falls back to the next model on failure and reports it as model_used", async () => {
+    generateContentMock
+      .mockRejectedValueOnce(new Error("500 internal server error"))
+      .mockResolvedValueOnce({ text: JSON.stringify(["Bullet one"]) });
+
+    const result = await generateApplicationStrategy("key", job, skills);
+
+    expect(result.model_used).toBe("gemini-3.1-flash-lite-preview");
+    expect(result.strategies).toEqual(["Bullet one"]);
+  });
+
+  it("throws immediately on an invalid API key without trying other models", async () => {
+    generateContentMock.mockRejectedValue(new Error("API_KEY_INVALID"));
+
+    await expect(generateApplicationStrategy("bad-key", job, skills)).rejects.toThrow(
+      "API_KEY_INVALID",
+    );
+    expect(generateContentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws a quota-exhausted error when every model hits 429", async () => {
+    generateContentMock.mockRejectedValue(new Error("429 RESOURCE_EXHAUSTED"));
+
+    await expect(generateApplicationStrategy("key", job, skills)).rejects.toThrow("quota");
+    // MODEL_QUEUE isn't exported; 5 is its current length (see gemini.ts) —
+    // asserts every model in the queue was tried before giving up.
+    expect(generateContentMock).toHaveBeenCalledTimes(5);
   });
 });

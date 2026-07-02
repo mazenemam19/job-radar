@@ -29,6 +29,14 @@ All notable changes to this project are documented in this file.
   `DashboardLoadingState.tsx`, `DashboardErrorState.tsx`, `FilterTabs.tsx`;
   `FilterMode` moved out of the component file into `lib/types.ts` (172
   lines, complexity 14 → resolved, audit row #14)
+- `gemini.ts`: `callGemini` and `generateApplicationStrategy` each hand-rolled
+  the same "try each model in MODEL_QUEUE, bail immediately on an invalid
+  key, otherwise fall through and track whether every failure was
+  quota-related" loop; extracted once into `callWithModelFallback` /
+  `tryModelCall`. `filterBatch` split into `buildResultMap` (idx
+  validation/dedup + missing-decision logging) and `failOpenResultMap`
+  (whole-batch failure path) so the batch-level try/catch stays simple
+  (complexity 11/14/11 → resolved, audit row #15)
 
 ### Testing
 
@@ -37,6 +45,9 @@ All notable changes to this project are documented in this file.
   `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)
 - Added `dashboard-client.test.ts` covering `computeModeCounts` and
   `filterJobsByMode` extracted from `DashboardClient.tsx` (audit row #14)
+- Added direct coverage for `generateApplicationStrategy` (success,
+  model-fallback, invalid-key short-circuit, quota exhaustion) — previously
+  untested (audit row #15)
 
 ## [2.1.1] - 2026-07-02
 
