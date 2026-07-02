@@ -50,7 +50,7 @@ Status column: `pending` / `in progress` / `done`
 | 1   | `src/app/api/admin/defaults/route.ts`                       | complexity 47                                   | done    |
 | 2   | `src/lib/sources/ats-utils.ts`                              | 815 lines, complexity 16                        | done    |
 | 3   | `src/components/settings/SettingsForm.tsx`                  | 605 lines, complexity 21, 29 useState, no tests | done    |
-| 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | pending |
+| 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | done    |
 | 5   | `src/lib/runner.ts`                                         | complexity 24, 160-line function                | pending |
 | 6   | `src/lib/settings.ts`                                       | complexity 23 (`mergeWithDefaults`)             | pending |
 | 7   | `src/components/admin/AdminComponents/DefaultsForm.tsx`     | 320 lines, complexity 21, no tests              | pending |
