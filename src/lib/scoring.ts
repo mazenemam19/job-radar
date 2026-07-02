@@ -7,7 +7,7 @@
 // Seniority is multi-label set-overlap with four editable term arrays.
 //             Junior is just another selectable level.
 
-import type { RawJob, ResolvedSettings, ScoredJob, SeniorityLevel } from "./types";
+import type { RawJob, ResolvedSettings, ScoredJob, ScoringWeights, SeniorityLevel } from "./types";
 
 // ── Seniority: term-array classification ─────────────────────
 
@@ -131,6 +131,36 @@ export function computeRecencyScore(postedAt: string): number {
   if (Number.isNaN(ms)) return 0;
   const ageDays = (Date.now() - ms) / 86_400_000;
   return Math.max(0, Math.round(100 - (ageDays / 7) * 100));
+}
+
+/** Fallback weights for display-only recompute when a job predates stored weights. */
+const DEFAULT_DISPLAY_WEIGHTS: ScoringWeights = { skill: 0.6, recency: 0.3, relocation: 0.1 };
+
+/**
+ * Recomputes recency and total score LIVE for display purposes, using the
+ * same weighted-sum formula as scoreJob. Callers that render a stored
+ * ScoredJob (dashboard card, job detail page) use this instead of scoreJob
+ * so the recency component never goes stale between page loads, without
+ * duplicating the scoring formula at each call site.
+ */
+export function computeLiveDisplayScore(
+  job: Pick<
+    ScoredJob,
+    | "posted_at"
+    | "fetched_at"
+    | "date_unknown"
+    | "skill_match_score"
+    | "relocation_bonus"
+    | "scoring_weights"
+  >,
+): { recencyScore: number; totalScore: number } {
+  const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
+  const recencyScore = computeRecencyScore(dateForRecency);
+  const { skill, recency, relocation } = job.scoring_weights ?? DEFAULT_DISPLAY_WEIGHTS;
+  const totalScore = Math.round(
+    job.skill_match_score * skill + recencyScore * recency + job.relocation_bonus * relocation,
+  );
+  return { recencyScore, totalScore };
 }
 
 // ── Skill matching ───────────────────────────────────────────

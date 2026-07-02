@@ -4,9 +4,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { computeRecencyScore, getDisplaySeniorityBadge } from "@/lib/scoring";
-import { MODE_COLORS, MODE_LABELS } from "@/lib/constants";
-import ScoreBar from "./ScoreBar";
+import { computeLiveDisplayScore } from "@/lib/scoring";
+import { formatPostedLabel } from "@/lib/job-display";
+import { MODE_COLORS } from "@/lib/constants";
+import JobBadges from "./JobBadges";
+import JobScoreBreakdown from "./JobScoreBreakdown";
+import JobCardActions from "./JobCardActions";
 import type { ScoredJob, ResolvedSettings } from "@/lib/types";
 
 interface Props {
@@ -17,30 +20,16 @@ interface Props {
   settings?: ResolvedSettings;
 }
 
-const BTN_CLASS = "cursor-pointer rounded-md border-0 px-3.5 py-1.5 text-[13px] font-medium";
-
 export default function JobCard({ job, onTrack, onStrategy, isTracked, settings }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  // Compute recency live from posted_at for display accuracy
-  const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
-  const liveRecencyScore = computeRecencyScore(dateForRecency);
-
-  // Recompute total score with live recency for display accuracy
-  const { skill, recency, relocation } = job.scoring_weights ?? {
-    skill: 0.6,
-    recency: 0.3,
-    relocation: 0.1,
-  };
-  const displayTotalScore = Math.round(
-    job.skill_match_score * skill + liveRecencyScore * recency + job.relocation_bonus * relocation,
-  );
+  // Recency and total score are recomputed live (never trust the stored
+  // snapshot) so the badge stays accurate as the job ages between loads.
+  const { recencyScore: liveRecencyScore, totalScore: displayTotalScore } =
+    computeLiveDisplayScore(job);
 
   const modeColor = MODE_COLORS[job.mode] ?? "#6366f1";
-
-  const postedLabel = job.date_unknown
-    ? `~${Math.round((Date.now() - Date.parse(job.fetched_at)) / 86_400_000)}d ago (date unknown)`
-    : formatRelativeDate(job.posted_at);
+  const postedLabel = formatPostedLabel(job);
 
   return (
     <article
@@ -75,148 +64,18 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
         </div>
       </div>
 
-      {/* Tags row */}
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <span
-          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-          style={{ background: `${modeColor}20`, color: modeColor }}
-        >
-          {MODE_LABELS[job.mode]}
-        </span>
+      <JobBadges job={job} modeColor={modeColor} settings={settings} />
 
-        {job.visa_sponsorship && (
-          <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#818cf8]">
-            Visa sponsorship
-          </span>
-        )}
+      {expanded && <JobScoreBreakdown job={job} liveRecencyScore={liveRecencyScore} />}
 
-        {settings && getDisplaySeniorityBadge(job, settings) && (
-          <span className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#22d3ee]">
-            {getDisplaySeniorityBadge(job, settings)}
-          </span>
-        )}
-
-        {job.gemini_quota_exhausted ? (
-          <span
-            title="Gemini's quota was exhausted, so this job is shown by default rather than filtered out."
-            className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
-            style={{ background: "rgba(245,158,11,0.12)" }}
-          >
-            ⚠ Gemini quota exhausted
-          </span>
-        ) : (
-          !job.gemini_reviewed && (
-            <span
-              title="Gemini didn't return a decision for this job, so it's shown by default rather than filtered out."
-              className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
-              style={{ background: "rgba(245,158,11,0.12)" }}
-            >
-              ⚠ Not AI-reviewed
-            </span>
-          )
-        )}
-
-        {job.matched_skills.slice(0, 5).map((s) => (
-          <span
-            key={s}
-            className="rounded-full bg-[#0f172a] px-2 py-0.5 text-[11px] text-[#64748b]"
-          >
-            {s}
-          </span>
-        ))}
-        {job.matched_skills.length > 5 && (
-          <span className="px-2 py-0.5 text-[11px] text-[#475569]">
-            +{job.matched_skills.length - 5}
-          </span>
-        )}
-
-        {job.bonus_skills.slice(0, 4).map((s) => (
-          <span
-            key={s}
-            title="Bonus skill — not part of your scoring, just nice to know it's there"
-            className="rounded-full px-2 py-0.5 text-[11px] text-[#f59e0b]"
-            style={{ background: "rgba(245,158,11,0.12)" }}
-          >
-            +{s}
-          </span>
-        ))}
-      </div>
-
-      {/* Score breakdown (expanded) */}
-      {expanded && (
-        <div className="mt-3 rounded-lg bg-[#0a0a18] p-3">
-          <div className="mb-1.5">
-            <div className="mb-[3px] text-[11px] text-[#64748b]">Skill match</div>
-            <ScoreBar value={job.skill_match_score} color="#6366f1" />
-          </div>
-          <div className="mb-1.5">
-            <div className="mb-[3px] text-[11px] text-[#64748b]">Recency (live)</div>
-            <ScoreBar value={liveRecencyScore} color="#22c55e" />
-          </div>
-          <div>
-            <div className="mb-[3px] text-[11px] text-[#64748b]">Relocation</div>
-            <ScoreBar value={job.relocation_bonus} color="#f59e0b" />
-          </div>
-          {job.gemini_reason && (
-            <div className="mt-2.5 text-xs italic text-[#475569]">Gemini: {job.gemini_reason}</div>
-          )}
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          onClick={() => setExpanded((p) => !p)}
-          className={BTN_CLASS}
-          style={{ background: "#1e1e30", color: "#94a3b8" }}
-        >
-          {expanded ? "Less" : "Details"}
-        </button>
-
-        {onStrategy && (
-          <button
-            onClick={() => onStrategy(job)}
-            className={BTN_CLASS}
-            style={{ background: "#1e1e30", color: "#818cf8" }}
-          >
-            ✨ Strategy
-          </button>
-        )}
-
-        {onTrack && (
-          <button
-            onClick={() => onTrack(job)}
-            className={BTN_CLASS}
-            style={{
-              background: isTracked ? "#16213e" : "#1e1e30",
-              color: isTracked ? "#6366f1" : "#94a3b8",
-            }}
-          >
-            {isTracked ? "✓ Tracked" : "+ Track"}
-          </button>
-        )}
-
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`${BTN_CLASS} no-underline`}
-          style={{ background: "#6366f1", color: "#fff" }}
-        >
-          Apply →
-        </a>
-      </div>
+      <JobCardActions
+        job={job}
+        expanded={expanded}
+        onToggleExpanded={() => setExpanded((p) => !p)}
+        onTrack={onTrack}
+        onStrategy={onStrategy}
+        isTracked={isTracked}
+      />
     </article>
   );
-}
-
-function formatRelativeDate(iso: string): string {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return "Unknown";
-  const days = Math.floor((Date.now() - ms) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
 }

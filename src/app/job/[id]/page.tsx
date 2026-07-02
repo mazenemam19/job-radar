@@ -9,21 +9,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
-import { computeRecencyScore } from "@/lib/scoring";
+import { computeLiveDisplayScore } from "@/lib/scoring";
+import { formatPostedLabel } from "@/lib/job-display";
 import { MODE_COLORS, MODE_LABELS } from "@/lib/constants";
 import ScoreBar from "@/components/dashboard/ScoreBar";
 import type { ScoredJob } from "@/lib/types";
-
-function formatRelativeDate(iso: string): string {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return "Unknown";
-  const days = Math.floor((Date.now() - ms) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
 
 const PAGE_SHELL_CLASS = "mx-auto min-h-screen max-w-[760px] bg-[#08080f] px-6 py-8 font-sans";
 const BACK_BTN_CLASS =
@@ -82,23 +72,11 @@ export default function JobDetailPage() {
     );
   }
 
-  const dateForRecency = job.date_unknown ? job.fetched_at : job.posted_at;
-  const liveRecencyScore = computeRecencyScore(dateForRecency);
-
-  const { skill, recency, relocation } = job.scoring_weights ?? {
-    skill: 0.6,
-    recency: 0.3,
-    relocation: 0.1,
-  };
-  const displayTotalScore = Math.round(
-    job.skill_match_score * skill + liveRecencyScore * recency + job.relocation_bonus * relocation,
-  );
+  const { recencyScore: liveRecencyScore, totalScore: displayTotalScore } =
+    computeLiveDisplayScore(job);
 
   const modeColor = MODE_COLORS[job.mode] ?? "#6366f1";
-
-  const postedLabel = job.date_unknown
-    ? `~${Math.round((Date.now() - Date.parse(job.fetched_at)) / 86_400_000)}d ago (date unknown)`
-    : formatRelativeDate(job.posted_at);
+  const postedLabel = formatPostedLabel(job);
 
   const cleanDescription = job.description
     ? DOMPurify.sanitize(job.description, {

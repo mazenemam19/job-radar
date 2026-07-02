@@ -8,11 +8,19 @@ All notable changes to this project are documented in this file.
 
 - `ats-bridge.ts`: replaced the 9-branch ATS-type switch with a fetcher lookup
   map (complexity 21 → resolved, audit row #8)
+- `JobCard.tsx`: split the tags row, expanded score panel, and action buttons
+  into `JobBadges`, `JobScoreBreakdown`, and `JobCardActions`; moved the live
+  score recompute into `computeLiveDisplayScore` (`lib/scoring.ts`) and the
+  posted-date label into `lib/job-display.ts` — both were duplicated verbatim
+  in `job/[id]/page.tsx`, which now imports the same helpers instead
+  (complexity 19 → resolved, audit row #9)
 
 ### Testing
 
 - Added dispatch coverage for all 9 ATS fetcher types and the unknown-ATS
   error path in `ats-bridge.test.ts`
+- Added `compute-live-display-score.test.ts` and `job-display.test.ts`
+  covering the score/date logic extracted from `JobCard.tsx`
 
 ## [2.0.0] - 2025-07-02
 
