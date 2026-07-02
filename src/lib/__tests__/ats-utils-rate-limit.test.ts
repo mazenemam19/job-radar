@@ -48,10 +48,43 @@ describe("safeFetch rate-limit handling", () => {
     const { safeFetch } = await import("../sources/ats-utils");
     const res = await safeFetch("https://boards-api.greenhouse.io/v1/boards/always-429/jobs");
 
-    // 1 initial attempt + MAX_429_RETRIES(2) retries = 3 total calls, then give up.
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    // 1 initial attempt + MAX_429_RETRIES(3) retries = 4 total calls, then give up.
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4);
     expect(res?.status).toBe(429);
-  }, 20_000); // exponential backoff (2s + 4s) exceeds vitest's default 5s test timeout
+  }, 30_000); // exponential backoff (2s + 4s + 8s) exceeds vitest's default 5s test timeout
+
+  it("honors a Retry-After longer than the old 15s cap, up to the new cap", async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.resolve({
+            status: 429,
+            ok: false,
+            headers: new Headers({ "retry-after": "20" }), // > old 15s cap, < new 30s cap
+          });
+        }
+        return Promise.resolve({
+          status: 200,
+          ok: true,
+          headers: new Headers(),
+          json: async () => ({}),
+        });
+      }),
+    );
+
+    const { safeFetch } = await import("../sources/ats-utils");
+    const start = Date.now();
+    const res = await safeFetch("https://boards-api.greenhouse.io/v1/boards/slow-limiter/jobs");
+    const elapsed = Date.now() - start;
+
+    expect(res?.status).toBe(200);
+    // Retry-After said 20s — the old code would've capped the wait at 15s
+    // and retried early. This should wait out close to the full 20s.
+    expect(elapsed).toBeGreaterThanOrEqual(19_000);
+  }, 25_000);
 
   it("staggers concurrent requests to the same host instead of firing them all at once", async () => {
     const callTimestamps: number[] = [];

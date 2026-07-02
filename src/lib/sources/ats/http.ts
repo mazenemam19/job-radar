@@ -11,7 +11,18 @@ import { trackDomainRequest } from "./run-state";
 // retries instead of just giving up for the rest of the run.
 const hostQueues = new Map<string, Promise<unknown>>();
 const HOST_STAGGER_MS = [200, 400, 600];
-const MAX_429_RETRIES = 2;
+// July 2 cron data (issue #52 follow-up): in-run retry alone still let a
+// handful of companies (different ones each run) exhaust their retries and
+// end the run 429'd. Two contributing factors, both addressed here:
+//   1. MAX_429_RETRIES=2 gave up too early for hosts whose limiter needs a
+//      third attempt to clear.
+//   2. The old 15s backoff cap silently truncated a longer Retry-After
+//      value, meaning a retry could fire *before* the host said it would
+//      accept one — actively working against the header we claim to honor.
+// Cross-run cooldown (like Workable's) is still the real fix if this isn't
+// enough on its own; that needs a migration and is tracked separately.
+const MAX_429_RETRIES = 3;
+const RETRY_BACKOFF_CAP_MS = 30_000;
 
 function queueByHost<T>(host: string, fn: () => Promise<T>): Promise<T> {
   const stagger = HOST_STAGGER_MS[Math.floor(Math.random() * HOST_STAGGER_MS.length)];
@@ -65,7 +76,9 @@ export async function safeFetch(
     if (res.status !== 429 || attempt === MAX_429_RETRIES) return res;
 
     const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
-    await new Promise((r) => setTimeout(r, Math.min(Math.max(backoffMs, 500), 15_000)));
+    await new Promise((r) =>
+      setTimeout(r, Math.min(Math.max(backoffMs, 500), RETRY_BACKOFF_CAP_MS)),
+    );
   }
   return null; // unreachable — loop always returns
 }
