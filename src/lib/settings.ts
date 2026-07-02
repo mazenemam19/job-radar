@@ -12,13 +12,7 @@
 
 import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
-import type {
-  DefaultSettings,
-  UserSettingsRow,
-  ResolvedSettings,
-  ScoringWeights,
-  SeniorityLevel,
-} from "./types";
+import type { DefaultSettings, UserSettingsRow, ResolvedSettings, ScoringWeights } from "./types";
 
 // Pure evaluation criteria only — no response-format instructions here.
 // The JSON contract is owned by code (see RESPONSE_FORMAT_INSTRUCTIONS in
@@ -223,38 +217,47 @@ export async function resolveUserSettings(userId: string): Promise<ResolvedSetti
   return mergeWithDefaults(defaults, userRow);
 }
 
+// Fields that merge as plain `user ?? default`. Excludes gemini_filter_prompt
+// (needs a FALLBACK_PROMPT floor) and scoring_weights (needs normaliseWeights).
+const SIMPLE_MERGE_FIELDS = [
+  "expert_skills",
+  "secondary_skills",
+  "bonus_skills",
+  "job_age_days",
+  "pipeline_local",
+  "pipeline_global",
+  "junior_keywords",
+  "mid_keywords",
+  "senior_keywords",
+  "staff_keywords",
+  "seniority_levels",
+  "score_denominator",
+  "excluded_keywords",
+  "blacklisted_locations",
+  "required_keywords",
+  "global_mode_blocked_regions",
+  "global_mode_allowed_locations",
+  "email_alerts_enabled",
+  "salary_reminder_enabled",
+] as const satisfies readonly (keyof DefaultSettings & keyof UserSettingsRow)[];
+
+type SimpleMergeField = (typeof SIMPLE_MERGE_FIELDS)[number];
+
 function mergeWithDefaults(
   defaults: DefaultSettings,
   user: UserSettingsRow | null,
 ): ResolvedSettings {
-  const rawWeights = user?.scoring_weights ?? defaults.scoring_weights;
-  const weights = normaliseWeights(rawWeights);
+  // Cast is safe: SIMPLE_MERGE_FIELDS is typed against both source interfaces.
+  const merged = {} as Record<SimpleMergeField, unknown>;
+  for (const field of SIMPLE_MERGE_FIELDS) {
+    merged[field] = user?.[field] ?? defaults[field];
+  }
 
   return {
-    expert_skills: user?.expert_skills ?? defaults.expert_skills,
-    secondary_skills: user?.secondary_skills ?? defaults.secondary_skills,
-    bonus_skills: user?.bonus_skills ?? defaults.bonus_skills,
-    job_age_days: user?.job_age_days ?? defaults.job_age_days,
-    pipeline_local: user?.pipeline_local ?? defaults.pipeline_local,
-    pipeline_global: user?.pipeline_global ?? defaults.pipeline_global,
-    junior_keywords: user?.junior_keywords ?? defaults.junior_keywords,
-    mid_keywords: user?.mid_keywords ?? defaults.mid_keywords,
-    senior_keywords: user?.senior_keywords ?? defaults.senior_keywords,
-    staff_keywords: user?.staff_keywords ?? defaults.staff_keywords,
-    seniority_levels: (user?.seniority_levels ?? defaults.seniority_levels) as SeniorityLevel[],
+    ...(merged as Pick<ResolvedSettings, SimpleMergeField>),
     gemini_filter_prompt:
       user?.gemini_filter_prompt ?? defaults.gemini_filter_prompt ?? FALLBACK_PROMPT,
-    scoring_weights: weights,
-    score_denominator: user?.score_denominator ?? defaults.score_denominator,
-    excluded_keywords: user?.excluded_keywords ?? defaults.excluded_keywords,
-    blacklisted_locations: user?.blacklisted_locations ?? defaults.blacklisted_locations,
-    required_keywords: user?.required_keywords ?? defaults.required_keywords,
-    global_mode_blocked_regions:
-      user?.global_mode_blocked_regions ?? defaults.global_mode_blocked_regions,
-    global_mode_allowed_locations:
-      user?.global_mode_allowed_locations ?? defaults.global_mode_allowed_locations,
-    email_alerts_enabled: user?.email_alerts_enabled ?? defaults.email_alerts_enabled,
-    salary_reminder_enabled: user?.salary_reminder_enabled ?? defaults.salary_reminder_enabled,
+    scoring_weights: normaliseWeights(user?.scoring_weights ?? defaults.scoring_weights),
   };
 }
 

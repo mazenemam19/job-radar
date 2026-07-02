@@ -52,7 +52,7 @@ Status column: `pending` / `in progress` / `done`
 | 3   | `src/components/settings/SettingsForm.tsx`                  | 605 lines, complexity 21, 29 useState, no tests | done    |
 | 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | done    |
 | 5   | `src/lib/runner.ts`                                         | complexity 24, 160-line function                | done    |
-| 6   | `src/lib/settings.ts`                                       | complexity 23 (`mergeWithDefaults`)             | pending |
+| 6   | `src/lib/settings.ts`                                       | complexity 23 (`mergeWithDefaults`)             | done    |
 | 7   | `src/components/admin/AdminComponents/DefaultsForm.tsx`     | 320 lines, complexity 21, no tests              | pending |
 | 8   | `src/lib/ats-bridge.ts`                                     | complexity 21                                   | pending |
 | 9   | `src/components/dashboard/JobCard.tsx`                      | 171 lines, complexity 19, no tests              | pending |
