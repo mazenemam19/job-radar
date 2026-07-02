@@ -57,7 +57,7 @@ describe("Workable fetcher rate-limit handling", () => {
     expect(callTimestamps).toHaveLength(2);
     const spread = Math.max(...callTimestamps) - Math.min(...callTimestamps);
     expect(spread).toBeGreaterThan(1000); // min stagger is 1500ms
-  });
+  }, 15_000); // real 1500ms stagger + overhead can exceed vitest's default 5s test timeout under load
 
   it("queues and staggers detail-page requests instead of firing them unqueued", async () => {
     const callTimestamps: number[] = [];
