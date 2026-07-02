@@ -39,7 +39,7 @@ Status column: `pending` / `in progress` / `done`
 
 | #   | File                                                        | Issue                                           | Status  |
 | --- | ----------------------------------------------------------- | ----------------------------------------------- | ------- |
-| 1   | `src/app/api/admin/defaults/route.ts`                       | complexity 47                                   | pending |
+| 1   | `src/app/api/admin/defaults/route.ts`                       | complexity 47                                   | done    |
 | 2   | `src/lib/sources/ats-utils.ts`                              | 815 lines, complexity 16                        | pending |
 | 3   | `src/components/settings/SettingsForm.tsx`                  | 605 lines, complexity 21, 29 useState, no tests | pending |
 | 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | pending |
