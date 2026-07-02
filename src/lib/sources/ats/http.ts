@@ -36,7 +36,7 @@ function queueByHost<T>(host: string, fn: () => Promise<T>): Promise<T> {
 }
 
 /** Reads Retry-After (seconds or HTTP date) into a millisecond delay, if present. */
-function parseRetryAfterMs(res: Response): number | null {
+export function parseRetryAfterMs(res: Response): number | null {
   const header = res.headers.get("retry-after");
   if (!header) return null;
   const seconds = Number(header);

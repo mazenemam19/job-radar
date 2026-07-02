@@ -1,9 +1,10 @@
 // src/lib/sources/ats/workable.ts
-// Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change.
 import type { ATSConfig, ATSRawInput, FetcherResult, WorkableJob, WorkableDetail } from "@/types";
 import type { JobMode } from "@/lib/types";
 import { processJobs, stripHtml, pLimit } from "./job-processing";
+import { parseRetryAfterMs } from "./http";
 import {
+  trackDomainRequest,
   isWorkableBlocked,
   getWorkableBudget,
   getWorkableUsed,
@@ -11,23 +12,60 @@ import {
   markWorkable429,
 } from "./run-state";
 
-const workableQueues = new Map<JobMode, Promise<unknown>>();
+// BUG FIX (July 2 incident): every 429 in both post-fix cron runs was
+// Workable — afba5dc never touched this file, so none of that fix applied
+// here. Two real, separate bugs:
+//
+// 1. This queue used to be keyed by JobMode ("local" | "global"), but every
+//    Workable request — local or global — hits the SAME host
+//    (apply.workable.com). Two independent queues meant a local-mode
+//    request and a global-mode request could fire at the exact same
+//    instant, which defeats the entire point of a stagger queue.
+// 2. The per-job detail-page loop further down used a raw, un-queued
+//    fetch() with only a pLimit(5) concurrency cap — zero stagger, zero
+//    retry, zero relation to the queue above. For a company with 20 open
+//    roles, that's 5 simultaneous hits to apply.workable.com, repeated for
+//    every company in the run.
+//
+// Fix: one host-keyed queue (there's only ever one host, so no Map needed),
+// shared by the list call AND every detail call, plus a retry-on-429 loop —
+// previously the list call marked-and-gave-up on the first 429, and the
+// detail call silently swallowed it with no retry at all.
+let workableQueue: Promise<unknown> = Promise.resolve();
+const WORKABLE_STAGGER_MS = [1500, 2000, 3000];
+const WORKABLE_MAX_429_RETRIES = 3;
+const WORKABLE_BACKOFF_CAP_MS = 30_000;
 
-function queueWorkable<T>(fn: () => Promise<T>, mode: JobMode): Promise<T> {
-  const delays = [1500, 2000, 3000];
-  const randomDelay = delays[Math.floor(Math.random() * delays.length)];
-
-  if (!workableQueues.has(mode)) {
-    workableQueues.set(mode, Promise.resolve());
-  }
-
-  const currentQueue = workableQueues.get(mode)!;
-  const result = currentQueue.then(() => new Promise((r) => setTimeout(r, randomDelay))).then(fn);
-  workableQueues.set(
-    mode,
-    result.catch(() => {}),
-  );
+function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
+  const stagger = WORKABLE_STAGGER_MS[Math.floor(Math.random() * WORKABLE_STAGGER_MS.length)];
+  const result = workableQueue.then(() => new Promise((r) => setTimeout(r, stagger))).then(fn);
+  workableQueue = result.catch(() => {});
   return result;
+}
+
+/** Queued, retried fetch for any apply.workable.com URL (list or detail). */
+async function fetchWorkableUrl(url: string, slug: string): Promise<Response | null> {
+  trackDomainRequest(url);
+  const doFetch = () =>
+    fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+      signal: AbortSignal.timeout(30_000),
+    }).catch(() => null);
+
+  for (let attempt = 0; attempt <= WORKABLE_MAX_429_RETRIES; attempt++) {
+    const res = await queueWorkable(doFetch);
+    if (!res) return null;
+    if (res.status !== 429) return res;
+    if (attempt === WORKABLE_MAX_429_RETRIES) {
+      markWorkable429(slug);
+      return res;
+    }
+    const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
+    await new Promise((r) =>
+      setTimeout(r, Math.min(Math.max(backoffMs, 500), WORKABLE_BACKOFF_CAP_MS)),
+    );
+  }
+  return null; // unreachable — loop always returns
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
@@ -55,19 +93,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
   incrementWorkableUsed(mode);
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const doFetch = () => {
-    return fetch(listUrl, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      signal: AbortSignal.timeout(30_000),
-    })
-      .then((r) => {
-        if (r.status === 429) markWorkable429(c.slug);
-        return r;
-      })
-      .catch(() => null);
-  };
-
-  const res = await queueWorkable(doFetch, mode);
+  const res = await fetchWorkableUrl(listUrl, c.slug);
 
   if (!res)
     return {
@@ -99,10 +125,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-        const dr = await fetch(detailUrl, {
-          headers: { "User-Agent": "Mozilla/5.0" },
-          signal: AbortSignal.timeout(30_000),
-        }).catch(() => null);
+        const dr = await fetchWorkableUrl(detailUrl, c.slug);
         let desc = stripHtml(r.description || "");
         if (dr && dr.ok) {
           try {
