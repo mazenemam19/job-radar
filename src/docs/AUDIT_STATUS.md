@@ -16,7 +16,15 @@ at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
 ## Findings not yet fixed
 
-- 19/19 components in `src/components` have zero test files.
+- 18/19 components in `src/components` have zero test files. `SettingsForm.tsx` is
+  the exception in substance, not in count: it was split into a thin render layer
+  (`SettingsForm.tsx`, `_shared.tsx`), a stateful hook (`hooks/useSettingsForm.ts`),
+  and pure logic (`lib/settings-form.ts`) — only the last has a test file, but it now
+  holds all the CSV-parsing/hydration/payload-building logic that used to be
+  inline and untested. Neither the component nor the hook has a direct test file;
+  `vitest.config.ts`'s `include` only covers `src/lib/__tests__/**` and
+  `src/app/api/**`, so component/hook-level tests wouldn't even run today without
+  a config change — out of scope for this row.
 - API route coverage — CORRECTED after checking git history + actual imports,
   not just filename matching. Some route tests live in `src/lib/__tests__/`
   and import the handler directly (e.g. `salary-route.test.ts` imports
@@ -41,7 +49,7 @@ Status column: `pending` / `in progress` / `done`
 | --- | ----------------------------------------------------------- | ----------------------------------------------- | ------- |
 | 1   | `src/app/api/admin/defaults/route.ts`                       | complexity 47                                   | done    |
 | 2   | `src/lib/sources/ats-utils.ts`                              | 815 lines, complexity 16                        | done    |
-| 3   | `src/components/settings/SettingsForm.tsx`                  | 605 lines, complexity 21, 29 useState, no tests | pending |
+| 3   | `src/components/settings/SettingsForm.tsx`                  | 605 lines, complexity 21, 29 useState, no tests | done    |
 | 4   | `src/app/api/admin/companies/[id]/route.ts`                 | complexity 26                                   | pending |
 | 5   | `src/lib/runner.ts`                                         | complexity 24, 160-line function                | pending |
 | 6   | `src/lib/settings.ts`                                       | complexity 23 (`mergeWithDefaults`)             | pending |

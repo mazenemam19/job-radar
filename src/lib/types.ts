@@ -182,6 +182,40 @@ export interface ResolvedSettings {
   salary_reminder_enabled: boolean;
 }
 
+/** Editable state backing the settings form. Comma-separated list fields are
+ *  kept as raw strings while being edited and only split into arrays when
+ *  building the save payload (see src/lib/settings-form.ts). */
+export interface SettingsFormFields {
+  geminiKey: string;
+  clearGeminiKey: boolean;
+  expertSkills: string;
+  secondarySkills: string;
+  jobAgeDays: number;
+  pipelineLocal: boolean;
+  pipelineGlobal: boolean;
+  seniorityLevels: Set<SeniorityLevel>;
+  juniorKeywords: string;
+  midKeywords: string;
+  seniorKeywords: string;
+  staffKeywords: string;
+  emailAlerts: boolean;
+  salaryReminders: boolean;
+  geminiPrompt: string;
+  skillWeight: number;
+  recencyWeight: number;
+  excludedKeywords: string;
+  blacklistedLocations: string;
+  requiredKeywords: string;
+  globalBlockedRegions: string;
+  globalAllowedLocations: string;
+}
+
+export interface SettingsData {
+  resolved: ResolvedSettings;
+  raw: UserSettingsRow | null;
+  profile: { email: string; has_gemini_key: boolean; onboarding_complete: boolean };
+}
+
 // ── User Profile ────────────────────────────────────────────
 
 export interface UserProfile {
