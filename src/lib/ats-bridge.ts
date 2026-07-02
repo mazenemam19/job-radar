@@ -1,8 +1,9 @@
 // src/lib/ats-bridge.ts
 // Bridges DB-sourced company rows (from public.ats_companies) to the existing
-// ATS fetcher functions in src/lib/sources/ats-utils.ts.
+// ATS fetcher functions, re-exported from src/lib/sources/ats-utils.ts (the
+// implementation now lives in src/lib/sources/ats/ — see AUDIT_STATUS.md row #2).
 //
-// IMPORTANT: We IMPORT from ats-utils.ts but NEVER MODIFY it.
+// IMPORTANT: We IMPORT the fetchers but NEVER change their behavior here.
 // The fetchers expect a company config object that matches what ALL_COMPANIES
 // currently provides. This file performs the structural translation.
 

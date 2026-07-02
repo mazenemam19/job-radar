@@ -2,9 +2,9 @@
 // Regression guard for AUDIT_STATUS.md row #2 (ats-utils.ts complexity 16).
 // extractEgyptCity() was refactored from an 11-branch if-chain into a data
 // table. It isn't exported, so these tests go through processJobs() in
-// mode "local", which is the only caller. Match order is asserted to be
-// unchanged, INCLUDING the pre-existing bug where "new cairo" is caught by
-// the earlier "cairo" branch and therefore never returns "New Cairo".
+// mode "local", which is the only caller. "New Cairo" now matches correctly
+// — the "new cairo" pattern was moved ahead of the plain "cairo" pattern,
+// which previously shadowed it (see ats/job-processing.ts for detail).
 import { describe, it, expect } from "vitest";
 import { processJobs } from "../sources/ats-utils";
 import type { ATSRawInput, BaseCompany } from "@/types/api";
@@ -41,6 +41,8 @@ describe("extractEgyptCity (via processJobs, mode=local)", () => {
     ["Nasr City, Egypt", "Nasr City, Cairo"],
     ["Nasr-City", "Nasr City, Cairo"],
     ["Heliopolis, Egypt", "Heliopolis, Cairo"],
+    ["New Cairo, Egypt", "New Cairo"],
+    ["New-Cairo", "New Cairo"],
     ["6th of October City", "6th of October"],
     ["Sheikh Zayed, Egypt", "6th of October"],
     ["Smart Village, Egypt", "Smart Village, Giza"],
@@ -57,12 +59,11 @@ describe("extractEgyptCity (via processJobs, mode=local)", () => {
     expect(jobs[0].location).toBe("Cairo");
   });
 
-  it("documents the preserved bug: 'New Cairo' is shadowed by the 'cairo' branch", () => {
-    // Pre-existing behavior, not introduced by this refactor. "new cairo"
-    // contains "cairo" as a substring, and "cairo" is matched first, so the
-    // dedicated "New Cairo" pattern is unreachable. If this test starts
-    // failing because it now returns "New Cairo", the bug fix landed —
-    // update this test and drop the "unreachable" comment in ats-utils.ts.
-    expect(localCity("New Cairo, Egypt")).toBe("Cairo");
+  it("no longer lets 'cairo' shadow 'new cairo' (regression guard for the fixed bug)", () => {
+    // "new cairo" contains "cairo" as a substring. Before this fix, "cairo"
+    // was matched first and "New Cairo" jobs were mislabeled "Cairo". The
+    // "new cairo" pattern now runs first, so this must stay "New Cairo".
+    expect(localCity("New Cairo, Egypt")).toBe("New Cairo");
+    expect(localCity("new cairo")).toBe("New Cairo");
   });
 });
