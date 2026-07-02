@@ -17,6 +17,8 @@ export type ATSType =
 
 export type JobMode = "local" | "global";
 
+export type FilterMode = "all" | "local" | "global";
+
 /** Seniority levels, ordinal-ranked for display purposes. */
 export type SeniorityLevel = "junior" | "mid" | "senior" | "staff";
 

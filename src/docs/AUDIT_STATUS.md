@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-02 (row #13 closed)
+Last updated: 2026-07-02 (row #14 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -16,13 +16,14 @@ at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
 ## Findings not yet fixed
 
-- 17/19 components in `src/components` have zero test files. `SettingsForm.tsx` and
-  `DefaultsForm.tsx` are exceptions in substance, not in count: each was split into a
-  thin render layer, a stateful hook (`hooks/useSettingsForm.ts` /
-  `hooks/useDefaultsForm.ts`), and pure logic (`lib/settings-form.ts` /
-  `lib/defaults-form.ts`) — only the lib layer has a test file, but it now holds all
-  the CSV-parsing/hydration/payload-building logic that used to be inline and
-  untested. Neither component nor either hook has a direct test file;
+- 16/19 components in `src/components` have zero test files. `SettingsForm.tsx`,
+  `DefaultsForm.tsx`, and (as of row #14) `DashboardClient.tsx` are exceptions in
+  substance, not in count: each was split into a thin render layer, a stateful hook
+  (`hooks/useSettingsForm.ts` / `hooks/useDefaultsForm.ts` / `hooks/useDashboardFeed.ts`),
+  and pure logic (`lib/settings-form.ts` / `lib/defaults-form.ts` / `lib/dashboard-client.ts`)
+  — only the lib layer has a test file, but it now holds the mode-counting/filtering
+  logic that used to be inline and untested. Neither component nor any of the three
+  hooks has a direct test file;
   `vitest.config.ts`'s `include` only covers `src/lib/__tests__/**` and
   `src/app/api/**`, so component/hook-level tests wouldn't even run today without
   a config change — out of scope for this row.
@@ -65,7 +66,7 @@ Status column: `pending` / `in progress` / `done`
 | 11  | `src/components/admin/AdminComponents/SubmissionsTable.tsx` | complexity 14                                   | done    |
 | 12  | `src/lib/scoring.ts`                                        | complexity 14 (`passesSettingsGate`)            | done    |
 | 13  | `src/app/job/[id]/page.tsx`                                 | 201 lines, complexity 14                        | done    |
-| 14  | `src/components/dashboard/DashboardClient.tsx`              | 172 lines, complexity 14                        | pending |
+| 14  | `src/components/dashboard/DashboardClient.tsx`              | 172 lines, complexity 14                        | done    |
 | 15  | `src/lib/gemini.ts`                                         | 3 functions over complexity 10                  | pending |
 | 16  | `src/components/landing/LandingContent.tsx`                 | 203 lines                                       | pending |
 | 17  | `src/components/salary/SalaryPage.tsx`                      | 176 lines, no tests                             | pending |
@@ -80,6 +81,6 @@ Status column: `pending` / `in progress` / `done`
 ## Standing rule for every item above
 
 For each file: audit → fix → add/update tests → update docs if referenced in
-`ARCHITECTURE.md` → show Checked/Fixed/Open → confirm before moving to the next row.
+`docs/ARCHITECTURE.md` → show Checked/Fixed/Open → confirm before moving to the next row.
 Update this table's Status column when a row is done, and commit the update
 alongside the code fix so the file and the repo state stay in sync.

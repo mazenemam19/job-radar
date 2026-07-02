@@ -22,12 +22,21 @@ All notable changes to this project are documented in this file.
   the detail page has room to show the full skill lists) and the existing
   `JobScoreBreakdown.tsx` is now reused as-is (232 lines/complexity 14 → 164
   lines, resolved, audit row #13)
+- `DashboardClient.tsx`: split into a thin render layer, a stateful hook
+  (`hooks/useDashboardFeed.ts` — owns fetch/rebuild/tracked-ids state) and
+  pure logic (`lib/dashboard-client.ts` — mode counting, pipeline filtering);
+  loading state, error state, and the filter tab bar extracted into
+  `DashboardLoadingState.tsx`, `DashboardErrorState.tsx`, `FilterTabs.tsx`;
+  `FilterMode` moved out of the component file into `lib/types.ts` (172
+  lines, complexity 14 → resolved, audit row #14)
 
 ### Testing
 
 - Added direct coverage for `passesExcludedKeywordsGate`,
   `passesRequiredKeywordsGate`, `passesBlacklistedLocationsGate`, and
   `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)
+- Added `dashboard-client.test.ts` covering `computeModeCounts` and
+  `filterJobsByMode` extracted from `DashboardClient.tsx` (audit row #14)
 
 ## [2.1.1] - 2026-07-02
 

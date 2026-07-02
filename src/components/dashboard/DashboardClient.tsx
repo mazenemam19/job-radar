@@ -1,103 +1,40 @@
 "use client";
 // src/components/dashboard/DashboardClient.tsx
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import JobCard from "./JobCard";
 import StrategyModal from "./StrategyModal";
 import TrackerModal from "../tracker/TrackerModal";
-import type { ScoredJob, PipelineLog, TrackerEntry, ResolvedSettings } from "@/lib/types";
-
-type FilterMode = "all" | "local" | "global";
+import DashboardLoadingState from "./DashboardLoadingState";
+import DashboardErrorState from "./DashboardErrorState";
+import FilterTabs from "./FilterTabs";
+import { useDashboardFeed } from "@/hooks/useDashboardFeed";
+import { computeModeCounts, filterJobsByMode } from "@/lib/dashboard-client";
+import type { ScoredJob, FilterMode } from "@/lib/types";
 
 export default function DashboardClient() {
-  const [jobs, setJobs] = useState<ScoredJob[]>([]);
-  const [settings, setSettings] = useState<ResolvedSettings | null>(null);
-  const [pipelineLog, setPipelineLog] = useState<PipelineLog | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [rebuilding, setRebuilding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fromCache, setFromCache] = useState(false);
+  const {
+    jobs,
+    settings,
+    pipelineLog,
+    loading,
+    rebuilding,
+    error,
+    fromCache,
+    trackedIds,
+    load,
+    rebuild,
+    markTracked,
+  } = useDashboardFeed();
   const [filter, setFilter] = useState<FilterMode>("all");
-  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
   const [strategyJob, setStrategyJob] = useState<ScoredJob | null>(null);
   const [trackerJob, setTrackerJob] = useState<ScoredJob | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/dashboard");
-      const data = await res.json();
+  if (loading) return <DashboardLoadingState rebuilding={rebuilding} />;
+  if (error) return <DashboardErrorState error={error} onRetry={load} />;
 
-      if (!data.ok) {
-        setError(data.error);
-        return;
-      }
-
-      setJobs(data.data.jobs);
-      setPipelineLog(data.data.pipeline_log);
-      setFromCache(data.data.from_cache);
-      if (data.data.settings) setSettings(data.data.settings);
-
-      if (!data.data.from_cache) setRebuilding(false);
-    } catch {
-      setError("Failed to load jobs. Check your network connection.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load tracker entry IDs to show "tracked" state on cards
-  const loadTrackedIds = useCallback(async () => {
-    const res = await fetch("/api/tracker");
-    const data = await res.json();
-    if (data.ok) {
-      setTrackedIds(new Set((data.data as TrackerEntry[]).map((e) => e.job_id)));
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    loadTrackedIds();
-  }, [load, loadTrackedIds]);
-
-  const filtered = filter === "all" ? jobs : jobs.filter((j) => j.mode === filter);
-
-  const modeCounts = jobs.reduce(
-    (acc, j) => ({ ...acc, [j.mode]: (acc[j.mode] ?? 0) + 1 }),
-    {} as Record<string, number>,
-  );
-
-  if (loading) {
-    return (
-      <div className="p-12 text-center">
-        <div className="mb-4 text-3xl">🔄</div>
-        <div className="text-base font-semibold text-indigo-400">
-          {rebuilding ? "Running your Gemini filter…" : "Loading your job feed…"}
-        </div>
-        <div className="mt-2 text-[13px] text-slate-600">
-          {rebuilding
-            ? "This takes 10–15 seconds on first load after a cron run. Subsequent opens are instant."
-            : "Checking your cached results…"}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-12 text-center">
-        <div className="mb-3 text-3xl">⚠️</div>
-        <div className="mb-4 text-[15px] text-red-400">{error}</div>
-        <button
-          onClick={load}
-          className="rounded-lg border-none bg-indigo-500 px-6 py-2.5 text-sm text-white cursor-pointer"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+  const filtered = filterJobsByMode(jobs, filter);
+  const modeCounts = computeModeCounts(jobs);
 
   return (
     <div className="px-8 py-7">
@@ -120,45 +57,19 @@ export default function DashboardClient() {
         </div>
 
         <button
-          onClick={() => {
-            setRebuilding(true);
-            load();
-          }}
+          onClick={rebuild}
           className="rounded-lg border border-[#1e1e30] bg-[#1e1e30] px-4 py-2 text-[13px] text-indigo-400 cursor-pointer"
         >
           ↺ Rebuild cache
         </button>
       </div>
 
-      {/* Pipeline filter tabs */}
-      <div className="mb-5 flex gap-2" role="tablist" aria-label="Filter jobs by pipeline">
-        {(
-          [
-            ["all", `All (${jobs.length})`, ""],
-            ["local", `🇪🇬 Local (${modeCounts.local ?? 0})`, "#22c55e"],
-            ["global", `🌐 Remote (${modeCounts.global ?? 0})`, "#f59e0b"],
-          ] as [FilterMode, string, string][]
-        ).map(([mode, label, color]) => {
-          const active = filter === mode;
-          return (
-            <button
-              key={mode}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setFilter(mode)}
-              className="rounded-full px-4 py-1.5 text-[13px] cursor-pointer"
-              style={{
-                border: `1px solid ${active && color ? color : "#1e1e30"}`,
-                background: active && color ? `${color}20` : "transparent",
-                color: active ? color || "#e2e8f0" : "#64748b",
-                fontWeight: active ? 600 : 400,
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      <FilterTabs
+        filter={filter}
+        counts={modeCounts}
+        totalJobs={jobs.length}
+        onChange={setFilter}
+      />
 
       {/* Job list */}
       {filtered.length === 0 ? (
@@ -191,7 +102,7 @@ export default function DashboardClient() {
         job={trackerJob}
         onClose={() => setTrackerJob(null)}
         onSaved={() => {
-          if (trackerJob) setTrackedIds((p) => new Set([...p, trackerJob.id]));
+          if (trackerJob) markTracked(trackerJob.id);
         }}
       />
     </div>
