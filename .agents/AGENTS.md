@@ -31,6 +31,13 @@
 - `/usr/bin/sh` is a broken Windows stub — use `bash` in husky hooks
 - `~` resolves to `C:\Users\<user>` (not AppData\Local\hermes)
 
+## Solved Problems
+
+- `docs/solutions/<category>/` — root-cause writeups for non-trivial bugs and
+  integrations (bugs/, integrations/, architecture/, performance/, tooling/).
+  Check here before re-investigating something that smells like it's happened
+  before.
+
 ## Data Flow
 
 - cron → fetchCompany() → processJobs() → raw_jobs (global table)

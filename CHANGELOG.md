@@ -6,6 +6,12 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- Workable fetcher: single host-keyed request queue (was keyed by job mode,
+  letting local/global requests race on the same host) shared by list and
+  detail-page calls; detail calls now get the same 429 retry/backoff as the
+  list call instead of bypassing rate-limiting entirely
+- `safeFetch`: retry budget 2 → 3, backoff cap 15s → 30s so a longer
+  `Retry-After` value is honored in full instead of truncated
 - `scoring.ts`: `passesSettingsGate`'s five sequential checks (seniority,
   excluded keywords, required keywords, blacklisted locations, skill match)
   split into individually exported, individually testable gate functions

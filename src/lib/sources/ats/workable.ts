@@ -12,25 +12,12 @@ import {
   markWorkable429,
 } from "./run-state";
 
-// BUG FIX (July 2 incident): every 429 in both post-fix cron runs was
-// Workable — afba5dc never touched this file, so none of that fix applied
-// here. Two real, separate bugs:
-//
-// 1. This queue used to be keyed by JobMode ("local" | "global"), but every
-//    Workable request — local or global — hits the SAME host
-//    (apply.workable.com). Two independent queues meant a local-mode
-//    request and a global-mode request could fire at the exact same
-//    instant, which defeats the entire point of a stagger queue.
-// 2. The per-job detail-page loop further down used a raw, un-queued
-//    fetch() with only a pLimit(5) concurrency cap — zero stagger, zero
-//    retry, zero relation to the queue above. For a company with 20 open
-//    roles, that's 5 simultaneous hits to apply.workable.com, repeated for
-//    every company in the run.
-//
-// Fix: one host-keyed queue (there's only ever one host, so no Map needed),
-// shared by the list call AND every detail call, plus a retry-on-429 loop —
-// previously the list call marked-and-gave-up on the first 429, and the
-// detail call silently swallowed it with no retry at all.
+// Every Workable request — list or detail, local or global mode — hits the
+// same host (apply.workable.com), so a single shared queue staggers all of
+// it. There's exactly one host here, so a plain Promise chain is enough;
+// no Map keyed by host or mode is needed. Every detail-page fetch also
+// routes through this queue and gets the same 429 retry-with-backoff
+// treatment as the list call, via fetchWorkableUrl below.
 let workableQueue: Promise<unknown> = Promise.resolve();
 const WORKABLE_STAGGER_MS = [1500, 2000, 3000];
 const WORKABLE_MAX_429_RETRIES = 3;

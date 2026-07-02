@@ -5,22 +5,20 @@ import { trackDomainRequest } from "./run-state";
 // Per-host request queue. Greenhouse, Lever, Ashby, and SmartRecruiters each
 // serve every company from a single shared host (e.g. boards-api.greenhouse.io),
 // but the runner's concurrency limit (8) has no host awareness — 8 companies
-// on the same ATS could previously fire simultaneously with zero stagger,
+// on the same ATS can fire simultaneously with zero stagger,
 // which is exactly the pattern that trips a shared API's rate limiter.
 // This staggers requests to the same host and, on a 429, backs off and
 // retries instead of just giving up for the rest of the run.
 const hostQueues = new Map<string, Promise<unknown>>();
 const HOST_STAGGER_MS = [200, 400, 600];
-// July 2 cron data (issue #52 follow-up): in-run retry alone still let a
-// handful of companies (different ones each run) exhaust their retries and
-// end the run 429'd. Two contributing factors, both addressed here:
-//   1. MAX_429_RETRIES=2 gave up too early for hosts whose limiter needs a
-//      third attempt to clear.
-//   2. The old 15s backoff cap silently truncated a longer Retry-After
-//      value, meaning a retry could fire *before* the host said it would
-//      accept one — actively working against the header we claim to honor.
-// Cross-run cooldown (like Workable's) is still the real fix if this isn't
-// enough on its own; that needs a migration and is tracked separately.
+// Some hosts need a third attempt to clear their limiter, so the retry
+// budget allows one more than the common case requires. The backoff cap is
+// wide enough to honor a Retry-After value up to 30s in full — a capped
+// wait shorter than the requested delay means retrying before the host
+// says it's ready, which defeats the point of reading the header at all.
+// This queue is per-run only; a host that stays hostile for an entire run's
+// retry budget needs cross-run cooldown tracking (see workable.ts's
+// isWorkableBlocked/markWorkable429 for the pattern), not a bigger budget.
 const MAX_429_RETRIES = 3;
 const RETRY_BACKOFF_CAP_MS = 30_000;
 
