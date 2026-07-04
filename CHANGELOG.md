@@ -82,6 +82,9 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `submit/route.ts` (`POST`): four sequential required-field guards replaced
+  with a single `validateSubmitPost` call; `countryFlag` lookup extracted —
+  both moved to `lib/submit-route.ts` (complexity 13 → resolved, audit row #20).
 - `salary/route.ts`: `aggregateSalaries` + its helpers (`pickAmount`,
   `bucketExperience`) and `validateSalaryPost` extracted to
   `lib/salary-route.ts`; POST body validation replaced with a single
