@@ -82,6 +82,9 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `tracker/[id]/route.ts` (`PATCH`): fields extraction and validation helper
+  `buildTrackerPatch` moved to `lib/tracker-route.ts` (complexity 11 →
+  resolved, audit row #22).
 - `CompaniesTable.tsx`: split into a thin render layer, a stateful hook
   (`hooks/useCompaniesTable.ts` — owns load/save/delete/edit state) and
   pure logic (`lib/companies-table.ts` — `filterCompanies`, `formFromRow`,
