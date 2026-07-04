@@ -5,7 +5,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { aggregateSalaries, validateSalaryPost, type SalaryPostBody } from "@/lib/salary-route";
-import type { EmploymentType, WorkArrangement, Pipeline } from "@/lib/types";
 
 // ── GET /api/salary — aggregated charts data ──────────────
 
