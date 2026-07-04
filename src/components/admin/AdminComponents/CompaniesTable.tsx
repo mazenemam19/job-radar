@@ -1,112 +1,39 @@
 "use client";
 // src/components/admin/AdminComponents/CompaniesTable.tsx
+// Thin render layer — all state and fetch logic lives in hooks/useCompaniesTable.ts;
+// filtering and form helpers live in lib/companies-table.ts.
 
-import { useState, useEffect, useCallback } from "react";
-import type { ATSCompanyRow } from "@/lib/types";
 import { VALID_ATS } from "@/lib/constants";
+import { filterCompanies, type CompanyForm } from "@/lib/companies-table";
+import { useCompaniesTable } from "@/hooks/useCompaniesTable";
 import { ActionBtn, FormField, INPUT_CLASS, TH_CLASS, TD_CLASS, LABEL_CLASS } from "./_shared";
 
-type CompanyForm = Omit<ATSCompanyRow, "id" | "created_at" | "updated_at">;
-
-const EMPTY_FORM: CompanyForm = {
-  name: "",
-  ats: "greenhouse",
-  slug: "",
-  country: "",
-  country_flag: "🌍",
-  city: "",
-  pipeline_local: false,
-  pipeline_global: false,
-  is_active: true,
-};
-
 export function CompaniesTable() {
-  const [companies, setCompanies] = useState<ATSCompanyRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<CompanyForm>(EMPTY_FORM);
-  const [showNew, setShowNew] = useState(false);
+  const {
+    companies,
+    loading,
+    search,
+    setSearch,
+    editId,
+    form,
+    setForm,
+    showNew,
+    startNew,
+    startEdit,
+    cancelForm,
+    saveNew,
+    saveEdit,
+    deleteCompany,
+  } = useCompaniesTable();
 
-  const load = useCallback(async () => {
-    const res = await fetch("/api/admin/companies");
-    const d = await res.json();
-    if (d.ok) setCompanies(d.data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function saveNew() {
-    const res = await fetch("/api/admin/companies", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const d = await res.json();
-    if (d.ok) {
-      setShowNew(false);
-      setForm(EMPTY_FORM);
-      load();
-    }
-  }
-
-  async function saveEdit() {
-    if (!editId) return;
-    const res = await fetch(`/api/admin/companies/${editId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const d = await res.json();
-    if (d.ok) {
-      setEditId(null);
-      setForm(EMPTY_FORM);
-      load();
-    }
-  }
-
-  async function deleteCompany(id: string) {
-    if (!confirm("Delete this company?")) return;
-    await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
-    setCompanies((p) => p.filter((c) => c.id !== id));
-  }
-
-  function startEdit(c: ATSCompanyRow) {
-    setEditId(c.id);
-    setForm({
-      name: c.name,
-      ats: c.ats,
-      slug: c.slug,
-      country: c.country,
-      country_flag: c.country_flag,
-      city: c.city ?? "",
-      pipeline_local: c.pipeline_local,
-      pipeline_global: c.pipeline_global,
-      is_active: c.is_active,
-    });
-    setShowNew(false);
-  }
-
-  const filtered = companies.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.country.toLowerCase().includes(search.toLowerCase()) ||
-      c.ats.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = filterCompanies(companies, search);
 
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-[22px] font-bold text-[#e2e8f0]">ATS Companies ({companies.length})</h1>
         <button
-          onClick={() => {
-            setShowNew(true);
-            setEditId(null);
-            setForm(EMPTY_FORM);
-          }}
+          onClick={startNew}
           className="cursor-pointer rounded-lg border-0 bg-[#6366f1] px-[18px] py-2.5 text-[13px] font-semibold text-white"
         >
           + Add company
@@ -125,11 +52,7 @@ export function CompaniesTable() {
           form={form}
           setForm={setForm}
           onSave={editId ? saveEdit : saveNew}
-          onCancel={() => {
-            setShowNew(false);
-            setEditId(null);
-            setForm(EMPTY_FORM);
-          }}
+          onCancel={cancelForm}
           isEdit={Boolean(editId)}
         />
       )}

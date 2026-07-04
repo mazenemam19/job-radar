@@ -82,6 +82,10 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `CompaniesTable.tsx`: split into a thin render layer, a stateful hook
+  (`hooks/useCompaniesTable.ts` — owns load/save/delete/edit state) and
+  pure logic (`lib/companies-table.ts` — `filterCompanies`, `formFromRow`,
+  `EMPTY_FORM`) (154 lines/no tests → resolved, audit row #21).
 - `submit/route.ts` (`POST`): four sequential required-field guards replaced
   with a single `validateSubmitPost` call; `countryFlag` lookup extracted —
   both moved to `lib/submit-route.ts` (complexity 13 → resolved, audit row #20).
