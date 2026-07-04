@@ -38,17 +38,22 @@ export async function runCronJob(
 ): Promise<CronRunResult> {
   const db = createAdminClient();
   const startMs = Date.now();
+  console.log(`[cron] run started (trigger=${trigger})`);
 
   // 1. Load active companies
   const { data: companies, error: companiesError } = await db
     .from("ats_companies")
     .select("*")
     .eq("is_active", true);
+  console.log(
+    `[cron] loaded ${companies?.length ?? 0} active companies (+${Date.now() - startMs}ms)`,
+  );
 
   // Load Workable rate-limit state (blocked slugs, budget config) from the DB
   // before fetching anything — this is what actually persists it across runs,
   // since serverless invocations don't share memory or /tmp.
   await loadWorkableStateFromDB();
+  console.log(`[cron] workable state loaded (+${Date.now() - startMs}ms)`);
 
   if (companiesError || !companies?.length) {
     const msg = companiesError?.message ?? "No active companies found";
@@ -64,13 +69,20 @@ export async function runCronJob(
   // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited,
   // degrading to partial results if the fetch phase runs past its time budget.
   const deadline = startMs + FETCH_TIME_BUDGET_MS;
+  console.log(
+    `[cron] fetch phase starting, deadline in ${deadline - Date.now()}ms (+${Date.now() - startMs}ms)`,
+  );
   const { allJobs, sourceHealth, errors } = await fetchAllCompanyJobs(
     companies as ATSCompanyRow[],
     deadline,
   );
+  console.log(
+    `[cron] fetch phase done: ${allJobs.length} jobs, ${errors.length} errors (+${Date.now() - startMs}ms)`,
+  );
 
   // 5. Upsert into raw_jobs (chunked, deduplicated within each chunk)
   errors.push(...(await upsertRawJobs(db, allJobs)));
+  console.log(`[cron] upsert done (+${Date.now() - startMs}ms)`);
 
   // 6. Bump app_config.last_cron_at → invalidates all user_jobs_cache entries
   const { error: configError } = await db

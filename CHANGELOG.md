@@ -6,6 +6,29 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `queueByHost` (`http.ts`), shared by Greenhouse/Lever/Ashby/SmartRecruiters/
+  JazzHR/Breezy/Teamtailor: was a single fully-serial chain per host — the
+  same shape of bug Workable had before its own fix above, just never
+  exercised hard enough to notice. This is why the 504 came back after the
+  Workable lane pool and cron time budget both shipped: SmartRecruiters'
+  per-company detail-page fanout (`pLimit(5)`) funnels into this same shared
+  host queue across every SmartRecruiters company in the run, so it scales
+  wall-clock time the same way Workable used to. Replaced with a
+  `HOST_LANE_COUNT`-lane pool per host, mirroring `WORKABLE_LANE_COUNT`.
+- `safeFetch` and `fetchWorkableUrl`: added a 90s total-wall-clock ceiling
+  per call, independent of retry count. Without it, a single persistently-429
+  or slow host could hold its lane for close to the full theoretical worst
+  case (4 attempts × 45s timeout + 3 × 30s backoff ≈ 270s) — and because a
+  lane is a serial chain, every other request queued behind it in that lane
+  waits for the whole thing, regardless of the cron's own dispatch-time
+  deadline (`fetch-jobs.ts`), which has no power over work already in flight.
+- Added `console.log`/`console.error`/`console.warn` at the per-request layer
+  (`safeFetch`, `fetchWorkableUrl`), per-company dispatch layer
+  (`fetch-jobs.ts`), and per-phase layer (`runner.ts`) — there was previously
+  zero logging anywhere in the fetch pipeline, so when Vercel hard-kills a
+  run at 300s, the function dies before the `cron_logs_v2` insert ever runs
+  and nothing is recorded anywhere. See
+  `docs/solutions/bugs/issue-52-504-recurrence-part3.md`.
 - Workable fetcher: the single fully-serial request queue introduced to fix the
   July 2 429 recurrence scaled wall-clock time linearly with total request count,
   turning a ~150s cron run into a 300s Vercel timeout (504). Replaced with a

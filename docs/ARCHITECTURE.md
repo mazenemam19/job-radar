@@ -349,22 +349,43 @@ returning a normalized `Job[]`. Shared concerns handled in this file:
 
 - **Relative date parsing** (`parseRelativeDate`) and **country/timezone detection**
   (`detectCountry`, `isTimezoneIncompatible`) applied uniformly across sources.
-- **HTML stripping** (`stripHtml`) and a bounded **`safeFetch`** (45s timeout) for
-  resilience against slow/unresponsive ATS endpoints.
+- **HTML stripping** (`stripHtml`) and a bounded **`safeFetch`** (45s per-attempt
+  timeout, 90s total-wall-clock ceiling across every attempt/backoff combined — see
+  below) for resilience against slow/unresponsive ATS endpoints.
 - **Concurrency limiting** (`pLimit`) for fan-out within a single ATS call, separate from
   the cross-company limiter in `runner.ts`.
-- **Workable-specific rate limiting** (`src/lib/sources/ats/workable.ts`, not
-  `ats-utils.ts`): a bounded lane pool (`queueWorkable`, `WORKABLE_LANE_COUNT` = 2
-  independent staggered chains, not one fully-serial queue) shared by every list and
-  detail-page call across every company and mode, since Workable's rate limit is
-  enforced at the host level, not per company. Paired with a persisted blocklist
+- **Per-host lane pools** (`src/lib/sources/ats/http.ts`'s `queueByHost`,
+  `HOST_LANE_COUNT` = 2; mirrored in `workable.ts`'s `queueWorkable`,
+  `WORKABLE_LANE_COUNT` = 2): every ATS that serves all companies from one shared
+  host (Greenhouse, Lever, Ashby, SmartRecruiters, JazzHR, Breezy, Teamtailor,
+  Workable) routes through `HOST_LANE_COUNT` independent staggered chains per host,
+  not one fully-serial queue — a single serial chain scales wall-clock time linearly
+  with total request count on that host across every company in the run, which is
+  what caused the Workable 504 (see §"Known regressions" below) and was latent here
+  too until it was actually exercised hard enough (SmartRecruiters' per-company
+  detail-page fanout shares one host across every SmartRecruiters company). Each
+  `safeFetch`/`fetchWorkableUrl` call additionally enforces its own 90s total-time
+  ceiling independent of retry count, since a lane is a serial chain — one request
+  stuck retrying would otherwise hold up everything queued behind it in that lane for
+  up to the full theoretical worst case (~270s), regardless of any dispatch-level
+  deadline the caller checks before starting new work (see `fetch-jobs.ts` below).
+  Workable's queue is additionally paired with a persisted blocklist
   (`isWorkableBlocked` / `markWorkableSlugsBlocked24h`) and budget config, loaded
   from / flushed to `app_config` (`loadWorkableStateFromDB`, `flushWorkable429sToDB`)
-  so the limiter survives across stateless serverless invocations, which don't share
-  memory or disk between cron runs. Lane count is an informed default, not a measured
-  one — Workable doesn't publish a rate limit for this unauthenticated widget
-  endpoint, so it's tuned against `cron_logs_v2` duration and 429 count after live
-  runs, not a documented number.
+  so it survives across stateless serverless invocations, which don't share memory or
+  disk between cron runs. Lane counts and the 90s ceiling are informed defaults, not
+  measured ones — none of these ATS types publish a rate limit for their
+  unauthenticated endpoints, so they're tuned against `cron_logs_v2` duration and
+  429 count after live runs, not a documented number.
+- **Logging**: `safeFetch`/`fetchWorkableUrl` (per request: host/slug, attempt,
+  status, elapsed ms), `fetch-jobs.ts` (per company+mode: dispatch start, done, or
+  skipped-past-deadline), and `runner.ts` (per phase: companies loaded, workable
+  state loaded, fetch phase start/end, upsert done) all `console.log`/`warn`/`error`.
+  This exists because there was previously zero logging anywhere in the fetch
+  pipeline — when Vercel hard-kills a run at the `maxDuration` ceiling, the function
+  dies before the `cron_logs_v2` insert ever runs, so without these lines a killed
+  run leaves no trace anywhere. Retrieve via `vercel logs <deployment-url>` (Hobby
+  plan retains runtime logs for 1 hour) or the Vercel dashboard's Logs tab.
 - **`processJobs()`** — the shared normalization step every fetcher funnels through.
   Applies only geography/timezone eligibility (for the `global` pipeline) and a hard
   30-day age cap; it does **not** filter by title, role, or skill — that gate was

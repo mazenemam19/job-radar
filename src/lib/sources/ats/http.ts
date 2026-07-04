@@ -2,14 +2,22 @@
 // Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change.
 import { trackDomainRequest } from "./run-state";
 
-// Per-host request queue. Greenhouse, Lever, Ashby, and SmartRecruiters each
-// serve every company from a single shared host (e.g. boards-api.greenhouse.io),
-// but the runner's concurrency limit (8) has no host awareness — 8 companies
-// on the same ATS can fire simultaneously with zero stagger,
-// which is exactly the pattern that trips a shared API's rate limiter.
-// This staggers requests to the same host and, on a 429, backs off and
-// retries instead of just giving up for the rest of the run.
-const hostQueues = new Map<string, Promise<unknown>>();
+// Per-host lane pool. Greenhouse, Lever, Ashby, SmartRecruiters, JazzHR,
+// Breezy, and Teamtailor each serve every company from a single shared host
+// (e.g. boards-api.greenhouse.io), but the runner's concurrency limit (8) has
+// no host awareness — 8 companies on the same ATS can fire simultaneously
+// with zero stagger, which is exactly the pattern that trips a shared API's
+// rate limiter. HOST_LANE_COUNT independent lanes per host cap concurrency
+// instead of eliminating it — mirrors workable.ts's WORKABLE_LANE_COUNT
+// pattern exactly, for the same reason: a single fully-serial chain (the
+// previous version of this function) scales wall-clock time linearly with
+// total request count on that host across every company in the run, which
+// is what caused the Workable 504 regression and was silently present here
+// too, just never exercised hard enough to notice — see
+// docs/solutions/bugs/issue-52-504-recurrence-part3.md.
+export const HOST_LANE_COUNT = 2;
+const hostLanes = new Map<string, Promise<unknown>[]>();
+const hostNextLane = new Map<string, number>();
 const HOST_STAGGER_MS = [200, 400, 600];
 // Some hosts need a third attempt to clear their limiter, so the retry
 // budget allows one more than the common case requires. The backoff cap is
@@ -21,15 +29,33 @@ const HOST_STAGGER_MS = [200, 400, 600];
 // isWorkableBlocked/markWorkable429 for the pattern), not a bigger budget.
 const MAX_429_RETRIES = 3;
 const RETRY_BACKOFF_CAP_MS = 30_000;
+// Hard ceiling on total wall-clock time a single safeFetch call — across
+// every attempt, queue wait, and backoff combined — is allowed to spend.
+// Without this, one slow or persistently-429ing host can hold a lane for
+// close to the full theoretical worst case (4 attempts x 45s timeout + 3 x
+// 30s backoff ~= 270s) — and because a lane is a serial chain, every other
+// request queued behind it in that lane waits for the whole thing,
+// regardless of any deadline the caller checks before dispatch. This cap is
+// independent of, and in addition to, the cron's own dispatch-time deadline
+// (see fetch-jobs.ts) — that one stops new work from starting; this one
+// stops work already in flight from running away.
+const MAX_TOTAL_FETCH_MS = 90_000;
 
 function queueByHost<T>(host: string, fn: () => Promise<T>): Promise<T> {
+  if (!hostLanes.has(host)) {
+    hostLanes.set(
+      host,
+      Array.from({ length: HOST_LANE_COUNT }, () => Promise.resolve()),
+    );
+    hostNextLane.set(host, 0);
+  }
+  const lanes = hostLanes.get(host)!;
+  const lane = hostNextLane.get(host)!;
+  hostNextLane.set(host, (lane + 1) % HOST_LANE_COUNT);
+
   const stagger = HOST_STAGGER_MS[Math.floor(Math.random() * HOST_STAGGER_MS.length)];
-  const prev = hostQueues.get(host) ?? Promise.resolve();
-  const result = prev.then(() => new Promise((r) => setTimeout(r, stagger))).then(fn);
-  hostQueues.set(
-    host,
-    result.catch(() => {}),
-  );
+  const result = lanes[lane].then(() => new Promise((r) => setTimeout(r, stagger))).then(fn);
+  lanes[lane] = result.catch(() => {});
   return result;
 }
 
@@ -50,6 +76,7 @@ export async function safeFetch(
   extraHeaders?: Record<string, string>,
 ): Promise<Response | null> {
   trackDomainRequest(url);
+  const t0 = Date.now();
 
   let host: string;
   try {
@@ -69,14 +96,42 @@ export async function safeFetch(
     }).catch(() => null);
 
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
-    const res = await queueByHost(host, doFetch);
-    if (!res) return null;
-    if (res.status !== 429 || attempt === MAX_429_RETRIES) return res;
+    if (Date.now() - t0 >= MAX_TOTAL_FETCH_MS) {
+      console.error(
+        `[safeFetch] ${host}: giving up before attempt ${attempt} — total-time ceiling (${MAX_TOTAL_FETCH_MS}ms) reached`,
+      );
+      return null;
+    }
 
-    const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
-    await new Promise((r) =>
-      setTimeout(r, Math.min(Math.max(backoffMs, 500), RETRY_BACKOFF_CAP_MS)),
+    const res = await queueByHost(host, doFetch);
+    const elapsed = Date.now() - t0;
+
+    if (!res) {
+      console.error(
+        `[safeFetch] ${host}: attempt ${attempt} network error/timeout after ${elapsed}ms`,
+      );
+      return null;
+    }
+    if (res.status !== 429 || attempt === MAX_429_RETRIES) {
+      console.log(
+        `[safeFetch] ${host}: attempt ${attempt} -> ${res.status} (${elapsed}ms elapsed)`,
+      );
+      return res;
+    }
+
+    console.warn(
+      `[safeFetch] ${host}: attempt ${attempt} -> 429, backing off (${elapsed}ms elapsed)`,
     );
+    const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
+    const cappedBackoff = Math.min(Math.max(backoffMs, 500), RETRY_BACKOFF_CAP_MS);
+
+    if (elapsed + cappedBackoff >= MAX_TOTAL_FETCH_MS) {
+      console.error(
+        `[safeFetch] ${host}: backoff would exceed total-time ceiling — returning last 429 after ${elapsed}ms instead of waiting`,
+      );
+      return res;
+    }
+    await new Promise((r) => setTimeout(r, cappedBackoff));
   }
   return null; // unreachable — loop always returns
 }

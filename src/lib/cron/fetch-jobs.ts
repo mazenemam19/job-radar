@@ -68,6 +68,7 @@ function makeFetchTask(
 ): () => Promise<FetchTaskResult> {
   return () => {
     if (Date.now() >= deadline) {
+      console.warn(`[cron] ${row.name} (${mode}): skipped — time budget exceeded`);
       return Promise.resolve({
         company: row.name,
         mode,
@@ -75,7 +76,12 @@ function makeFetchTask(
         error: "Skipped — time budget exceeded",
       });
     }
-    return fetchCompany(row, mode);
+    const t0 = Date.now();
+    console.log(`[cron] ${row.name} (${mode}): dispatching (ats=${row.ats})`);
+    return fetchCompany(row, mode).then((result) => {
+      console.log(`[cron] ${row.name} (${mode}): done in ${Date.now() - t0}ms`);
+      return result;
+    });
   };
 }
 

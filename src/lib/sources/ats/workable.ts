@@ -33,6 +33,13 @@ let nextLane = 0;
 const WORKABLE_STAGGER_MS = [1500, 2000, 3000];
 const WORKABLE_MAX_429_RETRIES = 3;
 const WORKABLE_BACKOFF_CAP_MS = 30_000;
+// Same reasoning as MAX_TOTAL_FETCH_MS in http.ts: a lane is a serial chain,
+// so one request stuck retrying holds up every other request behind it in
+// that lane regardless of any dispatch-level deadline. Kept as its own
+// constant (not imported from http.ts) since Workable's per-request timeout
+// (30s) and retry count differ from safeFetch's — the two ceilings are
+// allowed to diverge if that's ever warranted, but start at the same value.
+const WORKABLE_MAX_TOTAL_FETCH_MS = 90_000;
 
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
   const lane = nextLane;
@@ -48,6 +55,7 @@ function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
 /** Queued, retried fetch for any apply.workable.com URL (list or detail). */
 async function fetchWorkableUrl(url: string, slug: string): Promise<Response | null> {
   trackDomainRequest(url);
+  const t0 = Date.now();
   const doFetch = () =>
     fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
@@ -55,17 +63,45 @@ async function fetchWorkableUrl(url: string, slug: string): Promise<Response | n
     }).catch(() => null);
 
   for (let attempt = 0; attempt <= WORKABLE_MAX_429_RETRIES; attempt++) {
+    if (Date.now() - t0 >= WORKABLE_MAX_TOTAL_FETCH_MS) {
+      console.error(
+        `[workable] ${slug}: giving up before attempt ${attempt} — total-time ceiling (${WORKABLE_MAX_TOTAL_FETCH_MS}ms) reached`,
+      );
+      return null;
+    }
+
     const res = await queueWorkable(doFetch);
-    if (!res) return null;
-    if (res.status !== 429) return res;
+    const elapsed = Date.now() - t0;
+
+    if (!res) {
+      console.error(
+        `[workable] ${slug}: attempt ${attempt} network error/timeout after ${elapsed}ms`,
+      );
+      return null;
+    }
+    if (res.status !== 429) {
+      console.log(`[workable] ${slug}: attempt ${attempt} -> ${res.status} (${elapsed}ms elapsed)`);
+      return res;
+    }
     if (attempt === WORKABLE_MAX_429_RETRIES) {
+      console.warn(`[workable] ${slug}: exhausted retries on 429, marking blocked`);
       markWorkable429(slug);
       return res;
     }
-    const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
-    await new Promise((r) =>
-      setTimeout(r, Math.min(Math.max(backoffMs, 500), WORKABLE_BACKOFF_CAP_MS)),
+
+    console.warn(
+      `[workable] ${slug}: attempt ${attempt} -> 429, backing off (${elapsed}ms elapsed)`,
     );
+    const backoffMs = parseRetryAfterMs(res) ?? 1000 * 2 ** (attempt + 1);
+    const cappedBackoff = Math.min(Math.max(backoffMs, 500), WORKABLE_BACKOFF_CAP_MS);
+
+    if (elapsed + cappedBackoff >= WORKABLE_MAX_TOTAL_FETCH_MS) {
+      console.error(
+        `[workable] ${slug}: backoff would exceed total-time ceiling — returning last 429 after ${elapsed}ms instead of waiting`,
+      );
+      return res;
+    }
+    await new Promise((r) => setTimeout(r, cappedBackoff));
   }
   return null; // unreachable — loop always returns
 }

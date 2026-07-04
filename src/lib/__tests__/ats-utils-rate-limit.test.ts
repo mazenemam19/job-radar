@@ -7,6 +7,7 @@
 // the fix mechanically instead of relying on a live cron run against a
 // real ATS to "probably" show fewer 429s.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { HOST_LANE_COUNT } from "../sources/ats/http";
 
 describe("safeFetch rate-limit handling", () => {
   beforeEach(() => {
@@ -97,17 +98,33 @@ describe("safeFetch rate-limit handling", () => {
     expect(elapsed).toBeGreaterThanOrEqual(19_000);
   });
 
-  it("staggers concurrent requests to the same host instead of firing them all at once", async () => {
-    const callTimestamps: number[] = [];
+  it("bounds concurrency to HOST_LANE_COUNT instead of fully serializing every request", async () => {
+    // Regression guard for the 504 that came back after Part A: this test
+    // used to assert `spread > 400` for 5 requests to the same host — i.e.
+    // it defined "correct" as "fully serial, one at a time." That's the same
+    // shape of bug workable.ts had before its own lane-pool fix. A host
+    // queue that's fully serial scales wall-clock time linearly with total
+    // request count across every company sharing that host — exactly what
+    // caused the Workable 504, just never fixed here. This test instead
+    // proves real (but bounded) concurrency is achieved: more than 1 request
+    // in flight at once, never more than HOST_LANE_COUNT.
+    let active = 0;
+    let maxActive = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(() => {
-        callTimestamps.push(Date.now());
-        return Promise.resolve({
-          status: 200,
-          ok: true,
-          headers: new Headers(),
-          json: async () => ({}),
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            active -= 1;
+            resolve({
+              status: 200,
+              ok: true,
+              headers: new Headers(),
+              json: async () => ({}),
+            });
+          }, 5000); // long enough in-flight window to overlap across lanes
         });
       }),
     );
@@ -120,15 +137,39 @@ describe("safeFetch rate-limit handling", () => {
     const pending = Promise.all(
       Array.from({ length: 5 }, (_, i) => safeFetch(`https://${host}/v1/boards/company-${i}/jobs`)),
     );
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(40_000);
     await pending;
 
-    expect(callTimestamps).toHaveLength(5);
-    const spread = Math.max(...callTimestamps) - Math.min(...callTimestamps);
-    // Old behavior: all 5 fire within ~0ms of each other. New behavior: each
-    // queued request waits 200-600ms behind the previous one on that host,
-    // so 5 requests should span at least ~4 stagger intervals.
-    expect(spread).toBeGreaterThan(400);
+    expect(maxActive).toBeGreaterThan(1); // real concurrency achieved
+    expect(maxActive).toBeLessThanOrEqual(HOST_LANE_COUNT); // still bounded, not an unstaggered burst
+  });
+
+  it("gives up on a single request before it can burn through the whole retry budget", async () => {
+    // Regression guard for the 504 that came back after Part A + Part B:
+    // neither of those touched what happens once a request is already
+    // in-flight and retrying. Without a total-time ceiling, one host stuck
+    // returning 429 could hold its lane for close to the full theoretical
+    // worst case (~270s), and everything queued behind it in that lane
+    // waits the whole time regardless of any dispatch-level deadline.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 429,
+        ok: false,
+        headers: new Headers({ "retry-after": "40" }), // > RETRY_BACKOFF_CAP_MS(30s), forces the cap every time
+      }),
+    );
+
+    const { safeFetch } = await import("../sources/ats-utils");
+    const pending = safeFetch("https://boards-api.greenhouse.io/v1/boards/stuck-host/jobs");
+    await vi.runAllTimersAsync();
+    const res = await pending;
+
+    // Each backoff is capped at 30s. Two backoffs (60s) plus fetch time
+    // already exceeds the 90s ceiling on the third — so it gives up instead
+    // of taking the full 4-attempt, ~120s+ retry budget.
+    expect(vi.mocked(fetch).mock.calls.length).toBeLessThan(4);
+    expect(res?.status).toBe(429); // still returns the real last response, not null
   });
 
   it("does not make unrelated hosts wait behind a different host's queue", async () => {
