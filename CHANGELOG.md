@@ -82,6 +82,10 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `verify-domain-counts-coverage.ts`: decomposed IIFE complexity by splitting
+  stats logging, task building, delta reporting, and Breezy/Teamtailor status checks
+  into helper functions; replaced local limiter with imported `withConcurrencyLimit`
+  (complexity 20 → resolved, audit row #23).
 - `tracker/[id]/route.ts` (`PATCH`): fields extraction and validation helper
   `buildTrackerPatch` moved to `lib/tracker-route.ts` (complexity 11 →
   resolved, audit row #22).
