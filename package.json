@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "cron": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/cron.ts",
+    "cron:log": "mkdir -p logs && pnpm cron 2>&1 | tee logs/cron-$(date +%Y%m%d-%H%M%S).log",
     "verify-domain-counts": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/verify-domain-counts.ts",
     "verify-domain-counts-coverage": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json src/scripts/verify-domain-counts-coverage.ts",
     "salary-reminders": "ts-node -r tsconfig-paths/register --project tsconfig.scripts.json scripts/send-salary-reminders.ts",

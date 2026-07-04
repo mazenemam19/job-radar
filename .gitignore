@@ -10,3 +10,8 @@ tsconfig.tsbuildinfo
 /playwright-report/
 /test-results/
 e2e/.auth/
+
+.vercel
+
+# local cron run logs (pnpm cron:log)
+logs/
