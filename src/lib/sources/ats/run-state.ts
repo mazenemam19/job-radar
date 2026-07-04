@@ -105,7 +105,10 @@ export async function loadWorkableStateFromDB(): Promise<void> {
 }
 
 export async function flushDomainCountsToDB(): Promise<void> {
-  if (!domainCountsCache || Object.keys(domainCountsCache).length === 0) return;
+  if (!domainCountsCache || Object.keys(domainCountsCache).length === 0) {
+    console.log("[ats-utils] flushDomainCountsToDB: nothing to flush, skipping");
+    return;
+  }
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const db = createAdminClient();
   // Atomic server-side add via increment_domain_counts(increments) instead of
@@ -120,12 +123,18 @@ export async function flushDomainCountsToDB(): Promise<void> {
     console.error("[ats-utils] flushDomainCountsToDB rpc failed:", error.message);
     return; // keep the unflushed delta around so a retry on a warm process can still send it
   }
+  console.log(
+    `[ats-utils] flushDomainCountsToDB: flushed ${Object.keys(domainCountsCache).length} hosts`,
+  );
   domainCountsCache = null;
 }
 
 export async function flushWorkable429sToDB(): Promise<void> {
   const slugs = getWorkable429SlugsThisRun();
-  if (slugs.length === 0) return;
+  if (slugs.length === 0) {
+    console.log("[ats-utils] flushWorkable429sToDB: no 429s this run, skipping");
+    return;
+  }
   markWorkableSlugsBlocked24h(slugs);
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
@@ -139,6 +148,8 @@ export async function flushWorkable429sToDB(): Promise<void> {
     .eq("id", 1);
   if (error) {
     console.error("[ats-utils] flushWorkable429sToDB update failed:", error.message);
+  } else {
+    console.log(`[ats-utils] flushWorkable429sToDB: blocked ${slugs.length} slug(s)`);
   }
 }
 

@@ -6,6 +6,28 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `runner.ts`: zero logging existed for any step between the upsert phase and
+  the end of the function — `app_config` update, `flushWorkable429sToDB`,
+  `flushDomainCountsToDB`, and the `cron_logs_v2` insert itself all only
+  logged on failure, and three of the four didn't even log that. `cron_logs_v2`
+  has had no successful row since 2026-07-02 despite scheduled runs
+  continuing on both daily triggers, and there was no way to tell from the
+  logs which of these four steps — or something after all of them — was
+  where the run stopped reaching the DB. Added a success-path log line after
+  each step, matching the existing `[cron] <phase> done (+Xms)` pattern from
+  the fetch/upsert phases. This is diagnostic only — it does not fix a known
+  root cause, because there isn't a confirmed one yet; it exists so the next
+  hard-killed run leaves an exact line of death instead of requiring another
+  round of guessing.
+- `runner.ts`: the `cron_logs_v2` insert's own error was discarded — the
+  destructured `error` was never read, so a failing insert into the table
+  that exists specifically to record run failures was itself invisible.
+  Now captured and logged.
+- `flushDomainCountsToDB` / `flushWorkable429sToDB` (`run-state.ts`): the
+  empty-input early return in both was a silent no-op with no log line,
+  indistinguishable in the log from "never reached this line at all." Both
+  now log which branch they took.
+
 - `queueByHost` (`http.ts`), shared by Greenhouse/Lever/Ashby/SmartRecruiters/
   JazzHR/Breezy/Teamtailor: was a single fully-serial chain per host — the
   same shape of bug Workable had before its own fix above, just never

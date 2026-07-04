@@ -92,19 +92,26 @@ export async function runCronJob(
 
   if (configError) {
     errors.push(`Failed to update app_config: ${configError.message}`);
+    console.error(
+      `[cron] app_config update failed: ${configError.message} (+${Date.now() - startMs}ms)`,
+    );
+  } else {
+    console.log(`[cron] app_config updated (+${Date.now() - startMs}ms)`);
   }
 
   // Persist any Workable 429s detected this run, so the next run actually
   // skips those companies instead of hammering them again immediately.
   await flushWorkable429sToDB();
+  console.log(`[cron] workable 429 flush done (+${Date.now() - startMs}ms)`);
 
   // Persist domain request counts for rate-limiting accuracy across runs.
   await flushDomainCountsToDB();
+  console.log(`[cron] domain counts flush done (+${Date.now() - startMs}ms)`);
 
   const durationMs = Date.now() - startMs;
 
   // 7. Log the cron run
-  await db.from("cron_logs_v2").insert({
+  const { error: logError } = await db.from("cron_logs_v2").insert({
     run_at: new Date().toISOString(),
     total_fetched: allJobs.length,
     duration_ms: durationMs,
@@ -113,12 +120,27 @@ export async function runCronJob(
     trigger,
   });
 
+  if (logError) {
+    // Nothing left to push this into — cron_logs_v2 IS the error sink. This
+    // is the one failure in the whole function that only console.error can
+    // carry, which is exactly why it needs its own explicit line: a silent
+    // failure here is indistinguishable from a hard kill with no trace at
+    // all (see docs/solutions/bugs/issue-52-504-recurrence-part3.md).
+    console.error(
+      `[cron] cron_logs_v2 insert failed: ${logError.message} (+${Date.now() - startMs}ms)`,
+    );
+  } else {
+    console.log(`[cron] cron_logs_v2 insert done (+${Date.now() - startMs}ms)`);
+  }
+
   // 8. Send "scan complete" notification to all eligible users.
+  console.log(`[cron] email phase starting (+${Date.now() - startMs}ms)`);
   const { emailResults, errors: emailErrors } = await sendScanNotifications(
     db,
     companies?.length ?? 0,
   );
   errors.push(...emailErrors);
+  console.log(`[cron] run complete (+${Date.now() - startMs}ms)`);
 
   return {
     total_fetched: allJobs.length,
