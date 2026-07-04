@@ -1,12 +1,12 @@
 // src/app/api/submit/route.ts
 // Public endpoint — no authentication required.
 // Inserts a row into ats_submissions with status='pending' for admin review.
+// Pure validation logic lives in lib/submit-route.ts.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { VALID_ATS, COUNTRY_FLAGS } from "@/lib/constants";
-import type { ATSType } from "@/lib/types";
+import { validateSubmitPost, countryFlag, type SubmitPostBody } from "@/lib/submit-route";
 
 // ---------------------------------------------------------------------------
 // Rate limiting — module-level, in-memory.
@@ -40,16 +40,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: {
-    company_name?: string;
-    ats_type?: string;
-    slug?: string;
-    country?: string;
-    city?: string;
-    pipeline_local?: boolean;
-    pipeline_global?: boolean;
-    submitter_email?: string;
-  };
+  let body: SubmitPostBody;
 
   try {
     body = await request.json();
@@ -57,26 +48,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Validate required fields
-  if (!body.company_name?.trim()) {
-    return NextResponse.json({ ok: false, error: "company_name is required" }, { status: 400 });
-  }
-  if (!VALID_ATS.includes(body.ats_type as ATSType)) {
-    return NextResponse.json({ ok: false, error: "Invalid ats_type" }, { status: 400 });
-  }
-  if (!body.slug?.trim()) {
-    return NextResponse.json({ ok: false, error: "slug is required" }, { status: 400 });
-  }
-  if (!body.country?.trim()) {
-    return NextResponse.json({ ok: false, error: "country is required" }, { status: 400 });
+  const validation = validateSubmitPost(body);
+  if (!validation.ok) {
+    return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
   }
 
-  const companyName = body.company_name.trim();
-  const atsType = body.ats_type as string;
-  const slug = body.slug.trim();
-  const country = body.country.trim();
-  const countryCode = country.toUpperCase();
-  const flag = COUNTRY_FLAGS[countryCode] ?? "🌍";
+  // All required fields are guaranteed non-empty strings after validation.
+  const companyName = body.company_name!.trim();
+  const atsType = body.ats_type!;
+  const slug = body.slug!.trim();
+  const country = body.country!.trim();
+  const flag = countryFlag(country);
 
   const db = createAdminClient();
   const { data, error } = await db

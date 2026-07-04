@@ -82,6 +82,31 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `e2e-login/route.ts` (`POST`): kept unchanged per the safety rules in `AGENTS.md`
+  ("The e2e-login route works as-is. Do not modify it") (row #24 exempt).
+- `verify-domain-counts-coverage.ts`: decomposed IIFE complexity by splitting
+  stats logging, task building, delta reporting, and Breezy/Teamtailor status checks
+  into helper functions; replaced local limiter with imported `withConcurrencyLimit`
+  (complexity 20 → resolved, audit row #23).
+- `tracker/[id]/route.ts` (`PATCH`): fields extraction and validation helper
+  `buildTrackerPatch` moved to `lib/tracker-route.ts` (complexity 11 →
+  resolved, audit row #22).
+- `CompaniesTable.tsx`: split into a thin render layer, a stateful hook
+  (`hooks/useCompaniesTable.ts` — owns load/save/delete/edit state) and
+  pure logic (`lib/companies-table.ts` — `filterCompanies`, `formFromRow`,
+  `EMPTY_FORM`) (154 lines/no tests → resolved, audit row #21).
+- `submit/route.ts` (`POST`): four sequential required-field guards replaced
+  with a single `validateSubmitPost` call; `countryFlag` lookup extracted —
+  both moved to `lib/submit-route.ts` (complexity 13 → resolved, audit row #20).
+- `salary/route.ts`: `aggregateSalaries` + its helpers (`pickAmount`,
+  `bucketExperience`) and `validateSalaryPost` extracted to
+  `lib/salary-route.ts`; POST body validation replaced with a single
+  `validateSalaryPost` call (complexity 13×2 → resolved, audit row #19).
+- `dashboard/route.ts` (`GET`): rebuild pipeline (date → settings →
+  global-mode → Gemini → score → merge) extracted into `buildFeed()` in
+  `lib/dashboard-route.ts`; enabled-pipeline list into `enabledModes()`.
+  Handler is now: auth → cache check → fetch raw → `buildFeed` → write cache
+  → respond (complexity 13 → resolved, audit row #18).
 - `LandingContent.tsx`: three data-driven sections (demo job cards, pipeline
   funnel, feature grid) extracted into their own components —
   `DemoJobCards.tsx`, `PipelineFunnel.tsx`, `FeatureGrid.tsx` — each owning

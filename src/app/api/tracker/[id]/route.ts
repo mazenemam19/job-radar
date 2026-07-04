@@ -1,11 +1,10 @@
 // src/app/api/tracker/[id]/route.ts
+// Pure patch-building logic is extracted to lib/tracker-route.ts.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { VALID_STATUSES } from "@/lib/constants";
-import type { TrackerStatus } from "@/lib/types";
-import type { Database } from "@/lib/database.types";
+import { buildTrackerPatch, type TrackerPatchBody } from "@/lib/tracker-route";
 
 // ── PATCH /api/tracker/[id] ───────────────────────────────
 
@@ -13,24 +12,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  let body: { status?: string; notes?: string; applied_at?: string };
+  let body: TrackerPatchBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
+  const patch = buildTrackerPatch(body, new Date().toISOString());
   const db = createServerClient();
-  const now = new Date().toISOString();
-
-  const patch: Database["public"]["Tables"]["tracker_entries"]["Update"] = { updated_at: now };
-  if (body.status && VALID_STATUSES.includes(body.status as TrackerStatus)) {
-    patch.status = body.status;
-    patch.last_status_change = now;
-  }
-  if ("notes" in body) patch.notes = typeof body.notes === "string" ? body.notes : null;
-  if ("applied_at" in body)
-    patch.applied_at = typeof body.applied_at === "string" ? body.applied_at : null;
 
   const { data, error } = await db
     .from("tracker_entries")
