@@ -11,6 +11,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { catchErrorResponse } from "@/lib/api-errors";
 import { runCronJob } from "@/lib/runner";
 
+// Hobby + Fluid Compute already defaults to 300s — this can't buy more time,
+// it's here so the ceiling is explicit instead of an assumed default.
+export const maxDuration = 300;
+
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;

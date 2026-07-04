@@ -174,7 +174,10 @@ GitHub Actions (cron.yml, 09:00 + 16:00 UTC)
        1. Load active companies from ats_companies
        2. Load persisted Workable rate-limit state from app_config
        3. Build one fetch task per (company × enabled pipeline)
-       4. Run tasks with an 8-way concurrency limiter
+       4. Run tasks with an 8-way concurrency limiter against a 270s
+          deadline (fetchAllCompanyJobs); tasks not yet dispatched when
+          the deadline passes are recorded as skipped instead of run —
+          already-in-flight fetches are left to finish, not cancelled
        5. fetchCompany() [ats-bridge.ts] dispatches to the right ATS
           fetcher in sources/ats-utils.ts (9 ATS types), normalizes
           the result into RawJob, and flags date_unknown jobs
@@ -188,6 +191,14 @@ GitHub Actions (cron.yml, 09:00 + 16:00 UTC)
 Actions / manual, secret as `Authorization: Bearer`), and is the only state-mutating step
 that touches the shared `raw_jobs` pool. **No Gemini calls happen here** — filtering is
 deferred to each user's own dashboard load.
+
+**Time budget:** `/api/cron` declares `maxDuration = 300` — the actual ceiling on Vercel
+Hobby + Fluid Compute, not something this export raises. The fetch phase gets a 270s
+slice of that (`FETCH_TIME_BUDGET_MS` in `runner.ts`), leaving 30s for the upsert/email/
+logging steps that run after it. A run that would otherwise blow through 300s and hard-504
+instead returns partial results, with the untried companies visible as
+`"<company> (<mode>): Skipped — time budget exceeded"` entries in `errors` and
+`cron_logs_v2`, rather than disappearing silently.
 
 ### 5.2 Per-user dashboard load — "Lazy C" rebuild
 
@@ -342,11 +353,18 @@ returning a normalized `Job[]`. Shared concerns handled in this file:
   resilience against slow/unresponsive ATS endpoints.
 - **Concurrency limiting** (`pLimit`) for fan-out within a single ATS call, separate from
   the cross-company limiter in `runner.ts`.
-- **Workable-specific rate limiting**: a sequential queue (`queueWorkable`) plus a
-  persisted blocklist (`isWorkableBlocked` / `markWorkableSlugsBlocked24h`) and budget
-  config, loaded from / flushed to `app_config` (`loadWorkableStateFromDB`,
-  `flushWorkable429sToDB`) so the limiter survives across stateless serverless
-  invocations, which don't share memory or disk between cron runs.
+- **Workable-specific rate limiting** (`src/lib/sources/ats/workable.ts`, not
+  `ats-utils.ts`): a bounded lane pool (`queueWorkable`, `WORKABLE_LANE_COUNT` = 2
+  independent staggered chains, not one fully-serial queue) shared by every list and
+  detail-page call across every company and mode, since Workable's rate limit is
+  enforced at the host level, not per company. Paired with a persisted blocklist
+  (`isWorkableBlocked` / `markWorkableSlugsBlocked24h`) and budget config, loaded
+  from / flushed to `app_config` (`loadWorkableStateFromDB`, `flushWorkable429sToDB`)
+  so the limiter survives across stateless serverless invocations, which don't share
+  memory or disk between cron runs. Lane count is an informed default, not a measured
+  one — Workable doesn't publish a rate limit for this unauthenticated widget
+  endpoint, so it's tuned against `cron_logs_v2` duration and 429 count after live
+  runs, not a documented number.
 - **`processJobs()`** — the shared normalization step every fetcher funnels through.
   Applies only geography/timezone eligibility (for the `global` pipeline) and a hard
   30-day age cap; it does **not** filter by title, role, or skill — that gate was

@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixes
+
+- Workable fetcher: the single fully-serial request queue introduced to fix the
+  July 2 429 recurrence scaled wall-clock time linearly with total request count,
+  turning a ~150s cron run into a 300s Vercel timeout (504). Replaced with a
+  2-lane bounded pool (`WORKABLE_LANE_COUNT`, round-robin) — throughput scales
+  with lane count while every request still staggers behind the others in its
+  lane, so it isn't the unstaggered burst that caused the original 429s.
+- Cron route (`/api/cron`): fetch phase now runs against an explicit 270s
+  deadline (`FETCH_TIME_BUDGET_MS` in `runner.ts`) instead of an unbounded
+  concurrency-limited loop. Companies not yet dispatched when the deadline
+  passes are recorded as `"<company> (<mode>): Skipped — time budget exceeded"`
+  in `errors`/`cron_logs_v2` rather than silently missing; already-dispatched
+  fetches are left to finish rather than cancelled. `maxDuration = 300` added
+  to the route explicitly (matches the existing Hobby + Fluid Compute ceiling —
+  doesn't raise it, just stops relying on an implicit default).
+
 ### Refactoring
 
 - `LandingContent.tsx`: three data-driven sections (demo job cards, pipeline
@@ -45,6 +62,14 @@ All notable changes to this project are documented in this file.
 
 ### Testing
 
+- `workable-rate-limit.test.ts`: replaced tests asserting full serialization
+  (`spread > Nms`) with tests asserting a `maxActive` concurrency counter
+  bounded by `WORKABLE_LANE_COUNT` — the old assertions defined "correct" as
+  "takes at least N seconds of pure stagger," which is what caused the 504,
+  not a regression guard against it.
+- `cron-fetch-jobs.test.ts`: added coverage proving the dispatch loop stops
+  starting new fetches once a mocked clock crosses the deadline, and that nothing
+  is skipped when every fetch finishes inside it.
 - Added direct coverage for `passesExcludedKeywordsGate`,
   `passesRequiredKeywordsGate`, `passesBlacklistedLocationsGate`, and
   `passesSkillMatchGate` in `scoring.test.ts` (audit row #12)

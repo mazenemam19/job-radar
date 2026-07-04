@@ -1,7 +1,8 @@
 // src/lib/cron/fetch-jobs.ts
 // Builds one fetch task per (company, pipeline) combination, runs them
-// concurrency-limited, and aggregates the results into jobs + per-source
-// health. Extracted from runner.ts to keep runCronJob's own complexity down.
+// concurrency-limited against a caller-supplied deadline, and aggregates
+// the results into jobs + per-source health. Extracted from runner.ts to
+// keep runCronJob's own complexity down.
 
 import { fetchCompany } from "../ats-bridge";
 import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "../types";
@@ -53,17 +54,47 @@ export interface FetchAllCompanyJobsResult {
 }
 
 /**
+ * Wraps a single (company, mode) fetch so the deadline is checked at the
+ * moment the task would actually start, not when the task list is built —
+ * total elapsed time is only knowable once earlier tasks have run.
+ * Past the deadline, returns a skip result with no network call instead of
+ * calling fetchCompany, so a slow run degrades to partial results instead
+ * of running past the caller's time budget.
+ */
+function makeFetchTask(
+  row: ATSCompanyRow,
+  mode: JobMode,
+  deadline: number,
+): () => Promise<FetchTaskResult> {
+  return () => {
+    if (Date.now() >= deadline) {
+      return Promise.resolve({
+        company: row.name,
+        mode,
+        jobs: [],
+        error: "Skipped — time budget exceeded",
+      });
+    }
+    return fetchCompany(row, mode);
+  };
+}
+
+/**
  * Fetches jobs from every (company, pipeline) combination in parallel
  * (concurrency-limited), aggregating jobs, per-source health, and errors.
+ * Companies not yet dispatched when `deadline` passes are recorded as
+ * skipped rather than fetched; already-dispatched fetches are left to
+ * finish rather than cancelled, since that work is already sunk.
  */
 export async function fetchAllCompanyJobs(
   companies: ATSCompanyRow[],
+  deadline: number,
 ): Promise<FetchAllCompanyJobsResult> {
   const tasks: Array<() => Promise<FetchTaskResult>> = [];
 
   for (const row of companies) {
-    if (row.pipeline_local) tasks.push(() => fetchCompany(row, "local"));
-    if (row.pipeline_global) tasks.push(() => fetchCompany(row, "global"));
+    if (row.pipeline_local) tasks.push(makeFetchTask(row, "local", deadline));
+    if (row.pipeline_global) tasks.push(makeFetchTask(row, "global", deadline));
   }
 
   const fetchResults = await withConcurrencyLimit(tasks, CONCURRENCY_LIMIT);

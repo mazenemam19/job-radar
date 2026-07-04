@@ -15,6 +15,13 @@ import type { ATSCompanyRow, CronRunResult } from "./types";
 
 // ── Main cron function ───────────────────────────────────────
 
+// Vercel Hobby + Fluid Compute caps this route at 300s (see maxDuration in
+// src/app/api/cron/route.ts) — there is no larger number to reach for on
+// this plan. 270s leaves a 30s buffer for the upsert/email/logging steps
+// that run after the fetch phase, so a slow fetch phase degrades to partial
+// results instead of the whole run getting hard-killed mid-upsert.
+const FETCH_TIME_BUDGET_MS = 270_000;
+
 /**
  * Runs the global cron job:
  *  1. Fetches all active companies from public.ats_companies
@@ -54,8 +61,13 @@ export async function runCronJob(
     };
   }
 
-  // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited
-  const { allJobs, sourceHealth, errors } = await fetchAllCompanyJobs(companies as ATSCompanyRow[]);
+  // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited,
+  // degrading to partial results if the fetch phase runs past its time budget.
+  const deadline = startMs + FETCH_TIME_BUDGET_MS;
+  const { allJobs, sourceHealth, errors } = await fetchAllCompanyJobs(
+    companies as ATSCompanyRow[],
+    deadline,
+  );
 
   // 5. Upsert into raw_jobs (chunked, deduplicated within each chunk)
   errors.push(...(await upsertRawJobs(db, allJobs)));
