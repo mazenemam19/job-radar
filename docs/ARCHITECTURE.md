@@ -168,7 +168,7 @@ they aren't visible from the TypeScript types alone.
 ### 5.1 Ingestion — scheduled scrape ("the cron job")
 
 ```
-GitHub Actions (cron.yml, 09:00 + 16:00 UTC)
+GitHub Actions (cron.yml, 07:00 + 16:00 UTC)
   → POST /api/cron  (Authorization: Bearer CRON_SECRET)
     → runCronJob() [src/lib/runner.ts]
        1. Load active companies from ats_companies
@@ -410,7 +410,7 @@ seconds of `fetchedAt`, it's treated as a fallback/unknown date rather than a re
 
 | Workflow                                 | Trigger                 | Calls                                                               | Auth needed                                                                    |
 | ---------------------------------------- | ----------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `.github/workflows/cron.yml`             | 09:00 + 16:00 UTC daily | `POST /api/cron`                                                    | `CRON_SECRET`, `VERCEL_PRODUCTION_URL`                                         |
+| `.github/workflows/cron.yml`             | 07:00 + 16:00 UTC daily | `POST /api/cron`                                                    | `CRON_SECRET`, `VERCEL_PRODUCTION_URL`                                         |
 | `.github/workflows/salary-reminders.yml` | 1st of month, 09:00 UTC | Runs `scripts/send-salary-reminders.ts` directly (not an API route) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_*`, `VERCEL_PRODUCTION_URL` |
 
 Both can also be run locally/manually: `pnpm run cron`, `pnpm run salary-reminders`.

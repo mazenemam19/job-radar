@@ -73,7 +73,7 @@ instant; only the first load after a cron run takes ~10-15s.
 
 Two GitHub Actions workflows, both calling `/api/cron`:
 
-- `.github/workflows/cron.yml` — the scrape, twice daily (09:00 + 16:00 UTC).
+- `.github/workflows/cron.yml` — the scrape, twice daily (07:00 + 16:00 UTC).
 - `.github/workflows/salary-reminders.yml` — monthly (1st @ 09:00 UTC), runs
   `scripts/send-salary-reminders.ts` directly (not an API route).
 
