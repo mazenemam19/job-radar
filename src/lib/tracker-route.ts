@@ -9,17 +9,24 @@ import type { Database } from "@/lib/database.types";
 export type TrackerUpdatePatch = Database["public"]["Tables"]["tracker_entries"]["Update"];
 
 /**
+ * The parsed JSON body of PATCH /api/tracker/[id].
+ * Matches the original inline body type in the route handler so TypeScript
+ * can check usage before and after validation.
+ */
+export type TrackerPatchBody = {
+  status?: string;
+  notes?: string;
+  applied_at?: string;
+};
+
+/**
  * Builds the update payload for a tracker entry from the request body.
  * Normalizes inputs and sets proper timestamps.
  */
-export function buildTrackerPatch(body: Record<string, unknown>, now: string): TrackerUpdatePatch {
+export function buildTrackerPatch(body: TrackerPatchBody, now: string): TrackerUpdatePatch {
   const patch: TrackerUpdatePatch = { updated_at: now };
 
-  if (
-    body.status &&
-    typeof body.status === "string" &&
-    VALID_STATUSES.includes(body.status as TrackerStatus)
-  ) {
+  if (body.status && VALID_STATUSES.includes(body.status as TrackerStatus)) {
     patch.status = body.status;
     patch.last_status_change = now;
   }

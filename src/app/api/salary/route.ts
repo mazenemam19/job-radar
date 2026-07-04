@@ -4,8 +4,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { aggregateSalaries, validateSalaryPost } from "@/lib/salary-route";
-import type { SalaryCurrency, EmploymentType, WorkArrangement, Pipeline } from "@/lib/types";
+import { aggregateSalaries, validateSalaryPost, type SalaryPostBody } from "@/lib/salary-route";
+import type { EmploymentType, WorkArrangement, Pipeline } from "@/lib/types";
 
 // ── GET /api/salary — aggregated charts data ──────────────
 
@@ -43,16 +43,7 @@ export async function POST(request: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  let body: {
-    role_title?: string;
-    years_experience?: number;
-    salary_egp?: number;
-    salary_usd?: number;
-    currency?: SalaryCurrency;
-    employment_type?: EmploymentType;
-    work_arrangement?: WorkArrangement;
-    pipeline?: Pipeline;
-  };
+  let body: SalaryPostBody;
 
   try {
     body = await request.json();
@@ -65,9 +56,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
   }
 
-  // At this point role_title, years_experience, and currency are all present and valid.
-  // The cast is safe — validateSalaryPost guards currency membership in VALID_CURRENCIES.
-  const currency = body.currency as SalaryCurrency;
+  // All required fields are guaranteed non-empty and valid after validateSalaryPost.
+  const currency = body.currency!;
 
   const db = createServerClient();
   const now = new Date().toISOString();

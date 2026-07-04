@@ -32,10 +32,10 @@ describe("buildTrackerPatch", () => {
     const patch1 = buildTrackerPatch({ notes: "Called recruiter" }, now);
     expect(patch1.notes).toBe("Called recruiter");
 
-    const patch2 = buildTrackerPatch({ notes: null }, now);
+    const patch2 = buildTrackerPatch({ notes: null as unknown as string }, now);
     expect(patch2.notes).toBeNull();
 
-    const patch3 = buildTrackerPatch({ notes: 123 }, now);
+    const patch3 = buildTrackerPatch({ notes: 123 as unknown as string }, now);
     expect(patch3.notes).toBeNull();
   });
 
@@ -43,7 +43,7 @@ describe("buildTrackerPatch", () => {
     const patch1 = buildTrackerPatch({ applied_at: "2026-07-01" }, now);
     expect(patch1.applied_at).toBe("2026-07-01");
 
-    const patch2 = buildTrackerPatch({ applied_at: null }, now);
+    const patch2 = buildTrackerPatch({ applied_at: null as unknown as string }, now);
     expect(patch2.applied_at).toBeNull();
   });
 });

@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { validateSubmitPost, countryFlag } from "@/lib/submit-route";
+import { validateSubmitPost, countryFlag, type SubmitPostBody } from "@/lib/submit-route";
 
 // ---------------------------------------------------------------------------
 // Rate limiting — module-level, in-memory.
@@ -40,16 +40,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: {
-    company_name?: string;
-    ats_type?: string;
-    slug?: string;
-    country?: string;
-    city?: string;
-    pipeline_local?: boolean;
-    pipeline_global?: boolean;
-    submitter_email?: string;
-  };
+  let body: SubmitPostBody;
 
   try {
     body = await request.json();
@@ -62,10 +53,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
   }
 
-  const companyName = (body.company_name as string).trim();
-  const atsType = body.ats_type as string;
-  const slug = (body.slug as string).trim();
-  const country = (body.country as string).trim();
+  // All required fields are guaranteed non-empty strings after validation.
+  const companyName = body.company_name!.trim();
+  const atsType = body.ats_type!;
+  const slug = body.slug!.trim();
+  const country = body.country!.trim();
   const flag = countryFlag(country);
 
   const db = createAdminClient();

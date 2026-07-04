@@ -77,8 +77,13 @@ export function useCompaniesTable() {
 
   async function deleteCompany(id: string) {
     if (!confirm("Delete this company?")) return;
-    await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
-    setCompanies((p) => p.filter((c) => c.id !== id));
+    const res = await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
+    const d = await res.json();
+    if (d.ok) {
+      setCompanies((p) => p.filter((c) => c.id !== id));
+    } else {
+      alert(`Delete failed: ${d.error ?? "unknown error"}`);
+    }
   }
 
   return {

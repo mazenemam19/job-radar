@@ -65,7 +65,9 @@ export async function buildFeed(
     }
   }
 
-  // Stage 6: Merge — deduplicates and sorts by total_score descending
+  // Stage 6: Merge — deduplicates and sorts by total_score descending.
+  // Empty first arg is intentional: this is a full rebuild path, not an
+  // incremental merge — there are no pre-existing cached jobs to preserve.
   const finalJobs = mergeJobs([], scoredJobs);
 
   const pipelineLog: PipelineLog = {

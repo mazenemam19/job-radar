@@ -4,7 +4,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { buildTrackerPatch } from "@/lib/tracker-route";
+import { buildTrackerPatch, type TrackerPatchBody } from "@/lib/tracker-route";
 
 // ── PATCH /api/tracker/[id] ───────────────────────────────
 
@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  let body: Record<string, unknown>;
+  let body: TrackerPatchBody;
   try {
     body = await request.json();
   } catch {

@@ -182,16 +182,25 @@ describe("buildFeed", () => {
   });
 
   it("drops jobs with total_score ≤ 0 from the final feed", async () => {
-    // A job with no skill matches will score 0 and be dropped
-    const zeroScoreJob = makeJob({
-      title: "Senior COBOL Programmer",
+    // A job that is both very old (recency_score = 0) and has no skill matches
+    // (skill_match_score = 0) will have total_score = 0 and must be dropped.
+    const oldDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(); // 120 days ago
+    const staleZeroSkillJob = makeJob({
+      title: "COBOL Programmer",
       description: "Needs COBOL experience only",
+      posted_at: oldDate,
+      fetched_at: oldDate,
+      date_unknown: false,
     });
-    // Expert skills are React + TypeScript — no match → skill_match_score = 0
-    const settingsNoReqd = makeSettings({ required_keywords: [], expert_skills: ["React"] });
+    // job_age_days is 365 so the job passes the date gate, but its score will be 0
+    const settingsWideAge = makeSettings({
+      job_age_days: 365,
+      required_keywords: [],
+      expert_skills: ["React"], // no match against COBOL description
+    });
     mockGemini.mockResolvedValue([
       {
-        ...zeroScoreJob,
+        ...staleZeroSkillJob,
         gemini_pass: true,
         gemini_reason: null,
         gemini_reviewed: true,
@@ -199,11 +208,34 @@ describe("buildFeed", () => {
       },
     ]);
 
-    const { finalJobs } = await buildFeed([zeroScoreJob], settingsNoReqd, "key");
+    const { finalJobs } = await buildFeed([staleZeroSkillJob], settingsWideAge, "key");
 
-    // skill_match_score = 0, recency might be non-zero; verify the job
-    // is dropped only when total_score ≤ 0 (recency alone keeps it above 0 if recent)
-    // Use a very old job so recency is also 0
-    expect(typeof finalJobs.length).toBe("number"); // structural check — score value is deterministic from scoring.ts
+    // Both skill_match_score and recency_score are 0 → total_score = 0 → dropped
+    expect(finalJobs).toHaveLength(0);
+  });
+
+  it("keeps a recent job with zero skill match (non-zero recency keeps total_score > 0)", async () => {
+    const recentZeroSkillJob = makeJob({
+      title: "COBOL Programmer",
+      description: "Needs COBOL experience only",
+    });
+    const settingsNoMatch = makeSettings({ required_keywords: [], expert_skills: ["React"] });
+    mockGemini.mockResolvedValue([
+      {
+        ...recentZeroSkillJob,
+        gemini_pass: true,
+        gemini_reason: null,
+        gemini_reviewed: true,
+        gemini_quota_exhausted: false,
+      },
+    ]);
+
+    const { finalJobs } = await buildFeed([recentZeroSkillJob], settingsNoMatch, "key");
+
+    // skill_match_score = 0 but recency_score is high (job is from today)
+    // → total_score > 0 → job survives
+    expect(finalJobs).toHaveLength(1);
+    expect(finalJobs[0].recency_score).toBeGreaterThan(0);
+    expect(finalJobs[0].total_score).toBeGreaterThan(0);
   });
 });

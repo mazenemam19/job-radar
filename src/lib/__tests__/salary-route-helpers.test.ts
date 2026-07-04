@@ -11,6 +11,7 @@ import {
   VALID_CURRENCIES,
 } from "../salary-route";
 import type { RawSalaryRow } from "../salary-route";
+import type { SalaryCurrency } from "@/lib/types";
 
 // ── pickAmount ────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ describe("validateSalaryPost", () => {
   it("rejects when years_experience is null", () => {
     const result = validateSalaryPost({
       role_title: "Dev",
-      years_experience: null,
+      years_experience: null as unknown as number,
       currency: "EGP",
     });
     expect(result.ok).toBe(false);
@@ -167,7 +168,11 @@ describe("validateSalaryPost", () => {
   });
 
   it("rejects an unrecognised currency", () => {
-    const result = validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: "BTC" });
+    const result = validateSalaryPost({
+      role_title: "Dev",
+      years_experience: 3,
+      currency: "BTC" as unknown as SalaryCurrency,
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("Invalid currency");
   });

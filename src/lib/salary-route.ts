@@ -2,7 +2,13 @@
 // Pure logic for GET + POST /api/salary — no Next.js, no Supabase calls.
 // Kept separate so it's unit-testable without mocking the route layer.
 
-import type { SalaryAggregate, SalaryCurrency, Pipeline } from "@/lib/types";
+import type {
+  SalaryAggregate,
+  SalaryCurrency,
+  Pipeline,
+  EmploymentType,
+  WorkArrangement,
+} from "@/lib/types";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -19,21 +25,36 @@ export const VALID_CURRENCIES: readonly SalaryCurrency[] = ["EGP", "USD", "EUR",
 
 // ── POST validation ───────────────────────────────────────────
 
+/**
+ * The parsed JSON body of POST /api/salary.
+ * Fields are typed to their expected domain types, matching the original
+ * inline body type in the route handler so TypeScript can check usage
+ * after validation narrows them.
+ */
 export type SalaryPostBody = {
-  role_title?: unknown;
-  years_experience?: unknown;
-  currency?: unknown;
-  [key: string]: unknown;
+  role_title?: string;
+  years_experience?: number;
+  salary_egp?: number;
+  salary_usd?: number;
+  currency?: SalaryCurrency;
+  employment_type?: EmploymentType;
+  work_arrangement?: WorkArrangement;
+  pipeline?: Pipeline;
 };
 
 export type ValidationResult = { ok: true } | { ok: false; error: string };
+
+/** Type guard: returns true when x is a recognised SalaryCurrency value. */
+export function isSalaryCurrency(x: unknown): x is SalaryCurrency {
+  return VALID_CURRENCIES.includes(x as SalaryCurrency);
+}
 
 /** Validates a POST /api/salary request body. Returns ok or an error message. */
 export function validateSalaryPost(body: SalaryPostBody): ValidationResult {
   if (!body.role_title || body.years_experience == null || !body.currency) {
     return { ok: false, error: "role_title, years_experience and currency are required" };
   }
-  if (!VALID_CURRENCIES.includes(body.currency as SalaryCurrency)) {
+  if (!isSalaryCurrency(body.currency)) {
     return { ok: false, error: "Invalid currency" };
   }
   return { ok: true };
