@@ -82,6 +82,8 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `e2e-login/route.ts` (`POST`): kept unchanged per the safety rules in `AGENTS.md`
+  ("The e2e-login route works as-is. Do not modify it") (row #24 exempt).
 - `verify-domain-counts-coverage.ts`: decomposed IIFE complexity by splitting
   stats logging, task building, delta reporting, and Breezy/Teamtailor status checks
   into helper functions; replaced local limiter with imported `withConcurrencyLimit`

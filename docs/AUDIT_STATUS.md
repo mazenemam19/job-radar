@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-04 (row #23 closed)
+Last updated: 2026-07-04 (row #24 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -76,7 +76,7 @@ Status column: `pending` / `in progress` / `done`
 | 21  | `src/components/admin/AdminComponents/CompaniesTable.tsx`   | 154 lines, no tests                                        | done       |
 | 22  | `src/app/api/tracker/[id]/route.ts`                         | complexity 11                                              | done       |
 | 23  | `src/scripts/verify-domain-counts-coverage.ts`              | complexity 20 (script, low priority)                       | done       |
-| 24  | `src/app/api/test/e2e-login/route.ts`                       | complexity 13 (test helper, low priority)                  | pending    |
+| 24  | `src/app/api/test/e2e-login/route.ts`                       | complexity 13 (test helper, low priority)                  | exempt     |
 
 ## Salary Page — Data Model Redesign (new initiative, split from row #17)
 
