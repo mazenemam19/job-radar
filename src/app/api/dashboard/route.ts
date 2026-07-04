@@ -5,21 +5,16 @@
 //
 // The Gemini filter uses the user's own API key from user_profiles.gemini_api_key.
 // First load after a cron run takes 10-15s; all subsequent opens are instant.
+//
+// Rebuild logic lives in lib/dashboard-route.ts (pure, unit-testable).
 
 import { NextResponse } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
-import { filterJobsWithGemini } from "@/lib/gemini";
-import {
-  scoreJob,
-  mergeJobs,
-  passesDateGate,
-  passesSettingsGate,
-  passesGlobalModeGate,
-} from "@/lib/scoring";
 import { isCacheFresh } from "@/lib/runner";
+import { buildFeed, enabledModes } from "@/lib/dashboard-route";
 import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
@@ -72,18 +67,11 @@ export async function GET() {
     }
   }
 
-  // The Gemini key is now optional — see the Step 4 branch below for
-  // what happens without one.
-
-  // ── Step 1: Fetch raw jobs for enabled pipelines ─────────────
-  const enabledModes: string[] = [];
-  if (settings.pipeline_local) enabledModes.push("local");
-  if (settings.pipeline_global) enabledModes.push("global");
-
+  // ── Fetch raw jobs for enabled pipelines ─────────────────────
   const { data: rawJobsData, error: rawError } = await adminDb
     .from("raw_jobs")
     .select("*")
-    .in("mode", enabledModes)
+    .in("mode", enabledModes(settings))
     .order("fetched_at", { ascending: false })
     .limit(2000); // hard cap to keep Gemini context manageable
 
@@ -91,70 +79,14 @@ export async function GET() {
     return dbErrorResponse("dashboard:GET", rawError);
   }
 
-  const rawJobs = (rawJobsData ?? []) as RawJob[];
-  const totalFetched = rawJobs.length;
-
-  // ── Step 2: Date filter ──────────────────────────────────────
-  const afterDateFilter = rawJobs.filter((j) => passesDateGate(j, settings.job_age_days));
-
-  // ── Step 3: Settings filter (seniority + tech stack + regex gates) ──
-  const afterSettingsFilter = afterDateFilter.filter((j) => passesSettingsGate(j, settings));
-
-  // ── Step 3.5: Global mode timezone/region filter ─────────────
-  // Only applies to jobs in the "global" pipeline. Uses per-user settings
-  // (global_mode_blocked_regions / global_mode_allowed_locations) instead of
-  // the old hardcoded isTimezoneIncompatible() in ats-utils.ts.
-  const afterGlobalModeFilter = afterSettingsFilter.filter((j) =>
-    j.mode === "global" ? passesGlobalModeGate(j, settings) : true,
+  // ── Run pipeline (date → settings → global-mode → Gemini → score → merge) ─
+  const { finalJobs, pipelineLog } = await buildFeed(
+    (rawJobsData ?? []) as RawJob[],
+    settings,
+    profile?.gemini_api_key,
   );
 
-  // ── Step 4: Gemini filter ────────────────────────────────────
-  // No key -> skip Gemini entirely rather than hard-blocking the whole
-  // dashboard (the old behavior). An invalid/exhausted key already failed
-  // open silently and showed everything anyway, so the strictest outcome
-  // was backwards: reserved for the one case where the user did
-  // everything right. Missing-key jobs get the same fail-open shape
-  // the strict matching already produces, so the "Not AI-reviewed" badge
-  // covers this for free.
-  const geminiFiltered = profile?.gemini_api_key
-    ? await filterJobsWithGemini(profile.gemini_api_key, afterGlobalModeFilter, settings)
-    : afterGlobalModeFilter.map((j) => ({
-        ...j,
-        gemini_pass: true,
-        gemini_reason: null,
-        gemini_reviewed: false,
-        gemini_quota_exhausted: false,
-      }));
-
-  // ── Step 5: Score ────────────────────────────────────────────
-  const scoredJobs: ScoredJob[] = [];
-  for (const job of geminiFiltered) {
-    const scored = scoreJob(
-      job,
-      settings,
-      job.gemini_pass,
-      job.gemini_reason,
-      job.gemini_reviewed,
-      job.gemini_quota_exhausted,
-    );
-    if (scored && scored.total_score > 0) {
-      scoredJobs.push(scored);
-    }
-  }
-
-  // Merge deduplicates and sorts by total_score
-  const finalJobs = mergeJobs([], scoredJobs);
-
-  // ── Step 6: Build pipeline log ───────────────────────────────
-  const pipelineLog: PipelineLog = {
-    total_fetched: totalFetched,
-    after_date_filter: afterDateFilter.length,
-    after_settings_filter: afterSettingsFilter.length,
-    after_gemini: finalJobs.length,
-    cached_at: new Date().toISOString(),
-  };
-
-  // ── Step 7: Write cache ──────────────────────────────────────
+  // ── Write cache ──────────────────────────────────────────────
   const { data: appConfig } = await adminDb
     .from("app_config")
     .select("last_cron_at")

@@ -82,6 +82,11 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `dashboard/route.ts` (`GET`): rebuild pipeline (date → settings →
+  global-mode → Gemini → score → merge) extracted into `buildFeed()` in
+  `lib/dashboard-route.ts`; enabled-pipeline list into `enabledModes()`.
+  Handler is now: auth → cache check → fetch raw → `buildFeed` → write cache
+  → respond (complexity 13 → resolved, audit row #18).
 - `LandingContent.tsx`: three data-driven sections (demo job cards, pipeline
   funnel, feature grid) extracted into their own components —
   `DemoJobCards.tsx`, `PipelineFunnel.tsx`, `FeatureGrid.tsx` — each owning
