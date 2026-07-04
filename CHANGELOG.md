@@ -6,6 +6,20 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `run-state.ts` / `workable.ts`: `markWorkable429` only ever protected
+  _future_ runs — it fed a set that gets flushed to the DB after the fetch
+  phase already finished, so a slug that 429'd had zero cooldown for the
+  rest of the run that discovered it. Combined with the ceiling-triggered
+  give-up path never calling `markWorkable429` at all (confirmed via a live
+  local run: 415 429s, 0 "marking blocked" lines), a company with many job
+  listings could have every single detail-page request independently
+  re-discover the same 429, each paying up to the 90s ceiling — one company
+  alone took 562s. `markWorkable429` now blocks immediately for the rest of
+  the current run, the ceiling-triggered 429 path now actually calls it, and
+  the detail-page fanout checks the block before each request instead of
+  only once before the list call. See
+  `docs/solutions/bugs/issue-52-504-recurrence-part4.md`.
+
 - `runner.ts`: zero logging existed for any step between the upsert phase and
   the end of the function — `app_config` update, `flushWorkable429sToDB`,
   `flushDomainCountsToDB`, and the `cron_logs_v2` insert itself all only

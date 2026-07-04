@@ -99,6 +99,7 @@ async function fetchWorkableUrl(url: string, slug: string): Promise<Response | n
       console.error(
         `[workable] ${slug}: backoff would exceed total-time ceiling — returning last 429 after ${elapsed}ms instead of waiting`,
       );
+      markWorkable429(slug);
       return res;
     }
     await new Promise((r) => setTimeout(r, cappedBackoff));
@@ -163,7 +164,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-        const dr = await fetchWorkableUrl(detailUrl, c.slug);
+        const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
         let desc = stripHtml(r.description || "");
         if (dr && dr.ok) {
           try {

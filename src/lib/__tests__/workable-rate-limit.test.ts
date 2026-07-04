@@ -118,6 +118,44 @@ describe("Workable fetcher rate-limit handling", () => {
     expect(maxActive).toBeLessThanOrEqual(WORKABLE_LANE_COUNT); // but never more than the lane pool allows
   });
 
+  it("stops fetching detail pages for later batches once the slug gets blocked mid-fanout", async () => {
+    let detailFetchCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        const isDetail = url.includes("/jobs/");
+        if (isDetail) detailFetchCount += 1;
+        if (isDetail) {
+          // Every detail call 429s, forever — the exact "flaky ATS" shape
+          // from the live incident.
+          return Promise.resolve({ status: 429, ok: false, headers: new Headers() });
+        }
+        // 15 jobs, more than WORKABLE_LANE_COUNT/pLimit's batch size of 5,
+        // so this only stays cheap if later batches short-circuit.
+        return Promise.resolve(
+          mockListResponse(
+            Array.from({ length: 15 }, (_, i) => ({
+              shortcode: `job-${i}`,
+              title: `Role ${i}`,
+              description: "",
+            })),
+          ),
+        );
+      }),
+    );
+
+    const { fetchWorkable } = await import("../sources/ats/workable");
+    const pending = fetchWorkable({ ...baseCompany, slug: "always-429-co" }, "local");
+    await vi.advanceTimersByTimeAsync(300_000); // past every ceiling/backoff this can hit
+    await pending;
+
+    // Without the same-run block, 15 jobs each independently retrying to
+    // the ceiling would mean detail fetch attempts scale with job count.
+    // With it, only the first batch (≤5, times a few retries) ever calls
+    // fetch — the remaining ~10 jobs short-circuit via isWorkableBlocked.
+    expect(detailFetchCount).toBeLessThan(15 * 2);
+  });
+
   it("retries a 429 on the list endpoint instead of giving up immediately", async () => {
     let calls = 0;
     vi.stubGlobal(

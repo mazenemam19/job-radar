@@ -177,4 +177,10 @@ export function markWorkableSlugsBlocked24h(slugs: string[]): void {
 
 export function markWorkable429(slug: string): void {
   workable429SlugsThisRun.add(slug);
+  // Block for the remainder of THIS run too, not just future ones —
+  // flushWorkable429sToDB only persists to the DB after the whole fetch
+  // phase finishes, so without this, isWorkableBlocked() stays blind to a
+  // slug that just 429'd until tomorrow's run. See
+  // docs/solutions/bugs/issue-52-504-recurrence-part4.md.
+  setWorkableBlocked(slug, new Date(Date.now() + 864e5));
 }
