@@ -82,6 +82,10 @@ All notable changes to this project are documented in this file.
 
 ### Refactoring
 
+- `salary/route.ts`: `aggregateSalaries` + its helpers (`pickAmount`,
+  `bucketExperience`) and `validateSalaryPost` extracted to
+  `lib/salary-route.ts`; POST body validation replaced with a single
+  `validateSalaryPost` call (complexity 13×2 → resolved, audit row #19).
 - `dashboard/route.ts` (`GET`): rebuild pipeline (date → settings →
   global-mode → Gemini → score → merge) extracted into `buildFeed()` in
   `lib/dashboard-route.ts`; enabled-pipeline list into `enabledModes()`.

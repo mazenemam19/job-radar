@@ -1,6 +1,6 @@
 # Code Health Audit — Status
 
-Last updated: 2026-07-04 (row #18 closed)
+Last updated: 2026-07-04 (row #19 closed)
 Purpose: resume this work in a new chat without re-deriving findings. Point Claude
 at this file + the repo and say "read docs/AUDIT_STATUS.md and continue."
 
@@ -71,7 +71,7 @@ Status column: `pending` / `in progress` / `done`
 | 16  | `src/components/landing/LandingContent.tsx`                 | 203 lines                                                  | done       |
 | 17  | `src/components/salary/SalaryPage.tsx`                      | superseded — see "Salary Page — Data Model Redesign" below | superseded |
 | 18  | `src/app/api/dashboard/route.ts`                            | complexity 13                                              | done       |
-| 19  | `src/app/api/salary/route.ts`                               | complexity 13 (x2)                                         | pending    |
+| 19  | `src/app/api/salary/route.ts`                               | complexity 13 (x2)                                         | done       |
 | 20  | `src/app/api/submit/route.ts`                               | complexity 13                                              | pending    |
 | 21  | `src/components/admin/AdminComponents/CompaniesTable.tsx`   | 154 lines, no tests                                        | pending    |
 | 22  | `src/app/api/tracker/[id]/route.ts`                         | complexity 11                                              | pending    |
