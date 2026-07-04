@@ -4,7 +4,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { aggregateSalaries, validateSalaryPost, VALID_CURRENCIES } from "@/lib/salary-route";
+import { aggregateSalaries, validateSalaryPost } from "@/lib/salary-route";
 import type { SalaryCurrency, EmploymentType, WorkArrangement, Pipeline } from "@/lib/types";
 
 // ── GET /api/salary — aggregated charts data ──────────────
@@ -94,6 +94,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true, data }, { status: 201 });
 }
-
-// Re-export for tests that import VALID_CURRENCIES from this module path
-export { VALID_CURRENCIES };
