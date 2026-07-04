@@ -1,14 +1,12 @@
 // src/lib/__tests__/workable-rate-limit.test.ts
-// Regression guard for the July 2 incident: every 429 in both post-fix cron
-// runs was a Workable company (see cron_logs_v2), not Greenhouse/Lever/
-// Ashby/SmartRecruiters — afba5dc (the "fix rate-limit ATS fetchers" commit)
-// never touched workable.ts, and workable.ts had two of its own bugs:
-//   1. The queue was keyed by JobMode, so a "local" fetch and a "global"
-//      fetch could hit apply.workable.com at the exact same instant.
-//   2. The detail-page loop bypassed the queue entirely (raw fetch, only a
-//      concurrency cap, no stagger, no retry).
+// Every Workable request (list or detail, either mode) shares one host,
+// apply.workable.com, and routes through a bounded lane pool: never more
+// than WORKABLE_LANE_COUNT requests in flight at once, each still staggered
+// within its own lane, and a 429 on the list call retries instead of
+// giving up immediately.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ATSConfig } from "@/types";
+import { WORKABLE_LANE_COUNT } from "../sources/ats/workable";
 
 const baseCompany: ATSConfig = {
   name: "Acme",
@@ -27,14 +25,13 @@ function mockListResponse(jobs: unknown[] = []) {
   };
 }
 
-// Fake timers: these tests assert on the queue's *logical* behavior (did the
-// second call wait behind the first, did N calls queue instead of firing at
-// once) not on literal wall-clock duration. Real setTimeout made that claim
-// true but slow and sandbox-jitter-prone; vi.advanceTimersByTimeAsync proves
-// the same claim deterministically. ADVANCE_MS is a generous upper bound on
-// any test's worst-case total queued delay — Math.random() still picks the
-// real stagger value each run, this just fast-forwards the clock past it.
-const ADVANCE_MS = 20_000;
+// Fake timers: these tests assert on the lane pool's *logical* behavior (how
+// many requests are ever in flight at once, does a 429 retry) not on literal
+// wall-clock duration. vi.advanceTimersByTimeAsync proves concurrency bounds
+// deterministically regardless of Math.random()'s stagger draw each run.
+// ADVANCE_MS is a generous upper bound on any test's worst-case total queued
+// delay across all lanes.
+const ADVANCE_MS = 40_000;
 
 describe("Workable fetcher rate-limit handling", () => {
   beforeEach(() => {
@@ -47,57 +44,68 @@ describe("Workable fetcher rate-limit handling", () => {
     vi.resetModules();
   });
 
-  it("does not fire local-mode and global-mode requests concurrently on apply.workable.com", async () => {
-    const callTimestamps: number[] = [];
+  it("caps concurrent list-call requests at the lane count across mixed local/global companies", async () => {
+    let active = 0;
+    let maxActive = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(() => {
-        callTimestamps.push(Date.now());
-        return Promise.resolve(mockListResponse());
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            active -= 1;
+            resolve(mockListResponse());
+          }, 5000); // long enough in-flight window to guarantee lane overlap is observed
+        });
       }),
     );
 
     const { fetchWorkable } = await import("../sources/ats/workable");
 
-    // Old behavior: these hit two independent per-mode queues and could
-    // fire within milliseconds of each other despite both being
-    // apply.workable.com. New behavior: one shared host queue, so the
-    // second call waits behind the first.
+    // 6 companies, mixed modes — more than WORKABLE_LANE_COUNT, so this only
+    // stays safe if concurrency is bounded by the lane pool rather than by
+    // (accidentally) how many modes happen to be in play.
     const pending = Promise.all([
-      fetchWorkable({ ...baseCompany, slug: "local-co" }, "local"),
-      fetchWorkable({ ...baseCompany, slug: "global-co" }, "global"),
+      fetchWorkable({ ...baseCompany, slug: "local-1" }, "local"),
+      fetchWorkable({ ...baseCompany, slug: "local-2" }, "local"),
+      fetchWorkable({ ...baseCompany, slug: "local-3" }, "local"),
+      fetchWorkable({ ...baseCompany, slug: "global-1" }, "global"),
+      fetchWorkable({ ...baseCompany, slug: "global-2" }, "global"),
+      fetchWorkable({ ...baseCompany, slug: "global-3" }, "global"),
     ]);
     await vi.advanceTimersByTimeAsync(ADVANCE_MS);
     await pending;
 
-    expect(callTimestamps).toHaveLength(2);
-    const spread = Math.max(...callTimestamps) - Math.min(...callTimestamps);
-    expect(spread).toBeGreaterThan(1000); // min stagger is 1500ms
+    expect(maxActive).toBeGreaterThan(1); // real concurrency — not the old one-at-a-time queue
+    expect(maxActive).toBeLessThanOrEqual(WORKABLE_LANE_COUNT); // still bounded — not an unstaggered burst
   });
 
-  it("queues and staggers detail-page requests instead of firing them unqueued", async () => {
-    const callTimestamps: number[] = [];
+  it("caps concurrent detail-page requests for a single company at the lane count", async () => {
+    let active = 0;
+    let maxActive = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string) => {
-        callTimestamps.push(Date.now());
-        if (url.includes("/jobs/")) {
-          return Promise.resolve({
-            status: 200,
-            ok: true,
-            headers: new Headers(),
-            json: async () => ({}),
-          });
-        }
-        return Promise.resolve(
-          mockListResponse(
-            Array.from({ length: 4 }, (_, i) => ({
-              shortcode: `job-${i}`,
-              title: `Role ${i}`,
-              description: "",
-            })),
-          ),
-        );
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        const isDetail = url.includes("/jobs/");
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            active -= 1;
+            resolve(
+              isDetail
+                ? { status: 200, ok: true, headers: new Headers(), json: async () => ({}) }
+                : mockListResponse(
+                    Array.from({ length: 5 }, (_, i) => ({
+                      shortcode: `job-${i}`,
+                      title: `Role ${i}`,
+                      description: "",
+                    })),
+                  ),
+            );
+          }, 5000);
+        });
       }),
     );
 
@@ -106,13 +114,8 @@ describe("Workable fetcher rate-limit handling", () => {
     await vi.advanceTimersByTimeAsync(ADVANCE_MS);
     await pending;
 
-    // 1 list call + 4 detail calls = 5 total, all through the same queue.
-    expect(callTimestamps).toHaveLength(5);
-    const spread = Math.max(...callTimestamps) - Math.min(...callTimestamps);
-    // Old behavior: the 4 detail calls fired essentially at once (only a
-    // pLimit(5) concurrency cap, no stagger). New behavior: every one of
-    // them queues behind the list call and each other.
-    expect(spread).toBeGreaterThan(4000); // 4 queued gaps, min 1500ms each
+    expect(maxActive).toBeGreaterThan(1); // detail fetches actually overlap now
+    expect(maxActive).toBeLessThanOrEqual(WORKABLE_LANE_COUNT); // but never more than the lane pool allows
   });
 
   it("retries a 429 on the list endpoint instead of giving up immediately", async () => {

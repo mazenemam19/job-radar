@@ -13,20 +13,35 @@ import {
 } from "./run-state";
 
 // Every Workable request — list or detail, local or global mode — hits the
-// same host (apply.workable.com), so a single shared queue staggers all of
-// it. There's exactly one host here, so a plain Promise chain is enough;
-// no Map keyed by host or mode is needed. Every detail-page fetch also
-// routes through this queue and gets the same 429 retry-with-backoff
-// treatment as the list call, via fetchWorkableUrl below.
-let workableQueue: Promise<unknown> = Promise.resolve();
+// same host (apply.workable.com). A single fully-serial queue is safe from
+// bursts but scales wall-clock time linearly with total request count across
+// every company in the run. WORKABLE_LANE_COUNT independent lanes cap
+// concurrency instead of eliminating it: at most this many requests are ever
+// in flight at once, so throughput scales with lane count while every
+// request still staggers behind the others in its own lane. Every
+// detail-page fetch routes through the same lane pool and gets the same 429
+// retry-with-backoff treatment as the list call, via fetchWorkableUrl below.
+//
+// Lane count is an informed default, not a measured one — validate against
+// cron_logs_v2 duration and 429 count after a live run; raise it if duration
+// is still too high with zero 429s, lower it if 429s reappear.
+export const WORKABLE_LANE_COUNT = 2;
+const workableLanes: Promise<unknown>[] = Array.from({ length: WORKABLE_LANE_COUNT }, () =>
+  Promise.resolve(),
+);
+let nextLane = 0;
 const WORKABLE_STAGGER_MS = [1500, 2000, 3000];
 const WORKABLE_MAX_429_RETRIES = 3;
 const WORKABLE_BACKOFF_CAP_MS = 30_000;
 
 function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
+  const lane = nextLane;
+  nextLane = (nextLane + 1) % WORKABLE_LANE_COUNT;
   const stagger = WORKABLE_STAGGER_MS[Math.floor(Math.random() * WORKABLE_STAGGER_MS.length)];
-  const result = workableQueue.then(() => new Promise((r) => setTimeout(r, stagger))).then(fn);
-  workableQueue = result.catch(() => {});
+  const result = workableLanes[lane]
+    .then(() => new Promise((r) => setTimeout(r, stagger)))
+    .then(fn);
+  workableLanes[lane] = result.catch(() => {});
   return result;
 }
 
