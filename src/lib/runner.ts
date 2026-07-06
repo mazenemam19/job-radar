@@ -61,6 +61,7 @@ export async function runCronJob(
       total_fetched: 0,
       duration_ms: Date.now() - startMs,
       errors: [`Failed to load companies: ${msg}`],
+      warnings: [],
       source_health: {},
       trigger,
     };
@@ -72,12 +73,12 @@ export async function runCronJob(
   console.log(
     `[cron] fetch phase starting, deadline in ${deadline - Date.now()}ms (+${Date.now() - startMs}ms)`,
   );
-  const { allJobs, sourceHealth, errors } = await fetchAllCompanyJobs(
+  const { allJobs, sourceHealth, errors, warnings } = await fetchAllCompanyJobs(
     companies as ATSCompanyRow[],
     deadline,
   );
   console.log(
-    `[cron] fetch phase done: ${allJobs.length} jobs, ${errors.length} errors (+${Date.now() - startMs}ms)`,
+    `[cron] fetch phase done: ${allJobs.length} jobs, ${errors.length} errors, ${warnings.length} warnings (+${Date.now() - startMs}ms)`,
   );
 
   // 5. Upsert into raw_jobs (chunked, deduplicated within each chunk)
@@ -116,6 +117,7 @@ export async function runCronJob(
     total_fetched: allJobs.length,
     duration_ms: durationMs,
     errors: errors.length ? errors : null,
+    warnings: warnings.length ? warnings : null,
     source_health: sourceHealth,
     trigger,
   });
@@ -146,6 +148,7 @@ export async function runCronJob(
     total_fetched: allJobs.length,
     duration_ms: durationMs,
     errors,
+    warnings,
     source_health: sourceHealth,
     trigger,
     email_results: emailResults,

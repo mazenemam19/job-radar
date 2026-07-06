@@ -158,6 +158,32 @@ describe("fetchAllCompanyJobs", () => {
     expect(result.allJobs).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
   });
+
+  it("aggregates warnings separately from errors for an otherwise-successful fetch", async () => {
+    // Regression test for issue #52 part 2, priority 4 (Devsquad): a fetch
+    // that succeeds with a caveat (e.g. a few dead job-detail links) must
+    // not be reported as an error, but the caveat still needs to surface
+    // somewhere — this is that somewhere.
+    const companies = [makeCompanyRow({ id: "a", name: "Devsquad", pipeline_global: true })];
+
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => ({
+      company: row.name,
+      mode,
+      jobs: [makeRawJob("a-global")],
+      error: null,
+      warnings: [
+        "2/15 job detail fetches failed (dead/removed links) — used list description as fallback",
+      ],
+    }));
+
+    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE);
+
+    expect(result.errors).toHaveLength(0); // succeeded — must not read as a failure
+    expect(result.allJobs).toHaveLength(1); // and the jobs still made it through
+    expect(result.warnings).toEqual([
+      "Devsquad (global): 2/15 job detail fetches failed (dead/removed links) — used list description as fallback",
+    ]);
+  });
 });
 
 describe("fetchAllCompanyJobs — time budget", () => {

@@ -40,12 +40,17 @@ interface FetchTaskResult {
   mode: JobMode;
   jobs: RawJob[];
   error: string | null;
+  /** Non-blocking issues from a successful fetch — kept separate from
+   * `errors` so a routine caveat (e.g. a few dead job-detail links) doesn't
+   * read as equivalent to a real fetch failure. */
+  warnings?: string[];
 }
 
 export interface FetchAllCompanyJobsResult {
   allJobs: RawJob[];
   sourceHealth: CronRunResult["source_health"];
   errors: string[];
+  warnings: string[];
 }
 
 /**
@@ -103,6 +108,7 @@ export async function fetchAllCompanyJobs(
   const allJobs: RawJob[] = [];
   const sourceHealth: CronRunResult["source_health"] = {};
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const result of fetchResults) {
     const healthKey = `${result.company}:${result.mode}`;
@@ -117,7 +123,10 @@ export async function fetchAllCompanyJobs(
         errors: 0,
       };
     }
+    for (const w of result.warnings ?? []) {
+      warnings.push(`${result.company} (${result.mode}): ${w}`);
+    }
   }
 
-  return { allJobs, sourceHealth, errors };
+  return { allJobs, sourceHealth, errors, warnings };
 }

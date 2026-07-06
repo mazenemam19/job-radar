@@ -107,6 +107,30 @@ async function fetchWorkableUrl(url: string, slug: string): Promise<Response | n
   return null; // unreachable — loop always returns
 }
 
+/**
+ * Parses a job's detail-page response into a description, falling back to
+ * the list-call description when the detail fetch failed or its body
+ * wasn't the expected shape. `detailFailed` is what lets the caller tally
+ * dead/removed detail links into a warning instead of the failure just
+ * silently disappearing into the fallback.
+ */
+async function resolveJobDescription(
+  dr: Response | null,
+  fallbackDesc: string,
+): Promise<{ description: string; detailFailed: boolean }> {
+  if (!dr) return { description: fallbackDesc, detailFailed: false };
+  if (!dr.ok) return { description: fallbackDesc, detailFailed: true }; // non-2xx (404/410 etc.)
+  try {
+    const detail = (await dr.json()) as WorkableDetail;
+    return {
+      description: stripHtml(detail.full_description || detail.description || fallbackDesc),
+      detailFailed: false,
+    };
+  } catch {
+    return { description: fallbackDesc, detailFailed: true }; // 200 but unexpected body shape
+  }
+}
+
 export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
   const t0 = Date.now();
   if (isWorkableBlocked(c.slug))
@@ -161,31 +185,42 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
     // volume becomes a real budget concern, that's a separate, deliberate decision —
     // not a silent side effect of this filter.
     const jobs = rawJobs;
+    // A job's detail page can 404/410 between the list call and this fetch
+    // (delisted, stale shortcode) — that's routine board churn, not a fetch
+    // failure. `dr === null` (network error, timeout, or slug blocked
+    // mid-fanout) is deliberately NOT counted here: those already surface
+    // via fetchWorkableUrl's own logging / markWorkable429, and conflating
+    // them with dead-link churn would blur two different problems together.
+    let detailFailures = 0;
     const withDesc = await pLimit(
       jobs.map((r) => async () => {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
         const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
-        let desc = stripHtml(r.description || "");
-        if (dr && dr.ok) {
-          try {
-            const detail = (await dr.json()) as WorkableDetail;
-            desc = stripHtml(detail.full_description || detail.description || desc);
-          } catch {}
-        }
+        const { description, detailFailed } = await resolveJobDescription(
+          dr,
+          stripHtml(r.description || ""),
+        );
+        if (detailFailed) detailFailures += 1;
         return {
           id: `${mode}_workable_${c.slug}_${r.shortcode}`,
           title: r.title,
           location: r.city ?? c.city ?? c.country,
           url: r.url,
           postedAt: r.published_on,
-          description: desc,
+          description,
         };
       }),
       5,
     );
     const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
+    const warnings =
+      detailFailures > 0
+        ? [
+            `${detailFailures}/${jobs.length} job detail fetches failed (dead/removed links) — used list description as fallback`,
+          ]
+        : undefined;
 
-    return { jobs: processed, rawCount, durationMs: Date.now() - t0, ok: true };
+    return { jobs: processed, rawCount, warnings, durationMs: Date.now() - t0, ok: true };
   } catch (e) {
     return {
       jobs: [],

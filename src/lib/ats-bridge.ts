@@ -55,6 +55,8 @@ interface FetchResult {
   mode: JobMode;
   jobs: RawJob[];
   error: string | null;
+  /** Non-blocking issues from the fetcher (see FetcherResult.warnings). */
+  warnings?: string[];
 }
 
 /**
@@ -82,6 +84,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
     const result = await fetcher(config, mode);
     const rawJobs: Job[] = result.jobs;
     const fetchError: string | null = result.error ?? null;
+    const fetchWarnings = result.warnings;
 
     // Normalise and detect date_unknown (fallback date)
     const jobs: RawJob[] = rawJobs.map((j) => {
@@ -112,7 +115,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
       };
     });
 
-    return { company: row.name, mode, jobs, error: fetchError };
+    return { company: row.name, mode, jobs, error: fetchError, warnings: fetchWarnings };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     return { company: row.name, mode, jobs: [], error };

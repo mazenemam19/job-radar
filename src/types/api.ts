@@ -35,6 +35,11 @@ export interface FetcherResult {
   jobs: Job[];
   rawCount?: number;
   error?: string;
+  /** Non-blocking issues that didn't fail the fetch (e.g. a handful of dead
+   * per-job detail links on an otherwise-successful board). Distinct from
+   * `error`: an `error` means the fetch failed, `warnings` means it
+   * succeeded with a caveat worth surfacing. */
+  warnings?: string[];
   durationMs?: number;
   ok?: boolean; // CURRENT run success
   success?: number; // Lifetime success count

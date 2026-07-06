@@ -347,6 +347,17 @@ export interface CronRunResult {
   total_fetched: number;
   duration_ms: number;
   errors: string[];
+  /** Non-blocking issues (e.g. a few dead per-job detail links) — kept out
+   * of `errors` since they didn't fail anything. Persisted to
+   * cron_logs_v2.warnings — requires migration
+   * supabase/migrations/0001_cron_logs_v2_add_warnings.sql to be run by
+   * hand first (this repo has no migration runner). Until that migration
+   * runs, PostgREST rejects the insert in runner.ts with a "column
+   * cron_logs_v2.warnings does not exist" error — caught by the existing
+   * logError handling (see runner.ts), so the cron run itself still
+   * completes, but that run gets no cron_logs_v2 row at all until the
+   * migration is applied. Run the migration before/with this deploy. */
+  warnings: string[];
   source_health: Record<string, { fetched: number; errors: number; company: string }>;
   trigger: "github_actions" | "vercel_cron" | "manual";
   email_results?: EmailSendResult[];

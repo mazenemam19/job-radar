@@ -140,6 +140,7 @@ export type Database = {
           total_fetched: number | null;
           duration_ms: number | null;
           errors: string[] | null;
+          warnings: string[] | null;
           source_health: Json | null;
           trigger: string | null;
         };
@@ -149,6 +150,7 @@ export type Database = {
           total_fetched?: number | null;
           duration_ms?: number | null;
           errors?: string[] | null;
+          warnings?: string[] | null;
           source_health?: Json | null;
           trigger?: string | null;
         };
@@ -158,6 +160,7 @@ export type Database = {
           total_fetched?: number | null;
           duration_ms?: number | null;
           errors?: string[] | null;
+          warnings?: string[] | null;
           source_health?: Json | null;
           trigger?: string | null;
         };

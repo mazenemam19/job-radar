@@ -23,6 +23,12 @@ import { runCronJob } from "../lib/runner";
     } else {
       console.log("  Errors:         None");
     }
+    if (log.warnings.length) {
+      console.warn(`  Warnings (${log.warnings.length}):`);
+      log.warnings.forEach((w) => console.warn(`    ⚠ ${w}`));
+    } else {
+      console.log("  Warnings:       None");
+    }
     console.log("─────────────────────────────────────────────────────\n");
     process.exit(0);
   } catch (err) {
