@@ -12,8 +12,7 @@ export type ATSType =
   | "teamtailor"
   | "breezy"
   | "smartrecruiters"
-  | "bamboohr"
-  | "jazzhr";
+  | "bamboohr";
 
 export type JobMode = "local" | "global";
 

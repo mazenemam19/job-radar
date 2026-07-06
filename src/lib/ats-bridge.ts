@@ -16,7 +16,6 @@ import {
   fetchBreezy,
   fetchSmartRecruiters,
   fetchBambooHR,
-  fetchJazzHR,
 } from "@/lib/sources/ats-utils";
 
 import type { ATSCompanyRow, RawJob, JobMode } from "./types";
@@ -36,7 +35,6 @@ const FETCHERS: Record<ATSConfig["ats"], Fetcher> = {
   breezy: fetchBreezy,
   smartrecruiters: fetchSmartRecruiters,
   bamboohr: fetchBambooHR,
-  jazzhr: fetchJazzHR,
 };
 
 /** Convert a DB row + pipeline mode to the ATSConfig shape. */

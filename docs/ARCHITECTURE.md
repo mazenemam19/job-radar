@@ -66,7 +66,7 @@ flowchart TB
         tracker_entries
     end
 
-    ExternalATS["Greenhouse / Lever / Ashby / Workable /<br/>Teamtailor / Breezy / SmartRecruiters /<br/>BambooHR / JazzHR"]
+    ExternalATS["Greenhouse / Lever / Ashby / Workable /<br/>Teamtailor / Breezy / SmartRecruiters /<br/>BambooHR"]
     GeminiAPI["Gemini API (per-user key)"]
     SMTP["SMTP"]
 
@@ -343,8 +343,8 @@ survived the free stages:
 
 ## 7. ATS ingestion layer
 
-`src/lib/sources/ats-utils.ts` implements nine independent ATS fetchers — Greenhouse,
-Lever, Ashby, Workable, Teamtailor, Breezy, SmartRecruiters, BambooHR, JazzHR — each
+`src/lib/sources/ats-utils.ts` implements eight independent ATS fetchers — Greenhouse,
+Lever, Ashby, Workable, Teamtailor, Breezy, SmartRecruiters, BambooHR — each
 returning a normalized `Job[]`. Shared concerns handled in this file:
 
 - **Relative date parsing** (`parseRelativeDate`) and **country/timezone detection**
@@ -357,7 +357,7 @@ returning a normalized `Job[]`. Shared concerns handled in this file:
 - **Per-host lane pools** (`src/lib/sources/ats/http.ts`'s `queueByHost`,
   `HOST_LANE_COUNT` = 2; mirrored in `workable.ts`'s `queueWorkable`,
   `WORKABLE_LANE_COUNT` = 2): every ATS that serves all companies from one shared
-  host (Greenhouse, Lever, Ashby, SmartRecruiters, JazzHR, Breezy, Teamtailor,
+  host (Greenhouse, Lever, Ashby, SmartRecruiters, Breezy, Teamtailor,
   Workable) routes through `HOST_LANE_COUNT` independent staggered chains per host,
   not one fully-serial queue — a single serial chain scales wall-clock time linearly
   with total request count on that host across every company in the run, which is

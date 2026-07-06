@@ -40,7 +40,7 @@ Two pipelines, each independently toggleable per user in `/settings`:
 | 🌐 **Global** | Worldwide remote-friendly companies |
 
 Companies are sourced via Greenhouse, Lever, Ashby, Workable, Teamtailor,
-Breezy, SmartRecruiters, BambooHR, and JazzHR. New companies can be submitted
+Breezy, SmartRecruiters, and BambooHR. New companies can be submitted
 publicly at `/submit` and approved by an admin at `/admin/submissions`.
 
 ---

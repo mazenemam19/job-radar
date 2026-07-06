@@ -13,7 +13,6 @@ export const VALID_ATS: ATSType[] = [
   "breezy",
   "smartrecruiters",
   "bamboohr",
-  "jazzhr",
 ];
 
 export const VALID_STATUSES: TrackerStatus[] = [

@@ -16,8 +16,7 @@ export interface ATSConfig extends BaseCompany {
     | "teamtailor"
     | "breezy"
     | "smartrecruiters"
-    | "bamboohr"
-    | "jazzhr";
+    | "bamboohr";
   slug: string;
 }
 
@@ -140,15 +139,6 @@ export interface BambooDetail {
       description?: string;
     };
   };
-}
-
-export interface JazzJob {
-  id: string;
-  title: string;
-  location: string;
-  apply_url: string;
-  posted: string;
-  description: string;
 }
 
 // ── Internal Fetcher Types ───────────────────────────────────────────────

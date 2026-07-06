@@ -2,7 +2,7 @@
 // Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change.
 import { trackDomainRequest } from "./run-state";
 
-// Per-host lane pool. Greenhouse, Lever, Ashby, SmartRecruiters, JazzHR,
+// Per-host lane pool. Greenhouse, Lever, Ashby, SmartRecruiters,
 // Breezy, and Teamtailor each serve every company from a single shared host
 // (e.g. boards-api.greenhouse.io), but the runner's concurrency limit (8) has
 // no host awareness — 8 companies on the same ATS can fire simultaneously

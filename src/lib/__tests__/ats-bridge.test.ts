@@ -11,7 +11,6 @@ vi.mock("@/lib/sources/ats-utils", () => ({
   fetchBreezy: vi.fn(),
   fetchSmartRecruiters: vi.fn(),
   fetchBambooHR: vi.fn(),
-  fetchJazzHR: vi.fn(),
 }));
 
 import * as atsUtils from "@/lib/sources/ats-utils";
@@ -140,7 +139,6 @@ describe("fetchCompany", () => {
     ["breezy", atsUtils.fetchBreezy],
     ["smartrecruiters", atsUtils.fetchSmartRecruiters],
     ["bamboohr", atsUtils.fetchBambooHR],
-    ["jazzhr", atsUtils.fetchJazzHR],
   ] as const)("dispatches %s rows to the matching fetcher", async (ats, fetcherMock) => {
     (fetcherMock as ReturnType<typeof vi.fn>).mockResolvedValue({ jobs: [] });
 

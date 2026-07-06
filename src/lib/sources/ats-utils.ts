@@ -29,4 +29,3 @@ export { fetchTeamtailor } from "./ats/teamtailor";
 export { fetchBreezy } from "./ats/breezy";
 export { fetchSmartRecruiters } from "./ats/smart-recruiters";
 export { fetchBambooHR } from "./ats/bamboohr";
-export { fetchJazzHR } from "./ats/jazzhr";

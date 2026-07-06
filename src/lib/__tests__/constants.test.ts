@@ -4,8 +4,8 @@ import { VALID_ATS, VALID_STATUSES, COUNTRY_MAP, COUNTRY_FLAGS } from "../consta
 import type { ATSType, TrackerStatus } from "../types";
 
 describe("VALID_ATS", () => {
-  it("contains all 9 supported ATS types", () => {
-    expect(VALID_ATS).toHaveLength(9);
+  it("contains all 8 supported ATS types", () => {
+    expect(VALID_ATS).toHaveLength(8);
   });
 
   it.each([
@@ -17,7 +17,6 @@ describe("VALID_ATS", () => {
     "breezy",
     "smartrecruiters",
     "bamboohr",
-    "jazzhr",
   ])("includes %s as a valid ATS type", (ats) => {
     expect(VALID_ATS).toContain(ats as ATSType);
   });
@@ -32,16 +31,12 @@ describe("VALID_STATUSES", () => {
     expect(VALID_STATUSES).toHaveLength(6);
   });
 
-  it.each([
-    "applied",
-    "interviewing",
-    "offer",
-    "rejected",
-    "ghosted",
-    "saved",
-  ])("includes %s as a valid status", (status) => {
-    expect(VALID_STATUSES).toContain(status as TrackerStatus);
-  });
+  it.each(["applied", "interviewing", "offer", "rejected", "ghosted", "saved"])(
+    "includes %s as a valid status",
+    (status) => {
+      expect(VALID_STATUSES).toContain(status as TrackerStatus);
+    },
+  );
 });
 
 describe("COUNTRY_MAP", () => {

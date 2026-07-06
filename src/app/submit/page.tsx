@@ -31,7 +31,6 @@ const ATS_TYPES = [
     label: "BambooHR",
     slug_hint: 'Your BambooHR subdomain (e.g. "acme" from acme.bamboohr.com)',
   },
-  { value: "jazzhr", label: "JazzHR", slug_hint: "Your JazzHR company subdomain" },
 ];
 
 const LABEL_CLASS = "mb-1.5 block text-[13px] font-medium text-[#94a3b8]";
