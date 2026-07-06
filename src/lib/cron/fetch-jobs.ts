@@ -9,34 +9,29 @@ import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "../types";
 
 const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
 
-/** Simple concurrency limiter */
+/**
+ * Concurrency limiter using a fixed-size worker pool: `limit` workers each
+ * pull the next task off a shared index as soon as they're free, so at most
+ * `limit` tasks are ever in flight at once. Results are written back by
+ * original index, so the returned array preserves task order regardless of
+ * completion order.
+ */
 export async function withConcurrencyLimit<T>(
   tasks: Array<() => Promise<T>>,
   limit: number,
 ): Promise<T[]> {
-  const results: T[] = [];
-  const executing: Promise<void>[] = [];
+  const results: T[] = new Array(tasks.length);
+  let nextIndex = 0;
 
-  for (const task of tasks) {
-    const p: Promise<void> = task().then((r) => {
-      results.push(r);
-    });
-    executing.push(p);
-
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-      // Remove settled promises
-      for (let i = executing.length - 1; i >= 0; i--) {
-        const state = await Promise.race([
-          executing[i].then(() => "done").catch(() => "done"),
-          Promise.resolve("pending"),
-        ]);
-        if (state === "done") executing.splice(i, 1);
-      }
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const i = nextIndex++;
+      results[i] = await tasks[i]();
     }
   }
 
-  await Promise.allSettled(executing);
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+  await Promise.all(workers);
   return results;
 }
 

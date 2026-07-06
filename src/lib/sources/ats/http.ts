@@ -135,3 +135,37 @@ export async function safeFetch(
   }
   return null; // unreachable — loop always returns
 }
+
+/**
+ * Wraps safeFetch + JSON parsing behind one result type, so callers can't
+ * repeat the same three failure modes inconsistently: no response, a non-2xx
+ * status, and a 2xx status whose body still isn't JSON (a bot-challenge or
+ * WAF page served with HTTP 200 satisfies `res.ok` but crashes `res.json()`).
+ * Checking content-type before parsing catches that third case explicitly
+ * instead of it surfacing as an ambiguous parse-error further down.
+ */
+export async function safeFetchJson<T>(
+  url: string,
+  timeout?: number,
+  extraHeaders?: Record<string, string>,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const res = await safeFetch(url, timeout, extraHeaders);
+  if (!res) return { ok: false, error: "Network/Timeout" };
+  if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (!contentType.includes("application/json")) {
+    return {
+      ok: false,
+      error:
+        `Non-JSON response (content-type: "${contentType || "none"}") — ` +
+        `first 120 chars: ${text.slice(0, 120).replace(/\s+/g, " ")}`,
+    };
+  }
+  try {
+    return { ok: true, data: JSON.parse(text) as T };
+  } catch (e) {
+    return { ok: false, error: `Parse Error: ${e}` };
+  }
+}

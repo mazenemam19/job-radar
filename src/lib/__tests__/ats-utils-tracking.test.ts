@@ -54,7 +54,12 @@ describe("Teamtailor/Breezy domain_counts tracking", () => {
   it("tracks the breezy host via safeFetch instead of bypassing it", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] }),
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: async () => JSON.stringify([]),
+      }),
     );
 
     const { fetchBreezy, flushDomainCountsToDB } = await import("../sources/ats-utils");

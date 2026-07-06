@@ -69,6 +69,37 @@ describe("withConcurrencyLimit", () => {
     expect(settled).toBe(10);
     expect(results).toHaveLength(10);
   });
+
+  it("never runs more than `limit` tasks concurrently", async () => {
+    // Regression test: a prior version called every task() synchronously
+    // before the limit check could stop it, so peak concurrency tracked
+    // total task count instead of `limit`. This asserts the actual peak,
+    // not just that results eventually come back.
+    let current = 0;
+    let peak = 0;
+    const tasks = Array.from({ length: 266 }, () => async () => {
+      current++;
+      peak = Math.max(peak, current);
+      await new Promise((r) => setTimeout(r, 5));
+      current--;
+      return true;
+    });
+
+    const results = await withConcurrencyLimit(tasks, 8);
+    expect(peak).toBe(8);
+    expect(results).toHaveLength(266);
+  });
+
+  it("preserves result order regardless of completion order", async () => {
+    const delays = [30, 5, 20, 1, 15];
+    const tasks = delays.map((ms, i) => async () => {
+      await new Promise((r) => setTimeout(r, ms));
+      return i;
+    });
+
+    const results = await withConcurrencyLimit(tasks, 2);
+    expect(results).toEqual([0, 1, 2, 3, 4]);
+  });
 });
 
 describe("fetchAllCompanyJobs", () => {
