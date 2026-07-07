@@ -6,6 +6,43 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `fetch-jobs.ts`: `withConcurrencyLimit` called every task unconditionally
+  before checking the concurrency limit, so the limit only throttled how
+  fast the dispatch loop advanced, not how many tasks actually ran —
+  measured 217 of 266 companies dispatching concurrently against a
+  requested cap of 8 in the 2026-07-05 production log. This is the root
+  cause of a cluster of generic `Network/Timeout` errors previously
+  suspected to be local network flakiness. Rewritten as a worker-pool
+  (`limit` workers pulling from a shared task index); a same-day re-run
+  confirmed peak concurrency dropped to exactly 8 and `Network/Timeout`
+  errors dropped from 19 to 1. See
+  `docs/solutions/bugs/issue-52-429-404-followup-part3.md`.
+- ATS fetchers trusted `res.ok` to mean "this body is JSON," which a
+  200-status WAF/bot-challenge page defeats, producing a misleading
+  `Parse Error: SyntaxError` instead of the real cause (confirmed repro:
+  Artefactual Systems Inc. on Breezy). Added `safeFetchJson()` (`http.ts`)
+  checking status, then `content-type`, then parsing; migrated `breezy.ts`.
+  The remaining 7 fetchers (ashby, bamboohr, greenhouse, lever,
+  smart-recruiters, teamtailor, and `workable.ts`'s list-call) are still on
+  the old pattern — a live instance of the same bug class was caught on
+  Teamtailor (Yodo1) during validation of this fix, see the doc above for
+  the updated rollout order.
+- JazzHR removed entirely (fetcher, `ATSType` union member, submit-form
+  option, and all references) — confirmed dead. Two companies (TED,
+  Roadpass Digital) were being dispatched twice, once under their real ATS
+  (success) and once under a dead `jazzhr` duplicate row (timeout); a third
+  duplicate row (Humi Inc) was found via DB check before deleting anything.
+  All three duplicate rows removed from `ats_companies`. Separately, 13
+  companies confirmed permanently 404ing on their real ATS host (9
+  Greenhouse, 3 Lever, 1 Ashby — not all Workable, as first assumed) were
+  paused (`is_active = false`).
+- `fetchWorkable`: a job's detail page can 404 between the list call and
+  the detail fetch (delisted, stale shortcode) and was silently falling
+  back to the list description with no visibility. `FetcherResult` gained
+  an optional `warnings` field (distinct from `error`) — the company still
+  reports success, with a `"N/M job detail fetches failed (dead/removed
+links)"` note surfaced separately in `cron_logs_v2` (new `warnings
+text[]` column) and the `cron:log` console summary.
 - `run-state.ts` / `workable.ts`: `markWorkable429` only ever protected
   _future_ runs — it fed a set that gets flushed to the DB after the fetch
   phase already finished, so a slug that 429'd had zero cooldown for the
