@@ -15,6 +15,39 @@ export const VALID_ATS: ATSType[] = [
   "bamboohr",
 ];
 
+/**
+ * Options for the ATS-type <select> on the public submit form: value, display
+ * label, and the slug-format hint shown once that ATS is picked. Extracted
+ * from src/app/submit/page.tsx (react-component-architecture: constants
+ * always move out of component files, regardless of reuse count).
+ */
+export const ATS_TYPES: { value: ATSType; label: string; slug_hint: string }[] = [
+  {
+    value: "greenhouse",
+    label: "Greenhouse",
+    slug_hint: 'Your Greenhouse board token (e.g. "acmecorp")',
+  },
+  { value: "lever", label: "Lever", slug_hint: 'Your Lever company slug (e.g. "acme")' },
+  { value: "ashby", label: "Ashby", slug_hint: "Your Ashby organisation slug" },
+  {
+    value: "workable",
+    label: "Workable",
+    slug_hint: 'Your Workable subdomain (e.g. "acme" from acme.workable.com)',
+  },
+  { value: "teamtailor", label: "Teamtailor", slug_hint: "Your Teamtailor company slug" },
+  { value: "breezy", label: "Breezy HR", slug_hint: "Your Breezy company slug" },
+  {
+    value: "smartrecruiters",
+    label: "SmartRecruiters",
+    slug_hint: "Your SmartRecruiters company ID",
+  },
+  {
+    value: "bamboohr",
+    label: "BambooHR",
+    slug_hint: 'Your BambooHR subdomain (e.g. "acme" from acme.bamboohr.com)',
+  },
+];
+
 export const VALID_STATUSES: TrackerStatus[] = [
   "applied",
   "interviewing",

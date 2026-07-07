@@ -17,7 +17,12 @@ const baseCompany: ATSConfig = {
 };
 
 function mockListResponse(jobs: unknown[]) {
-  return { status: 200, ok: true, headers: new Headers(), json: async () => ({ jobs }) };
+  return {
+    status: 200,
+    ok: true,
+    headers: new Headers({ "content-type": "application/json" }),
+    text: async () => JSON.stringify({ jobs }),
+  };
 }
 
 const ADVANCE_MS = 40_000;

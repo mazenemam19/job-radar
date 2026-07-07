@@ -352,6 +352,25 @@ returning a normalized `Job[]`. Shared concerns handled in this file:
 - **HTML stripping** (`stripHtml`) and a bounded **`safeFetch`** (45s per-attempt
   timeout, 90s total-wall-clock ceiling across every attempt/backoff combined — see
   below) for resilience against slow/unresponsive ATS endpoints.
+- **JSON-safety** (`src/lib/sources/ats/http.ts`'s `safeFetchJson` / `parseJsonBody`):
+  a 200-status WAF/bot-challenge page satisfies `res.ok` but crashes a bare
+  `res.json()` call, surfacing as a misleading generic parse error. `parseJsonBody`
+  checks status, then `content-type`, then parses, returning one consistent result
+  type instead of each fetcher repeating (and drifting on) the same three failure
+  modes; `safeFetchJson` wraps `safeFetch` + `parseJsonBody` for the common case,
+  and `workable.ts` calls `parseJsonBody` directly on the `Response` its own queued
+  fetch already produced. All 8 fetchers use one or the other for their list-call.
+  Two fetchers' per-job detail-fetch fan-out (`workable.ts`, `bamboohr.ts`) are left
+  on their own inline `res.ok`/`try-catch` handling by design — a bad detail
+  response there already degrades gracefully (falls back to the list description)
+  rather than crashing, so it isn't the failure mode this pattern targets.
+  `teamtailor.ts` additionally guards the parsed body's shape explicitly
+  (`Array.isArray` on the expected `data` field): JSON-safety alone doesn't catch a
+  200 response whose body is valid JSON but missing the expected field, which is
+  what actually crashed on a live board (Yodo1) — see
+  `docs/solutions/bugs/issue-52-429-404-followup-part3.md`. The same shape-trust
+  gap exists in `greenhouse.ts`, `lever.ts`, and `smart-recruiters.ts` with no live
+  evidence of it firing there; noted in each file rather than speculatively fixed.
 - **Concurrency limiting** (`pLimit`) for fan-out within a single ATS call, separate from
   the cross-company limiter in `runner.ts`.
 - **Per-host lane pools** (`src/lib/sources/ats/http.ts`'s `queueByHost`,

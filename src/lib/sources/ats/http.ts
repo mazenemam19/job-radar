@@ -137,19 +137,21 @@ export async function safeFetch(
 }
 
 /**
- * Wraps safeFetch + JSON parsing behind one result type, so callers can't
- * repeat the same three failure modes inconsistently: no response, a non-2xx
- * status, and a 2xx status whose body still isn't JSON (a bot-challenge or
- * WAF page served with HTTP 200 satisfies `res.ok` but crashes `res.json()`).
- * Checking content-type before parsing catches that third case explicitly
- * instead of it surfacing as an ambiguous parse-error further down.
+ * Turns a Response (or null, for a failed fetch) into one result type, so
+ * callers can't repeat the same three failure modes inconsistently: no
+ * response, a non-2xx status, and a 2xx status whose body still isn't JSON
+ * (a bot-challenge or WAF page served with HTTP 200 satisfies `res.ok` but
+ * crashes `res.json()`). Checking content-type before parsing catches that
+ * third case explicitly instead of it surfacing as an ambiguous parse-error
+ * further down.
+ *
+ * Split out from safeFetchJson so callers with their own queued/retried
+ * fetch (e.g. workable.ts's fetchWorkableUrl) can reuse this parsing step
+ * on a Response they already have, instead of duplicating it.
  */
-export async function safeFetchJson<T>(
-  url: string,
-  timeout?: number,
-  extraHeaders?: Record<string, string>,
+export async function parseJsonBody<T>(
+  res: Response | null,
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  const res = await safeFetch(url, timeout, extraHeaders);
   if (!res) return { ok: false, error: "Network/Timeout" };
   if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
 
@@ -168,4 +170,14 @@ export async function safeFetchJson<T>(
   } catch (e) {
     return { ok: false, error: `Parse Error: ${e}` };
   }
+}
+
+/** safeFetch + parseJsonBody in one call, for callers with no queueing of their own. */
+export async function safeFetchJson<T>(
+  url: string,
+  timeout?: number,
+  extraHeaders?: Record<string, string>,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const res = await safeFetch(url, timeout, extraHeaders);
+  return parseJsonBody<T>(res);
 }

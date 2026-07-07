@@ -214,18 +214,15 @@ naming so they don't recur:
 
 ## Remaining / open work — priority order for next session
 
-1. **`safeFetchJson` rollout, teamtailor first.** Yodo1's live TypeError
-   above is concrete proof this isn't hypothetical for this fetcher.
-   Migrate `teamtailor.ts`, verify against Yodo1's real board, then do
-   `workable.ts`'s list-call (note: only the list call — the detail-fetch
-   path already has its own graceful-fallback handling from `362bdd8` and
-   doesn't need this), then the remaining five (ashby, bamboohr, greenhouse,
-   lever, smart-recruiters) one at a time against a live company each, per
-   the original plan. Don't blanket find/replace.
-2. **`ATS_TYPES` array in `submit/page.tsx`** — pre-existing
-   react-component-architecture violation (inline constants array), flagged
-   but correctly not bundled into the JazzHR removal PR. ~10 minute fix:
-   extract to `constants/ats.ts` or equivalent.
+1. ~~**`safeFetchJson` rollout, teamtailor first.**~~ **Done** — see
+   `issue-52-429-404-followup-part4.md`. All 7 remaining fetchers migrated;
+   `teamtailor.ts` additionally got an explicit shape guard (Yodo1's actual
+   failure was valid JSON with no `data` array, which `safeFetchJson` alone
+   doesn't catch). Live per-company verification against `pnpm cron:log`
+   still needs to happen in a real environment — not done from this
+   session's sandbox, see part 4 for why.
+2. ~~**`ATS_TYPES` array in `submit/page.tsx`**~~ **Done** — extracted to
+   `src/lib/constants.ts`, see `issue-52-429-404-followup-part4.md`.
 3. **Admin dashboard cron-summary card** — doesn't display `errors` or
    `warnings` today (confirmed: `select("run_at, total_fetched, duration_ms,
 trigger")` in `src/app/(protected)/admin/page.tsx`). Explicitly deferred
@@ -240,6 +237,14 @@ trigger")` in `src/app/(protected)/admin/page.tsx`). Explicitly deferred
 7. **Commit hygiene** — see the two process gaps above. No code change
    needed, just a habit: verify file lists and counts against `git show
 --stat` before writing the message that describes them.
+8. **New from part 4**: no shape guard was added to `greenhouse.ts`,
+   `lever.ts`, or `smart-recruiters.ts`, which have the same latent
+   shape-trust gap teamtailor had — no live evidence of it firing for these
+   three, so flagged in-code rather than fixed. Also new:
+   `smart-recruiters.ts`'s per-job detail-fetch loop silently drops a job
+   entirely on a bad detail response (returns `null`, filtered out) rather
+   than falling back to a list-level description like `workable.ts`/
+   `bamboohr.ts` do — pre-existing, real, out of scope for part 4.
 
 ## Files touched or referenced this session
 

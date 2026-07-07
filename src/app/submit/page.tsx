@@ -5,33 +5,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-const ATS_TYPES = [
-  {
-    value: "greenhouse",
-    label: "Greenhouse",
-    slug_hint: 'Your Greenhouse board token (e.g. "acmecorp")',
-  },
-  { value: "lever", label: "Lever", slug_hint: 'Your Lever company slug (e.g. "acme")' },
-  { value: "ashby", label: "Ashby", slug_hint: "Your Ashby organisation slug" },
-  {
-    value: "workable",
-    label: "Workable",
-    slug_hint: 'Your Workable subdomain (e.g. "acme" from acme.workable.com)',
-  },
-  { value: "teamtailor", label: "Teamtailor", slug_hint: "Your Teamtailor company slug" },
-  { value: "breezy", label: "Breezy HR", slug_hint: "Your Breezy company slug" },
-  {
-    value: "smartrecruiters",
-    label: "SmartRecruiters",
-    slug_hint: "Your SmartRecruiters company ID",
-  },
-  {
-    value: "bamboohr",
-    label: "BambooHR",
-    slug_hint: 'Your BambooHR subdomain (e.g. "acme" from acme.bamboohr.com)',
-  },
-];
+import { ATS_TYPES } from "@/lib/constants";
 
 const LABEL_CLASS = "mb-1.5 block text-[13px] font-medium text-[#94a3b8]";
 const INPUT_CLASS =
