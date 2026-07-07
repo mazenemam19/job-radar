@@ -20,8 +20,8 @@ function mockListResponse(jobs: unknown[] = []) {
   return {
     status: 200,
     ok: true,
-    headers: new Headers(),
-    json: async () => ({ jobs }),
+    headers: new Headers({ "content-type": "application/json" }),
+    text: async () => JSON.stringify({ jobs }),
   };
 }
 

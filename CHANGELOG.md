@@ -22,11 +22,27 @@ All notable changes to this project are documented in this file.
   `Parse Error: SyntaxError` instead of the real cause (confirmed repro:
   Artefactual Systems Inc. on Breezy). Added `safeFetchJson()` (`http.ts`)
   checking status, then `content-type`, then parsing; migrated `breezy.ts`.
-  The remaining 7 fetchers (ashby, bamboohr, greenhouse, lever,
-  smart-recruiters, teamtailor, and `workable.ts`'s list-call) are still on
-  the old pattern — a live instance of the same bug class was caught on
-  Teamtailor (Yodo1) during validation of this fix, see the doc above for
-  the updated rollout order.
+  Rollout now complete: `teamtailor.ts`, `ashby.ts`, `greenhouse.ts`,
+  `lever.ts`, `smart-recruiters.ts`, `bamboohr.ts` migrated in full, and
+  `workable.ts`'s list-call (its per-job detail-fetch path is untouched on
+  purpose — see below). `http.ts`'s `safeFetchJson` was split into
+  `parseJsonBody` (takes a `Response | null` directly) + a thin
+  `safeFetch`-calling wrapper, so `workable.ts` — which queues/retries its
+  own fetches — can reuse the parsing half without duplicating it.
+  `teamtailor.ts` additionally gained an explicit `Array.isArray` guard on
+  the parsed body's `data` field: `safeFetchJson` only confirms the body
+  parsed as JSON, not that it matches the expected shape, and Yodo1's board
+  returned valid JSON with no `data` array, crashing the old `data.length`
+  on `undefined` — a live instance of this caught during validation, see
+  `docs/solutions/bugs/issue-52-429-404-followup-part4.md`. No equivalent
+  guard was added to `greenhouse.ts`, `lever.ts`, or `smart-recruiters.ts`,
+  which have the same latent shape-trust issue with no fallback — flagged
+  in-code, not fixed, with no live evidence of it firing for those three.
+  `smart-recruiters.ts`'s per-job detail-fetch loop (left on the old
+  pattern, same carve-out as `workable.ts`'s) has a separate pre-existing
+  issue: a bad detail response returns `null` and the job is silently
+  dropped rather than falling back to a list-level description — also
+  flagged, not fixed, out of scope for this rollout.
 - JazzHR removed entirely (fetcher, `ATSType` union member, submit-form
   option, and all references) — confirmed dead. Two companies (TED,
   Roadpass Digital) were being dispatched twice, once under their real ATS
@@ -56,6 +72,13 @@ text[]` column) and the `cron:log` console summary.
   the detail-page fanout checks the block before each request instead of
   only once before the list call. See
   `docs/solutions/bugs/issue-52-504-recurrence-part4.md`.
+
+- `src/app/submit/page.tsx`: `ATS_TYPES` (the ATS-type `<select>`'s options —
+  value, label, slug-hint) was defined inline in the component, a
+  pre-existing violation of this repo's react-component-architecture
+  convention (constants always move out of component files). Extracted to
+  `src/lib/constants.ts`, next to the existing `VALID_ATS`. No behavior
+  change. See `docs/solutions/bugs/issue-52-429-404-followup-part4.md`.
 
 - `runner.ts`: zero logging existed for any step between the upsert phase and
   the end of the function — `app_config` update, `flushWorkable429sToDB`,

@@ -2,7 +2,7 @@
 import type { ATSConfig, ATSRawInput, FetcherResult, WorkableJob, WorkableDetail } from "@/types";
 import type { JobMode } from "@/lib/types";
 import { processJobs, stripHtml, pLimit } from "./job-processing";
-import { parseRetryAfterMs } from "./http";
+import { parseRetryAfterMs, parseJsonBody } from "./http";
 import {
   trackDomainRequest,
   isWorkableBlocked,
@@ -157,77 +157,68 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
   const res = await fetchWorkableUrl(listUrl, c.slug);
+  const parsed = await parseJsonBody<{ jobs?: WorkableJob[] }>(res);
 
-  if (!res)
+  if (!parsed.ok)
     return {
       jobs: [],
       rawCount: 0,
-      error: "Network/Timeout",
+      error: parsed.error,
       durationMs: Date.now() - t0,
       ok: false,
     };
-  if (!res.ok)
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `HTTP ${res.status}`,
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  try {
-    const data = (await res.json()) as { jobs?: WorkableJob[] };
-    const rawJobs = data.jobs || [];
-    const rawCount = rawJobs.length;
-    // NOTE: title pre-filtering was removed — all jobs now flow through
-    // to the per-user scoring pipeline where filtering actually belongs.
-    // Removed for the same reason as processJobs — role filtering is the
-    // user's call via /settings now, not a hardcoded gate. If Workable detail-fetch
-    // volume becomes a real budget concern, that's a separate, deliberate decision —
-    // not a silent side effect of this filter.
-    const jobs = rawJobs;
-    // A job's detail page can 404/410 between the list call and this fetch
-    // (delisted, stale shortcode) — that's routine board churn, not a fetch
-    // failure. `dr === null` (network error, timeout, or slug blocked
-    // mid-fanout) is deliberately NOT counted here: those already surface
-    // via fetchWorkableUrl's own logging / markWorkable429, and conflating
-    // them with dead-link churn would blur two different problems together.
-    let detailFailures = 0;
-    const withDesc = await pLimit(
-      jobs.map((r) => async () => {
-        const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-        const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
-        const { description, detailFailed } = await resolveJobDescription(
-          dr,
-          stripHtml(r.description || ""),
-        );
-        if (detailFailed) detailFailures += 1;
-        return {
-          id: `${mode}_workable_${c.slug}_${r.shortcode}`,
-          title: r.title,
-          location: r.city ?? c.city ?? c.country,
-          url: r.url,
-          postedAt: r.published_on,
-          description,
-        };
-      }),
-      5,
-    );
-    const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
-    const warnings =
-      detailFailures > 0
-        ? [
-            `${detailFailures}/${jobs.length} job detail fetches failed (dead/removed links) — used list description as fallback`,
-          ]
-        : undefined;
 
-    return { jobs: processed, rawCount, warnings, durationMs: Date.now() - t0, ok: true };
-  } catch (e) {
-    return {
-      jobs: [],
-      rawCount: 0,
-      error: `Parse Error: ${e}`,
-      durationMs: Date.now() - t0,
-      ok: false,
-    };
-  }
+  const rawJobs = parsed.data.jobs || [];
+  const rawCount = rawJobs.length;
+  // NOTE: title pre-filtering was removed — all jobs now flow through
+  // to the per-user scoring pipeline where filtering actually belongs.
+  // Removed for the same reason as processJobs — role filtering is the
+  // user's call via /settings now, not a hardcoded gate. If Workable detail-fetch
+  // volume becomes a real budget concern, that's a separate, deliberate decision —
+  // not a silent side effect of this filter.
+  const jobs = rawJobs;
+  // A job's detail page can 404/410 between the list call and this fetch
+  // (delisted, stale shortcode) — that's routine board churn, not a fetch
+  // failure. `dr === null` (network error, timeout, or slug blocked
+  // mid-fanout) is deliberately NOT counted here: those already surface
+  // via fetchWorkableUrl's own logging / markWorkable429, and conflating
+  // them with dead-link churn would blur two different problems together.
+  //
+  // The detail-fetch path below stays on its own inline .json()/try-catch
+  // (resolveJobDescription) rather than parseJsonBody, on purpose: it
+  // already degrades gracefully (falls back to the list description,
+  // counted as a warning, from 362bdd8) on any bad response, so it isn't
+  // the crash class this migration targets, and parseJsonBody's stricter
+  // content-type check would turn today's "fallback to list description"
+  // outcome into an identical outcome by a longer path for no gain.
+  let detailFailures = 0;
+  const withDesc = await pLimit(
+    jobs.map((r) => async () => {
+      const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
+      const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
+      const { description, detailFailed } = await resolveJobDescription(
+        dr,
+        stripHtml(r.description || ""),
+      );
+      if (detailFailed) detailFailures += 1;
+      return {
+        id: `${mode}_workable_${c.slug}_${r.shortcode}`,
+        title: r.title,
+        location: r.city ?? c.city ?? c.country,
+        url: r.url,
+        postedAt: r.published_on,
+        description,
+      };
+    }),
+    5,
+  );
+  const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
+  const warnings =
+    detailFailures > 0
+      ? [
+          `${detailFailures}/${jobs.length} job detail fetches failed (dead/removed links) — used list description as fallback`,
+        ]
+      : undefined;
+
+  return { jobs: processed, rawCount, warnings, durationMs: Date.now() - t0, ok: true };
 }
