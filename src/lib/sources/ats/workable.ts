@@ -112,14 +112,27 @@ async function fetchWorkableUrl(url: string, slug: string): Promise<Response | n
  * the list-call description when the detail fetch failed or its body
  * wasn't the expected shape. `detailFailed` is what lets the caller tally
  * dead/removed detail links into a warning instead of the failure just
- * silently disappearing into the fallback.
+ * silently disappearing into the fallback. `failureReason` splits that
+ * tally further: fetchWorkableUrl returns the final 429 Response itself
+ * (not null) once retries exhaust, which used to get bucketed identically
+ * to a genuine dead/removed link (404/410) — a rate-limit casualty isn't
+ * the same signal as a stale board link, so callers need to tell them apart.
  */
 async function resolveJobDescription(
   dr: Response | null,
   fallbackDesc: string,
-): Promise<{ description: string; detailFailed: boolean }> {
+): Promise<{
+  description: string;
+  detailFailed: boolean;
+  failureReason?: "rate-limited" | "dead-link";
+}> {
   if (!dr) return { description: fallbackDesc, detailFailed: false };
-  if (!dr.ok) return { description: fallbackDesc, detailFailed: true }; // non-2xx (404/410 etc.)
+  if (!dr.ok)
+    return {
+      description: fallbackDesc,
+      detailFailed: true,
+      failureReason: dr.status === 429 ? "rate-limited" : "dead-link",
+    };
   try {
     const detail = (await dr.json()) as WorkableDetail;
     return {
@@ -127,8 +140,23 @@ async function resolveJobDescription(
       detailFailed: false,
     };
   } catch {
-    return { description: fallbackDesc, detailFailed: true }; // 200 but unexpected body shape
+    return { description: fallbackDesc, detailFailed: true, failureReason: "dead-link" }; // 200 but unexpected body shape
   }
+}
+
+/**
+ * Builds the "N/M job detail fetches failed" warning, distinguishing a
+ * genuine dead/removed link (404/410, real board churn) from a 429 that
+ * exhausted retries (recovers on its own once the slug's cooldown clears) —
+ * see resolveJobDescription for where that distinction comes from.
+ */
+function detailFailureWarning(failures: number, rateLimited: number, totalJobs: number): string {
+  const prefix = `${failures}/${totalJobs} job detail fetches failed`;
+  const suffix = "— used list description as fallback";
+  if (rateLimited === failures)
+    return `${prefix} (rate-limited — 429 after retries exhausted) ${suffix}`;
+  if (rateLimited === 0) return `${prefix} (dead/removed links) ${suffix}`;
+  return `${prefix} (${rateLimited} rate-limited, ${failures - rateLimited} dead/removed links) ${suffix}`;
 }
 
 export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
@@ -192,15 +220,19 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
   // content-type check would turn today's "fallback to list description"
   // outcome into an identical outcome by a longer path for no gain.
   let detailFailures = 0;
+  let rateLimitedFailures = 0;
   const withDesc = await pLimit(
     jobs.map((r) => async () => {
       const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
       const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
-      const { description, detailFailed } = await resolveJobDescription(
+      const { description, detailFailed, failureReason } = await resolveJobDescription(
         dr,
         stripHtml(r.description || ""),
       );
-      if (detailFailed) detailFailures += 1;
+      if (detailFailed) {
+        detailFailures += 1;
+        if (failureReason === "rate-limited") rateLimitedFailures += 1;
+      }
       return {
         id: `${mode}_workable_${c.slug}_${r.shortcode}`,
         title: r.title,
@@ -215,9 +247,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
   const processed = processJobs(withDesc.filter(Boolean) as ATSRawInput[], c, mode);
   const warnings =
     detailFailures > 0
-      ? [
-          `${detailFailures}/${jobs.length} job detail fetches failed (dead/removed links) — used list description as fallback`,
-        ]
+      ? [detailFailureWarning(detailFailures, rateLimitedFailures, jobs.length)]
       : undefined;
 
   return { jobs: processed, rawCount, warnings, durationMs: Date.now() - t0, ok: true };

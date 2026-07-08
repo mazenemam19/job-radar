@@ -170,9 +170,23 @@ const workable429SlugsThisRun = new Set<string>();
 export function getWorkable429SlugsThisRun(): string[] {
   return Array.from(workable429SlugsThisRun);
 }
+// Jittered instead of a flat 864e5 (24h): a batch of slugs 429'd together in
+// the same run used to get the exact same expiry, so they all came OFF
+// cooldown together too, ~24h later — walking straight back into the same
+// thundering herd that blocked them in the first place. Each slug now gets
+// its own random point in [20h, 28h), so a blocked batch unblocks staggered
+// across ~8 real hours instead of one narrow window. See
+// docs/solutions/bugs/issue-52-504-recurrence-part5.md.
+const WORKABLE_COOLDOWN_MIN_MS = 20 * 3600e3;
+const WORKABLE_COOLDOWN_MAX_MS = 28 * 3600e3;
+
 export function markWorkableSlugsBlocked24h(slugs: string[]): void {
-  const until = new Date(Date.now() + 864e5);
-  for (const slug of slugs) setWorkableBlocked(slug, until);
+  for (const slug of slugs) {
+    const jitterMs =
+      WORKABLE_COOLDOWN_MIN_MS +
+      Math.random() * (WORKABLE_COOLDOWN_MAX_MS - WORKABLE_COOLDOWN_MIN_MS);
+    setWorkableBlocked(slug, new Date(Date.now() + jitterMs));
+  }
 }
 
 export function markWorkable429(slug: string): void {

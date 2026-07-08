@@ -6,6 +6,25 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `markWorkableSlugsBlocked24h()` (`run-state.ts`) computed one flat cooldown
+  expiry and applied it to every slug in a blocked batch, so a group that got
+  429'd together also came off cooldown together, ~24h later — walking
+  straight back into the same thundering herd that blocked them. A live
+  storm (2026-07-08 00:04) blocked 33 slugs together and, per the retest 95
+  minutes later, was on track to repeat the cycle on the same ~90-minute
+  window the next day. Now jitters each slug's expiry independently in
+  `[20h, 28h)`. Same storm run also skipped 39 non-Workable companies
+  ("time budget exceeded") because Workable dispatch shared one global
+  8-slot concurrency pool (`fetch-jobs.ts`) with every other ATS type — a
+  Workable company can hold a slot for up to 90s while only ever making
+  progress through 2 internal lanes, so a released batch could occupy 5+ of
+  the 8 shared slots and starve dispatch for everyone else. Workable now
+  gets its own pool capped at its lane count, run alongside the other-ATS
+  pool via `Promise.all` instead of sharing one. Secondary: `workable.ts`'s
+  "job detail fetches failed" warning now distinguishes a 429 that exhausted
+  retries from a genuine dead/removed link, previously bucketed identically.
+  See `docs/solutions/bugs/issue-52-504-recurrence-part5.md`.
+
 - `fetch-jobs.ts`: `withConcurrencyLimit` called every task unconditionally
   before checking the concurrency limit, so the limit only throttled how
   fast the dispatch loop advanced, not how many tasks actually ran —

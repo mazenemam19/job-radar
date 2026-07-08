@@ -28,3 +28,41 @@ describe("Workable cooldown — same-run protection", () => {
     expect(isWorkableBlocked("other-co")).toBe(false);
   });
 });
+
+describe("markWorkableSlugsBlocked24h — jittered expiry", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  // Regression test for issue-52-504-recurrence-part5: this used to compute
+  // ONE `until` timestamp and apply it to every slug in the batch, so a
+  // group blocked together always came off cooldown together too, walking
+  // straight back into the same thundering herd ~24h later. Each slug must
+  // now land at its own point in [20h, 28h) instead of sharing one instant.
+  it("gives each slug in the same batch a different expiry within [20h, 28h)", async () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    vi.setSystemTime(start);
+
+    const randomSpy = vi.spyOn(Math, "random");
+    randomSpy.mockReturnValueOnce(0); // slug-min -> exactly 20h
+    randomSpy.mockReturnValueOnce(1); // slug-max -> exactly 28h
+
+    const { markWorkableSlugsBlocked24h, isWorkableBlocked } =
+      await import("../sources/ats/run-state");
+    markWorkableSlugsBlocked24h(["slug-min", "slug-max"]);
+
+    // Just past the 20h mark: the min-jitter slug's cooldown has expired,
+    // but the max-jitter slug (28h) from the exact same batch call is still
+    // blocked — proof the two didn't get the same flat expiry.
+    vi.setSystemTime(start + 20 * 3600e3 + 1);
+    expect(isWorkableBlocked("slug-min")).toBe(false);
+    expect(isWorkableBlocked("slug-max")).toBe(true);
+
+    // And the max-jitter slug does clear once its own (28h) window passes.
+    vi.setSystemTime(start + 28 * 3600e3 + 1);
+    expect(isWorkableBlocked("slug-max")).toBe(false);
+  });
+});

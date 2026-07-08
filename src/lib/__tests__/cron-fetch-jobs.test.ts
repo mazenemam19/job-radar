@@ -7,6 +7,7 @@ vi.mock("../ats-bridge", () => ({
 
 import { fetchCompany } from "../ats-bridge";
 import { withConcurrencyLimit, fetchAllCompanyJobs } from "../cron/fetch-jobs";
+import { WORKABLE_LANE_COUNT } from "../sources/ats/workable";
 import type { ATSCompanyRow, RawJob } from "../types";
 
 function makeCompanyRow(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
@@ -243,5 +244,79 @@ describe("fetchAllCompanyJobs — time budget", () => {
 
     expect(fetchCompany).toHaveBeenCalledTimes(2);
     expect(result.errors).toHaveLength(0);
+  });
+});
+
+describe("fetchAllCompanyJobs — Workable gets its own concurrency pool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Regression test for issue-52-504-recurrence-part5: a batch of Workable
+  // companies dispatching at once used to share the same global 8-slot pool
+  // as every other ATS type, so a pileup of slow/stuck Workable fetches
+  // could crowd out dispatch for unrelated companies until the fetch-phase
+  // deadline passed. Workable must now be capped at its own lane-sized pool,
+  // leaving the other pool's slots untouched.
+  it("does not let a stalled batch of Workable fetches reduce dispatch for other ATS types", async () => {
+    let workableCallCount = 0;
+    let otherCallCount = 0;
+    const releaseWorkable: Array<() => void> = [];
+
+    vi.mocked(fetchCompany).mockImplementation((row, mode) => {
+      if (row.ats === "workable") {
+        workableCallCount++;
+        // Never resolves on its own — simulates a Workable fetch stuck deep
+        // in its own lane/backoff loop. If these ever share a pool with the
+        // other ATS types, they'll eat slots those other fetches need.
+        return new Promise((resolve) => {
+          releaseWorkable.push(() => resolve({ company: row.name, mode, jobs: [], error: null }));
+        });
+      }
+      otherCallCount++;
+      return Promise.resolve({ company: row.name, mode, jobs: [], error: null });
+    });
+
+    // More Workable companies than WORKABLE_LANE_COUNT, and more other-ATS
+    // companies than would fit in the shared 8-slot pool if Workable were
+    // hogging most of it — this only stays green if the pools are separate.
+    const companies = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        makeCompanyRow({
+          id: `w${i}`,
+          name: `Workable ${i}`,
+          ats: "workable",
+          pipeline_global: true,
+        }),
+      ),
+      ...Array.from({ length: 10 }, (_, i) =>
+        makeCompanyRow({
+          id: `g${i}`,
+          name: `Greenhouse ${i}`,
+          ats: "greenhouse",
+          pipeline_global: true,
+        }),
+      ),
+    ];
+
+    const deadline = Date.now() + 60_000;
+    const pending = fetchAllCompanyJobs(companies, deadline);
+
+    // Let dispatch actually happen without waiting on the stuck Workable
+    // promises, which never resolve on their own.
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(workableCallCount).toBe(WORKABLE_LANE_COUNT); // capped at its own pool size
+    expect(otherCallCount).toBe(10); // every other-ATS task dispatched and finished regardless
+
+    // Drain the Workable pool wave-by-wave: releasing the current batch lets
+    // its workers pick up the next task, which pushes a fresh unresolved
+    // promise onto releaseWorkable — so a single one-shot release wouldn't
+    // reach every wave.
+    while (releaseWorkable.length > 0) {
+      releaseWorkable.splice(0, releaseWorkable.length).forEach((release) => release());
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    await pending;
   });
 });

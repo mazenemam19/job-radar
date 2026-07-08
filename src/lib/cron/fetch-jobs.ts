@@ -5,9 +5,21 @@
 // keep runCronJob's own complexity down.
 
 import { fetchCompany } from "../ats-bridge";
+import { WORKABLE_LANE_COUNT } from "../sources/ats/workable";
 import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "../types";
 
-const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches
+const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches, non-Workable
+// Workable dispatch gets its own budget instead of sharing CONCURRENCY_LIMIT
+// with every other ATS type. A single Workable company task can occupy a
+// slot for up to WORKABLE_MAX_TOTAL_FETCH_MS (90s) while only ever making
+// progress through WORKABLE_LANE_COUNT internal lanes — so a batch of
+// Workable companies dispatching together (e.g. right after a cooldown
+// expires) could previously occupy 5+ of the 8 shared slots for extended
+// periods, starving dispatch for unrelated ATS types until the fetch-phase
+// deadline passed. Capping Workable's own pool at its lane count means it
+// can never hold more global slots than it can actually make use of at
+// once. See docs/solutions/bugs/issue-52-504-recurrence-part5.md.
+const WORKABLE_CONCURRENCY_LIMIT = WORKABLE_LANE_COUNT;
 
 /**
  * Concurrency limiter using a fixed-size worker pool: `limit` workers each
@@ -96,14 +108,23 @@ export async function fetchAllCompanyJobs(
   companies: ATSCompanyRow[],
   deadline: number,
 ): Promise<FetchAllCompanyJobsResult> {
-  const tasks: Array<() => Promise<FetchTaskResult>> = [];
+  const workableTasks: Array<() => Promise<FetchTaskResult>> = [];
+  const otherTasks: Array<() => Promise<FetchTaskResult>> = [];
 
   for (const row of companies) {
-    if (row.pipeline_local) tasks.push(makeFetchTask(row, "local", deadline));
-    if (row.pipeline_global) tasks.push(makeFetchTask(row, "global", deadline));
+    const bucket = row.ats === "workable" ? workableTasks : otherTasks;
+    if (row.pipeline_local) bucket.push(makeFetchTask(row, "local", deadline));
+    if (row.pipeline_global) bucket.push(makeFetchTask(row, "global", deadline));
   }
 
-  const fetchResults = await withConcurrencyLimit(tasks, CONCURRENCY_LIMIT);
+  // Two independent pools, not one shared one: Workable's own pool is capped
+  // at its internal lane count so it can never crowd out dispatch slots
+  // meant for other ATS types (see WORKABLE_CONCURRENCY_LIMIT above).
+  const [workableResults, otherResults] = await Promise.all([
+    withConcurrencyLimit(workableTasks, WORKABLE_CONCURRENCY_LIMIT),
+    withConcurrencyLimit(otherTasks, CONCURRENCY_LIMIT),
+  ]);
+  const fetchResults = [...workableResults, ...otherResults];
 
   const allJobs: RawJob[] = [];
   const sourceHealth: CronRunResult["source_health"] = {};

@@ -179,4 +179,39 @@ describe("Workable fetcher rate-limit handling", () => {
     expect(calls).toBe(2);
     expect(result.ok).toBe(true);
   });
+
+  // Regression test for the secondary finding in
+  // issue-52-504-recurrence-part5: resolveJobDescription used to treat any
+  // non-2xx detail response identically, so a 429 that exhausted retries
+  // read as "dead/removed link" in the warning message — indistinguishable
+  // from a real 404/410. The two now get split out.
+  it("distinguishes a rate-limited detail fetch (429 exhausted) from a genuine dead link (404) in the warning", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (!url.includes("/jobs/")) {
+          return Promise.resolve(
+            mockListResponse([
+              { shortcode: "dead-job", title: "Dead Job", description: "" },
+              { shortcode: "throttled-job", title: "Throttled Job", description: "" },
+            ]),
+          );
+        }
+        if (url.includes("dead-job")) {
+          return Promise.resolve({ status: 404, ok: false, headers: new Headers() });
+        }
+        // throttled-job always 429s — exhausts retries, same as the live incident.
+        return Promise.resolve({ status: 429, ok: false, headers: new Headers() });
+      }),
+    );
+
+    const { fetchWorkable } = await import("../sources/ats/workable");
+    const pending = fetchWorkable({ ...baseCompany, slug: "mixed-failures-co" }, "local");
+    await vi.advanceTimersByTimeAsync(300_000); // past every retry/backoff/ceiling
+    const result = await pending;
+
+    expect(result.warnings).toEqual([
+      "2/2 job detail fetches failed (1 rate-limited, 1 dead/removed links) — used list description as fallback",
+    ]);
+  });
 });
