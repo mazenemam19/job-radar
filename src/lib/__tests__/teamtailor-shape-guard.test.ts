@@ -33,15 +33,79 @@ describe("fetchTeamtailor — response-shape guard", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns a clean error instead of crashing when valid JSON has no `data` array", async () => {
+  it("returns a clean error instead of crashing when valid JSON has neither `data` nor `items`", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockJsonResponse({ meta: { ok: true } })));
 
     const { fetchTeamtailor } = await import("../sources/ats/teamtailor");
     const result = await fetchTeamtailor(baseCompany, "global");
 
     expect(result.ok).toBe(false);
-    expect(result.error).toBe("Unexpected response shape: missing `data` array");
+    expect(result.error).toBe("Unexpected response shape: missing `data` or `items` array");
     expect(result.jobs).toEqual([]);
+  });
+
+  it("processes JSON Feed's `items[]` shape (confirmed live: Full Fabric)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        mockJsonResponse({
+          version: "https://jsonfeed.org/version/1.1",
+          title: "Full Fabric Jobs",
+          items: [
+            {
+              id: "42",
+              url: "https://fullfabricspoonsixlimited.teamtailor.com/jobs/42",
+              title: "Technical Product Marketing Manager",
+              content_html: "<p>desc</p>",
+              date_published: "2026-06-01T00:00:00Z",
+              _jobposting: {
+                jobLocation: { address: { addressLocality: "London", addressCountry: "UK" } },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const { fetchTeamtailor } = await import("../sources/ats/teamtailor");
+    const result = await fetchTeamtailor(
+      { ...baseCompany, name: "Full Fabric", slug: "fullfabricspoonsixlimited" },
+      "global",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.rawCount).toBe(1);
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].title).toBe("Technical Product Marketing Manager");
+    expect(result.jobs[0].location).toBe("London, UK");
+  });
+
+  it("falls back to the company's configured city/country when a feed item has no jobLocation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        mockJsonResponse({
+          items: [
+            {
+              id: "1",
+              url: "https://example.teamtailor.com/jobs/1",
+              title: "Engineer",
+              content_html: "<p>desc</p>",
+              date_published: "2026-06-01T00:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const { fetchTeamtailor } = await import("../sources/ats/teamtailor");
+    const result = await fetchTeamtailor(
+      { ...baseCompany, city: "Remote", country: "US" },
+      "global",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.jobs[0].location).toBe("Remote");
   });
 
   it("still processes jobs normally when `data` is a proper array", async () => {

@@ -6,6 +6,20 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- Teamtailor's public `jobs.json` now serves JSON Feed
+  (`Content-Type: application/feed+json`) for at least some companies
+  (confirmed: Full Fabric), which the shared `parseJsonBody()` content-type
+  gate rejected outright — `"application/feed+json"` doesn't contain the
+  substring `"application/json"` the check looked for, so a valid,
+  parseable job listing got discarded as "Non-JSON response." Gate now
+  accepts any `+json` structured-syntax suffix (RFC 6839), and
+  `teamtailor.ts` gained a parsing branch for the JSON Feed `items[]` shape
+  alongside the legacy `data[]` shape. Full Fabric's board is alive and
+  correctly configured — this was purely a parser bug, not a dead board.
+  Yodo1 (the only other `ats=teamtailor` company) is being moved off the
+  ATS pipeline separately and isn't blocked on this fix. See
+  `docs/solutions/bugs/issue-52-teamtailor-feed-json.md`.
+
 - `markWorkableSlugsBlocked24h()` (`run-state.ts`) computed one flat cooldown
   expiry and applied it to every slug in a blocked batch, so a group that got
   429'd together also came off cooldown together, ~24h later — walking

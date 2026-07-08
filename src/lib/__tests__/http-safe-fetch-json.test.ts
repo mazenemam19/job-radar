@@ -30,6 +30,26 @@ describe("safeFetchJson", () => {
     if (result.ok) expect(result.data).toEqual([{ id: "1" }]);
   });
 
+  it("parses a body served with a +json structured-syntax suffix content-type (e.g. Teamtailor's JSON Feed)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/feed+json; charset=utf-8" }),
+        text: async () => JSON.stringify({ items: [{ id: "1" }] }),
+      }),
+    );
+
+    const { safeFetchJson } = await import("../sources/ats/http");
+    const result = await safeFetchJson<{ items: Array<{ id: string }> }>(
+      "https://example.com/jobs.json",
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.items).toEqual([{ id: "1" }]);
+  });
+
   it("fails with the response body's content-type on a 200 HTML/WAF challenge page", async () => {
     vi.stubGlobal(
       "fetch",

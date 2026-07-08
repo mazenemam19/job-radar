@@ -101,6 +101,31 @@ export interface TeamtailorJob {
   };
 }
 
+/**
+ * Teamtailor's public jobs.json now serves JSON Feed (jsonfeed.org) format
+ * for at least some companies (confirmed: Full Fabric), replacing the
+ * `{ data: TeamtailorJob[] }` JSON:API-style shape above. `_jobposting` is
+ * a non-standard JSON Feed extension carrying a schema.org JobPosting-style
+ * location.
+ */
+export interface TeamtailorFeedItem {
+  id: string;
+  url: string;
+  title?: string;
+  content_html?: string;
+  date_published?: string;
+  _jobposting?: {
+    jobLocation?:
+      | string
+      | {
+          address?: {
+            addressLocality?: string | null;
+            addressCountry?: string | null;
+          };
+        };
+  };
+}
+
 export interface BreezyJob {
   id: string;
   name: string;

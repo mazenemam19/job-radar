@@ -157,7 +157,14 @@ export async function parseJsonBody<T>(
 
   const contentType = res.headers.get("content-type") ?? "";
   const text = await res.text();
-  if (!contentType.includes("application/json")) {
+  // Match the base type exactly, or any "+json" structured syntax suffix
+  // (RFC 6839) — e.g. Teamtailor's public jobs.json now serves
+  // "application/feed+json" for JSON Feed (jsonfeed.org) responses, which
+  // `.includes("application/json")` used to reject outright even though
+  // the body parses as valid JSON.
+  const mimeType = contentType.split(";")[0].trim().toLowerCase();
+  const isJson = mimeType === "application/json" || mimeType.endsWith("+json");
+  if (!isJson) {
     return {
       ok: false,
       error:
