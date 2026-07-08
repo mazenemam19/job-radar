@@ -35,10 +35,16 @@ const STAGES: Stage[] = [
     color: "#a78bfa",
   },
   {
-    key: "after_gemini",
+    key: "after_gemini_filter",
     label: "Your Gemini filter",
-    filterLabel: "Final matches passing your personal AI filter prompt",
+    filterLabel: "Jobs passing your personal AI filter prompt",
     color: "#c4b5fd",
+  },
+  {
+    key: "after_scoring",
+    label: "Scoring",
+    filterLabel: "Final matches after scoring (jobs scoring 0 are dropped)",
+    color: "#e9d5ff",
   },
 ];
 

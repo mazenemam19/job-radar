@@ -236,7 +236,10 @@ export interface PipelineLog {
   total_fetched: number;
   after_date_filter: number;
   after_settings_filter: number;
-  after_gemini: number;
+  /** Jobs that passed the Gemini gate, before scoring/merge. */
+  after_gemini_filter: number;
+  /** Final jobs shown on the dashboard, after scoring (total_score > 0) and merge. */
+  after_scoring: number;
   cached_at: string;
 }
 

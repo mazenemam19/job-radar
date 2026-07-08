@@ -49,8 +49,8 @@ export default function DashboardClient() {
             </span>
             {pipelineLog && (
               <span className="ml-2 text-slate-600">
-                · {pipelineLog.total_fetched} fetched → {pipelineLog.after_gemini} after your Gemini
-                filter
+                · {pipelineLog.total_fetched} fetched → {pipelineLog.after_gemini_filter} after your
+                Gemini filter
               </span>
             )}
           </div>

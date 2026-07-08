@@ -108,7 +108,8 @@ describe("buildFeed", () => {
 
     expect(finalJobs).toEqual([]);
     expect(pipelineLog.total_fetched).toBe(0);
-    expect(pipelineLog.after_gemini).toBe(0);
+    expect(pipelineLog.after_gemini_filter).toBe(0);
+    expect(pipelineLog.after_scoring).toBe(0);
   });
 
   it("skips Gemini and marks jobs not-reviewed when no API key is given", async () => {
@@ -149,7 +150,7 @@ describe("buildFeed", () => {
     const { pipelineLog } = await buildFeed([oldJob], makeSettings({ job_age_days: 30 }), null);
 
     expect(pipelineLog.after_date_filter).toBe(0);
-    expect(pipelineLog.after_gemini).toBe(0);
+    expect(pipelineLog.after_scoring).toBe(0);
   });
 
   it("excludes jobs whose titles contain an excluded keyword", async () => {
@@ -178,7 +179,8 @@ describe("buildFeed", () => {
     expect(pipelineLog.total_fetched).toBe(1);
     expect(pipelineLog.after_date_filter).toBe(1);
     expect(pipelineLog.after_settings_filter).toBe(1);
-    expect(pipelineLog.after_gemini).toBe(finalJobs.length);
+    expect(pipelineLog.after_gemini_filter).toBe(1);
+    expect(pipelineLog.after_scoring).toBe(finalJobs.length);
   });
 
   it("drops jobs with total_score ≤ 0 from the final feed", async () => {
@@ -208,10 +210,16 @@ describe("buildFeed", () => {
       },
     ]);
 
-    const { finalJobs } = await buildFeed([staleZeroSkillJob], settingsWideAge, "key");
+    const { finalJobs, pipelineLog } = await buildFeed([staleZeroSkillJob], settingsWideAge, "key");
 
     // Both skill_match_score and recency_score are 0 → total_score = 0 → dropped
     expect(finalJobs).toHaveLength(0);
+    // The job DID pass Gemini -- it's the scoring stage that drops it. If these
+    // two numbers were still the same field (the old `after_gemini` bug), this
+    // job's rejection would get silently attributed to "failed your Gemini
+    // filter" when it never did.
+    expect(pipelineLog.after_gemini_filter).toBe(1);
+    expect(pipelineLog.after_scoring).toBe(0);
   });
 
   it("keeps a recent job with zero skill match (non-zero recency keeps total_score > 0)", async () => {

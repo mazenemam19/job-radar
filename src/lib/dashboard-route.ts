@@ -74,7 +74,8 @@ export async function buildFeed(
     total_fetched: totalFetched,
     after_date_filter: afterDateFilter.length,
     after_settings_filter: afterSettingsFilter.length,
-    after_gemini: finalJobs.length,
+    after_gemini_filter: geminiFiltered.length,
+    after_scoring: finalJobs.length,
     cached_at: new Date().toISOString(),
   };
 
