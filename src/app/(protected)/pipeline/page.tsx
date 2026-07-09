@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import FunnelView from "@/components/pipeline/FunnelView";
+import JobTraceSearch from "@/components/pipeline/JobTraceSearch";
 import type { PipelineLog } from "@/lib/types";
 
 export default function PipelinePage() {
@@ -19,5 +20,12 @@ export default function PipelinePage() {
     })();
   }, []);
 
-  return <FunnelView log={log} loading={loading} />;
+  return (
+    <>
+      <FunnelView log={log} loading={loading} />
+      <div className="px-8 pb-8">
+        <JobTraceSearch />
+      </div>
+    </>
+  );
 }

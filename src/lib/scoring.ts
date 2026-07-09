@@ -48,13 +48,31 @@ export function getMatchedLevels(job: RawJob, settings: ResolvedSettings): Senio
 }
 
 /**
+ * Explain variant of the seniority gate: same pass/fail logic as
+ * passesSeniorityGate, plus a human-readable reason on failure for the
+ * pipeline breakdown / job-trace search. Reason is null on pass — nothing
+ * downstream renders a reason for jobs that survived a gate.
+ */
+export function explainSeniorityGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
+  const matched = getMatchedLevels(job, settings);
+  if (matched.length === 0) return { pass: true, reason: null }; // unlabelled — unchanged behavior
+  const pass = matched.some((l) => settings.seniority_levels.includes(l));
+  if (pass) return { pass: true, reason: null };
+  return {
+    pass: false,
+    reason: `matched seniority level(s) [${matched.join(", ")}], none enabled [${settings.seniority_levels.join(", ")}]`,
+  };
+}
+
+/**
  * Gate logic: pass if any matched level is in the user's selected levels.
  * Unlabelled jobs (no level matches) always pass — unchanged behavior.
  */
 export function passesSeniorityGate(job: RawJob, settings: ResolvedSettings): boolean {
-  const matched = getMatchedLevels(job, settings);
-  if (matched.length === 0) return true; // unlabelled — unchanged behavior
-  return matched.some((l) => settings.seniority_levels.includes(l));
+  return explainSeniorityGate(job, settings).pass;
 }
 
 /**
@@ -202,57 +220,125 @@ export function hasRelocationSupport(job: RawJob): boolean {
 
 // ── Settings gate & Pre-filters ──────────────────────────────
 
-/** Word-boundary test: does any word in `words` appear as a whole word in `text`? */
-function matchesAnyWholeWord(text: string, words: string[]): boolean {
-  return words.some((word) => {
+/**
+ * Word-boundary search: returns the first word from `words` that appears as
+ * a whole word in `text`, or null if none match. matchesAnyWholeWord below
+ * is a thin boolean wrapper over this — one source of truth for the regex.
+ */
+function findMatchingWholeWord(text: string, words: string[]): string | null {
+  for (const word of words) {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
     const regex = new RegExp(`\\b${escaped}\\b`, "i");
-    return regex.test(text);
-  });
+    if (regex.test(text)) return word;
+  }
+  return null;
+}
+
+/** Word-boundary test: does any word in `words` appear as a whole word in `text`? */
+function matchesAnyWholeWord(text: string, words: string[]): boolean {
+  return findMatchingWholeWord(text, words) !== null;
+}
+
+/**
+ * Explain variant of the excluded-keywords gate: reports which excluded
+ * keyword matched the title on failure. Reason is null on pass.
+ */
+export function explainExcludedKeywordsGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
+  if (!settings.excluded_keywords || settings.excluded_keywords.length === 0) {
+    return { pass: true, reason: null };
+  }
+  const matched = findMatchingWholeWord(job.title.toLowerCase(), settings.excluded_keywords);
+  if (!matched) return { pass: true, reason: null };
+  return { pass: false, reason: `title matched excluded keyword "${matched}"` };
 }
 
 /** Gate 2: job title must not contain any excluded keyword. */
 export function passesExcludedKeywordsGate(job: RawJob, settings: ResolvedSettings): boolean {
-  if (!settings.excluded_keywords || settings.excluded_keywords.length === 0) {
-    return true;
-  }
-  return !matchesAnyWholeWord(job.title.toLowerCase(), settings.excluded_keywords);
+  return explainExcludedKeywordsGate(job, settings).pass;
 }
 
-/** Gate 3: title+description+location must meaningfully match required (or fallback expert) keywords. */
-export function passesRequiredKeywordsGate(job: RawJob, settings: ResolvedSettings): boolean {
+/**
+ * Explain variant of the required-keywords gate. On failure, none of the
+ * configured (or fallback expert_skills) keywords meaningfully matched, so
+ * the reason lists the full set that was checked against — there's no
+ * single "missing" term the way there is for excluded/blacklist, since
+ * failure here means zero of them cleared the bar.
+ */
+export function explainRequiredKeywordsGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
   const techKeywords =
     settings.required_keywords && settings.required_keywords.length > 0
       ? settings.required_keywords
       : settings.expert_skills;
 
   if (!techKeywords || techKeywords.length === 0) {
-    return true;
+    return { pass: true, reason: null };
   }
 
   const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
-  return hasMeaningfulKeywordMatch(textCombined, techKeywords);
+  const pass = hasMeaningfulKeywordMatch(textCombined, techKeywords);
+  if (pass) return { pass: true, reason: null };
+  return {
+    pass: false,
+    reason: `none of your required keywords matched: ${techKeywords.join(", ")}`,
+  };
+}
+
+/** Gate 3: title+description+location must meaningfully match required (or fallback expert) keywords. */
+export function passesRequiredKeywordsGate(job: RawJob, settings: ResolvedSettings): boolean {
+  return explainRequiredKeywordsGate(job, settings).pass;
+}
+
+/**
+ * Explain variant of the blacklisted-locations gate: reports which
+ * blacklisted term matched on failure. Reason is null on pass.
+ */
+export function explainBlacklistedLocationsGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
+  if (!settings.blacklisted_locations || settings.blacklisted_locations.length === 0) {
+    return { pass: true, reason: null };
+  }
+  const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
+  const matched = settings.blacklisted_locations.find(
+    (word) =>
+      matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase()),
+  );
+  if (!matched) return { pass: true, reason: null };
+  return { pass: false, reason: `matched blacklisted location/term "${matched}"` };
 }
 
 /** Gate 4: title+description+location must not contain a blacklisted location. */
 export function passesBlacklistedLocationsGate(job: RawJob, settings: ResolvedSettings): boolean {
-  if (!settings.blacklisted_locations || settings.blacklisted_locations.length === 0) {
-    return true;
-  }
-  const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
-  const hasBlacklisted = settings.blacklisted_locations.some(
-    (word) =>
-      matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase()),
-  );
-  return !hasBlacklisted;
+  return explainBlacklistedLocationsGate(job, settings).pass;
+}
+
+/**
+ * Explain variant of the skill-match floor: reason is a flat statement on
+ * failure (no single "matched term" concept — failure means nothing in
+ * expert_skills or secondary_skills cleared the boilerplate-aware bar).
+ */
+export function explainSkillMatchGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
+  const pass = hasMeaningfulKeywordMatch(job.description, [
+    ...settings.expert_skills,
+    ...settings.secondary_skills,
+  ]);
+  if (pass) return { pass: true, reason: null };
+  return { pass: false, reason: "no expert or secondary skill found in the job description" };
 }
 
 /** Gate 5: job description must meaningfully match the user's expert or secondary skills. */
 export function passesSkillMatchGate(job: RawJob, settings: ResolvedSettings): boolean {
-  return hasMeaningfulKeywordMatch(job.description, [
-    ...settings.expert_skills,
-    ...settings.secondary_skills,
-  ]);
+  return explainSkillMatchGate(job, settings).pass;
 }
 
 /**
@@ -272,41 +358,72 @@ export function passesSettingsGate(job: RawJob, settings: ResolvedSettings): boo
 // ── Global mode gate ────────────────────────────────────────
 
 /**
- * Evaluates whether a job passes the user's global mode timezone/region filter.
+ * Explain variant of the global-mode gate: reports whether an allowed
+ * location short-circuited the check, or which blocked region caused a
+ * failure. Reason is null whenever the gate passes.
  */
-export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): boolean {
+export function explainGlobalModeGate(
+  job: RawJob,
+  settings: ResolvedSettings,
+): { pass: boolean; reason: string | null } {
   const text = `${job.title} ${job.description} ${job.location}`.toLowerCase();
 
   if (settings.global_mode_allowed_locations?.length) {
     const isAllowed = settings.global_mode_allowed_locations.some((loc) =>
       text.includes(loc.toLowerCase()),
     );
-    if (isAllowed) return true;
+    if (isAllowed) return { pass: true, reason: null };
   }
 
   if (settings.global_mode_blocked_regions?.length) {
-    const isBlocked = settings.global_mode_blocked_regions.some((region) => {
+    const blockedMatch = settings.global_mode_blocked_regions.find((region) => {
       const escaped = region.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
       const regex = new RegExp(`\\b${escaped}\\b`, "i");
       return regex.test(text);
     });
-    if (isBlocked) return false;
+    if (blockedMatch) {
+      return { pass: false, reason: `matched blocked region "${blockedMatch}"` };
+    }
   }
 
-  return true;
+  return { pass: true, reason: null };
+}
+
+/**
+ * Evaluates whether a job passes the user's global mode timezone/region filter.
+ */
+export function passesGlobalModeGate(job: RawJob, settings: ResolvedSettings): boolean {
+  return explainGlobalModeGate(job, settings).pass;
 }
 
 // ── Date gate ────────────────────────────────────────────────
 
 /**
+ * Explain variant of the date gate: reports the job's age and the
+ * configured limit on failure. Reason is null on pass.
+ */
+export function explainDateGate(
+  job: RawJob,
+  maxAgeDays: number,
+): { pass: boolean; reason: string | null } {
+  const dateStr = job.date_unknown ? job.fetched_at : job.posted_at;
+  const ms = Date.parse(dateStr);
+  if (Number.isNaN(ms)) {
+    return { pass: false, reason: "posted/fetched date could not be parsed" };
+  }
+  const ageDays = (Date.now() - ms) / 86_400_000;
+  if (ageDays <= maxAgeDays) return { pass: true, reason: null };
+  return {
+    pass: false,
+    reason: `job is ${Math.round(ageDays)}d old, your limit is ${maxAgeDays}d`,
+  };
+}
+
+/**
  * Returns true if the job is within the configured age window.
  */
 export function passesDateGate(job: RawJob, maxAgeDays: number): boolean {
-  const dateStr = job.date_unknown ? job.fetched_at : job.posted_at;
-  const ms = Date.parse(dateStr);
-  if (Number.isNaN(ms)) return false;
-  const ageDays = (Date.now() - ms) / 86_400_000;
-  return ageDays <= maxAgeDays;
+  return explainDateGate(job, maxAgeDays).pass;
 }
 
 // ── Main scoring function ────────────────────────────────────

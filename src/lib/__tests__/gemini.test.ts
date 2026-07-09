@@ -3,7 +3,11 @@
 // jobs by positional index, not by echoing the job ID.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { filterJobsWithGemini, generateApplicationStrategy } from "../gemini";
+import {
+  filterJobsWithGemini,
+  filterJobsWithGeminiVerbose,
+  generateApplicationStrategy,
+} from "../gemini";
 import type { RawJob } from "../types";
 
 const { generateContentMock } = vi.hoisted(() => ({ generateContentMock: vi.fn() }));
@@ -163,6 +167,72 @@ describe("filterJobsWithGemini — index-based matching", () => {
     expect(result[0].gemini_pass).toBe(true);
     expect(result[0].gemini_reason).toBeNull();
     expect(result[0].gemini_reviewed).toBe(false);
+  });
+});
+
+describe("filterJobsWithGeminiVerbose — same batch calls, keeps failures", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    generateContentMock.mockReset();
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it("returns every job, tagged pass or fail, instead of dropping failures", async () => {
+    const jobs = [
+      makeJob({ id: "visa_gh_acme_1", title: "Frontend Engineer" }),
+      makeJob({ id: "visa_lever_globex_2", title: "Sales Manager" }),
+    ];
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify([
+        { idx: 0, pass: true, reason: "Strong React match" },
+        { idx: 1, pass: false, reason: "Not an engineering role" },
+      ]),
+    });
+
+    const result = await filterJobsWithGeminiVerbose("key", jobs, settings);
+
+    expect(result).toHaveLength(2);
+    const passing = result.find((r) => r.id === "visa_gh_acme_1");
+    const failing = result.find((r) => r.id === "visa_lever_globex_2");
+    expect(passing).toEqual({
+      id: "visa_gh_acme_1",
+      pass: true,
+      reason: "Strong React match",
+      reviewed: true,
+      quotaExhausted: false,
+    });
+    expect(failing).toEqual({
+      id: "visa_lever_globex_2",
+      pass: false,
+      reason: "Not an engineering role",
+      reviewed: true,
+      quotaExhausted: false,
+    });
+  });
+
+  it("only calls the model once per batch — same call count as filterJobsWithGemini", async () => {
+    const jobs = [makeJob({ id: "a" }), makeJob({ id: "b" })];
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify([
+        { idx: 0, pass: true, reason: "ok" },
+        { idx: 1, pass: false, reason: "no" },
+      ]),
+    });
+
+    await filterJobsWithGeminiVerbose("key", jobs, settings);
+
+    expect(generateContentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an empty array without calling the model when apiKey or jobs is empty", async () => {
+    expect(await filterJobsWithGeminiVerbose("", [makeJob()], settings)).toEqual([]);
+    expect(await filterJobsWithGeminiVerbose("key", [], settings)).toEqual([]);
+    expect(generateContentMock).not.toHaveBeenCalled();
   });
 });
 

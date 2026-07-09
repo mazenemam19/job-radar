@@ -232,14 +232,90 @@ export interface UserProfile {
 
 // ── Pipeline Log (stored in user_jobs_cache.pipeline_log) ───
 
-export interface PipelineLog {
-  total_fetched: number;
-  after_date_filter: number;
-  after_settings_filter: number;
-  /** Jobs that passed the Gemini gate, before scoring/merge. */
-  after_gemini_filter: number;
-  /** Final jobs shown on the dashboard, after scoring (total_score > 0) and merge. */
-  after_scoring: number;
+/** Max jobs kept per gate/section in the stored breakdown — bounded so the
+ *  cached payload (returned on every /api/dashboard load, not just /pipeline)
+ *  stays cheap regardless of how skewed one gate's drop rate is. The exact
+ *  count is never capped, only the itemized sample; the job-trace search
+ *  exists precisely so a job outside the top N is still findable. */
+export const MAX_PIPELINE_SAMPLE = 50;
+
+export interface DroppedJobEntry {
+  id: string;
+  title: string;
+  company: string;
+  /** Why this specific job was dropped at this gate. Null only appears in
+   *  practice for entries that are never null by construction (kept nullable
+   *  for shape-symmetry with GateOutcome, not because a real drop lacks one). */
+  reason: string | null;
+}
+
+export interface WrongModeEntry {
+  id: string;
+  title: string;
+  company: string;
+  mode: JobMode;
+}
+
+export interface OutsideWindowEntry {
+  id: string;
+  title: string;
+  company: string;
+  fetched_at: string;
+}
+
+export interface GateBreakdown {
+  /** True count of jobs dropped at this gate — never capped. */
+  count: number;
+  /** Up to MAX_PIPELINE_SAMPLE jobs, most-recently-fetched first. */
+  sample: DroppedJobEntry[];
+}
+
+/** The 9 real pipeline gates, in production order. */
+export interface GateBreakdowns {
+  date: GateBreakdown;
+  seniority: GateBreakdown;
+  excluded_keywords: GateBreakdown;
+  required_keywords: GateBreakdown;
+  blacklisted_locations: GateBreakdown;
+  skill_match: GateBreakdown;
+  global_mode: GateBreakdown;
+  gemini: GateBreakdown;
+  scoring: GateBreakdown;
+}
+
+/** buildFeed's own responsibility: the gate-by-gate breakdown of the
+ *  candidate pool it was handed, plus the final survivor count. Doesn't
+ *  know about ingestion-level losses — those happen before buildFeed ever
+ *  runs and require DB queries buildFeed (pure, no Supabase client) can't make. */
+export interface GateLog {
+  /** Size of the candidate pool buildFeed actually received (post mode-filter, post 2000-cap). */
+  candidate_window: number;
+  /** Final jobs shown on the dashboard, after every gate + scoring + merge. */
+  on_dashboard: number;
+  gates: GateBreakdowns;
+}
+
+/** route.ts's responsibility: losses that happen before a job ever enters
+ *  the candidate pool, so no gate ever sees them. Sequential, not parallel —
+ *  outside_candidate_window can only ever remove jobs that already passed
+ *  the mode filter, so its count can never exceed wrong_pipeline_mode's pool. */
+export interface IngestionLog {
+  /** Every raw_jobs row, any mode — the true top of the funnel. */
+  total_scraped: number;
+  /** raw_jobs rows matching the user's enabled pipeline(s), before the 2000-row cap. */
+  matched_pipelines: number;
+  wrong_pipeline_mode: {
+    count: number;
+    enabled_pipelines: string[];
+    sample: WrongModeEntry[];
+  };
+  outside_candidate_window: {
+    count: number;
+    sample: OutsideWindowEntry[];
+  };
+}
+
+export interface PipelineLog extends GateLog, IngestionLog {
   cached_at: string;
 }
 

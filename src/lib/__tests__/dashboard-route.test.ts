@@ -8,11 +8,11 @@ import type { RawJob, ResolvedSettings } from "../types";
 
 // ── Mock Gemini (network call) ─────────────────────────────────
 vi.mock("../gemini", () => ({
-  filterJobsWithGemini: vi.fn(),
+  filterJobsWithGeminiVerbose: vi.fn(),
 }));
 
-import { filterJobsWithGemini } from "../gemini";
-const mockGemini = filterJobsWithGemini as ReturnType<typeof vi.fn>;
+import { filterJobsWithGeminiVerbose } from "../gemini";
+const mockGemini = filterJobsWithGeminiVerbose as ReturnType<typeof vi.fn>;
 
 import { buildFeed, enabledModes } from "../dashboard-route";
 
@@ -70,6 +70,11 @@ function makeSettings(overrides: Partial<ResolvedSettings> = {}): ResolvedSettin
   } as ResolvedSettings;
 }
 
+/** A passing verbose Gemini decision for the given job(s). */
+function passingDecision(job: RawJob) {
+  return { id: job.id, pass: true, reason: null, reviewed: true, quotaExhausted: false };
+}
+
 // ── enabledModes ──────────────────────────────────────────────
 
 describe("enabledModes", () => {
@@ -104,12 +109,13 @@ describe("buildFeed", () => {
 
   it("returns an empty feed when no raw jobs are provided", async () => {
     mockGemini.mockResolvedValue([]);
-    const { finalJobs, pipelineLog } = await buildFeed([], settings, "key-abc");
+    const { finalJobs, gateLog } = await buildFeed([], settings, "key-abc");
 
     expect(finalJobs).toEqual([]);
-    expect(pipelineLog.total_fetched).toBe(0);
-    expect(pipelineLog.after_gemini_filter).toBe(0);
-    expect(pipelineLog.after_scoring).toBe(0);
+    expect(gateLog.candidate_window).toBe(0);
+    expect(gateLog.on_dashboard).toBe(0);
+    expect(gateLog.gates.gemini.count).toBe(0);
+    expect(gateLog.gates.scoring.count).toBe(0);
   });
 
   it("skips Gemini and marks jobs not-reviewed when no API key is given", async () => {
@@ -123,18 +129,9 @@ describe("buildFeed", () => {
     expect(finalJobs[0].gemini_reviewed).toBe(false);
   });
 
-  it("calls Gemini when an API key is supplied", async () => {
+  it("calls the verbose Gemini variant when an API key is supplied", async () => {
     const job = makeJob({ title: "Senior React Engineer" });
-    // Gemini marks the job as passing
-    mockGemini.mockResolvedValue([
-      {
-        ...job,
-        gemini_pass: true,
-        gemini_reason: null,
-        gemini_reviewed: true,
-        gemini_quota_exhausted: false,
-      },
-    ]);
+    mockGemini.mockResolvedValue([passingDecision(job)]);
 
     const { finalJobs } = await buildFeed([job], settings, "user-api-key");
 
@@ -143,107 +140,109 @@ describe("buildFeed", () => {
     expect(finalJobs[0].gemini_reviewed).toBe(true);
   });
 
-  it("filters out jobs older than job_age_days", async () => {
+  it("filters out jobs older than job_age_days, attributing the drop to the date gate", async () => {
     const oldDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days ago
     const oldJob = makeJob({ posted_at: oldDate, fetched_at: oldDate, date_unknown: false });
 
-    const { pipelineLog } = await buildFeed([oldJob], makeSettings({ job_age_days: 30 }), null);
+    const { gateLog } = await buildFeed([oldJob], makeSettings({ job_age_days: 30 }), null);
 
-    expect(pipelineLog.after_date_filter).toBe(0);
-    expect(pipelineLog.after_scoring).toBe(0);
+    expect(gateLog.gates.date.count).toBe(1);
+    expect(gateLog.gates.date.sample[0]).toMatchObject({ id: oldJob.id, title: oldJob.title });
+    expect(gateLog.on_dashboard).toBe(0);
   });
 
-  it("excludes jobs whose titles contain an excluded keyword", async () => {
-    const job = makeJob({ title: "Junior React Developer" });
-    const settingsWithExclude = makeSettings({ excluded_keywords: ["Junior"] });
+  it("excludes jobs whose titles contain an excluded keyword, attributing the drop to that gate", async () => {
+    const job = makeJob({ title: "Backend Engineer" });
+    const settingsWithExclude = makeSettings({ excluded_keywords: ["Backend"] });
 
-    const { pipelineLog } = await buildFeed([job], settingsWithExclude, null);
+    const { gateLog } = await buildFeed([job], settingsWithExclude, null);
 
-    expect(pipelineLog.after_settings_filter).toBe(0);
+    expect(gateLog.gates.excluded_keywords.count).toBe(1);
+    expect(gateLog.gates.excluded_keywords.sample[0].reason).toContain("Backend");
+    // Never reaches later gates.
+    expect(gateLog.gates.seniority.count).toBe(0);
   });
 
-  it("pipeline log counts are consistent with final job list length", async () => {
+  it("gate breakdown counts are consistent with the final job list length", async () => {
     const job = makeJob({ title: "Senior React Engineer" });
-    mockGemini.mockResolvedValue([
-      {
-        ...job,
-        gemini_pass: true,
-        gemini_reason: null,
-        gemini_reviewed: true,
-        gemini_quota_exhausted: false,
-      },
-    ]);
+    mockGemini.mockResolvedValue([passingDecision(job)]);
 
-    const { finalJobs, pipelineLog } = await buildFeed([job], settings, "key");
+    const { finalJobs, gateLog } = await buildFeed([job], settings, "key");
 
-    expect(pipelineLog.total_fetched).toBe(1);
-    expect(pipelineLog.after_date_filter).toBe(1);
-    expect(pipelineLog.after_settings_filter).toBe(1);
-    expect(pipelineLog.after_gemini_filter).toBe(1);
-    expect(pipelineLog.after_scoring).toBe(finalJobs.length);
+    expect(gateLog.candidate_window).toBe(1);
+    expect(gateLog.gates.date.count).toBe(0);
+    expect(gateLog.gates.gemini.count).toBe(0);
+    expect(gateLog.on_dashboard).toBe(finalJobs.length);
   });
 
-  it("drops jobs with total_score ≤ 0 from the final feed", async () => {
-    // A job that is both very old (recency_score = 0) and has no skill matches
-    // (skill_match_score = 0) will have total_score = 0 and must be dropped.
-    const oldDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(); // 120 days ago
-    const staleZeroSkillJob = makeJob({
-      title: "COBOL Programmer",
-      description: "Needs COBOL experience only",
-      posted_at: oldDate,
-      fetched_at: oldDate,
-      date_unknown: false,
+  it("drops jobs with total_score ≤ 0 from the final feed, attributing it to the scoring gate (not Gemini)", async () => {
+    // Zeroed scoring weights guarantee total_score = 0 regardless of how
+    // well the job otherwise matches — deliberately not using a "zero
+    // skill match" fixture here, since skill_match_score = 0 is
+    // incompatible with passing the skill_match GATE (both derive from the
+    // same underlying keyword match), so that scenario can't occur for a
+    // job that reaches scoring at all.
+    const matchingJob = makeJob({
+      title: "Senior React Engineer",
+      description: "We need React expertise",
     });
-    // job_age_days is 365 so the job passes the date gate, but its score will be 0
-    const settingsWideAge = makeSettings({
-      job_age_days: 365,
-      required_keywords: [],
-      expert_skills: ["React"], // no match against COBOL description
+    const settingsZeroWeight = makeSettings({
+      scoring_weights: { skill: 0, recency: 0, relocation: 0 },
     });
-    mockGemini.mockResolvedValue([
-      {
-        ...staleZeroSkillJob,
-        gemini_pass: true,
-        gemini_reason: null,
-        gemini_reviewed: true,
-        gemini_quota_exhausted: false,
-      },
-    ]);
+    mockGemini.mockResolvedValue([passingDecision(matchingJob)]);
 
-    const { finalJobs, pipelineLog } = await buildFeed([staleZeroSkillJob], settingsWideAge, "key");
+    const { finalJobs, gateLog } = await buildFeed([matchingJob], settingsZeroWeight, "key");
 
-    // Both skill_match_score and recency_score are 0 → total_score = 0 → dropped
+    // Zero-weighted scoring → total_score = 0 → dropped
     expect(finalJobs).toHaveLength(0);
     // The job DID pass Gemini -- it's the scoring stage that drops it. If these
     // two numbers were still the same field (the old `after_gemini` bug), this
     // job's rejection would get silently attributed to "failed your Gemini
     // filter" when it never did.
-    expect(pipelineLog.after_gemini_filter).toBe(1);
-    expect(pipelineLog.after_scoring).toBe(0);
+    expect(gateLog.gates.gemini.count).toBe(0);
+    expect(gateLog.gates.scoring.count).toBe(1);
+    expect(gateLog.gates.scoring.sample[0].reason).toContain("final score");
+    expect(gateLog.on_dashboard).toBe(0);
   });
 
-  it("keeps a recent job with zero skill match (non-zero recency keeps total_score > 0)", async () => {
-    const recentZeroSkillJob = makeJob({
-      title: "COBOL Programmer",
-      description: "Needs COBOL experience only",
+  it("a fresh job survives even when scoring is weighted entirely toward recency", async () => {
+    // Renamed from the old "zero skill match" framing: a job can't have
+    // skill_match_score = 0 while also clearing the skill_match GATE (see
+    // the note above), so this instead verifies the same underlying point —
+    // total_score isn't purely a function of skill match — by zeroing the
+    // skill weight directly rather than trying to zero the score itself.
+    const recentJob = makeJob({
+      title: "Senior React Engineer",
+      description: "We need React expertise",
     });
-    const settingsNoMatch = makeSettings({ required_keywords: [], expert_skills: ["React"] });
-    mockGemini.mockResolvedValue([
-      {
-        ...recentZeroSkillJob,
-        gemini_pass: true,
-        gemini_reason: null,
-        gemini_reviewed: true,
-        gemini_quota_exhausted: false,
-      },
-    ]);
+    const settingsRecencyOnly = makeSettings({
+      scoring_weights: { skill: 0, recency: 1, relocation: 0 },
+    });
+    mockGemini.mockResolvedValue([passingDecision(recentJob)]);
 
-    const { finalJobs } = await buildFeed([recentZeroSkillJob], settingsNoMatch, "key");
+    const { finalJobs } = await buildFeed([recentJob], settingsRecencyOnly, "key");
 
-    // skill_match_score = 0 but recency_score is high (job is from today)
-    // → total_score > 0 → job survives
     expect(finalJobs).toHaveLength(1);
     expect(finalJobs[0].recency_score).toBeGreaterThan(0);
     expect(finalJobs[0].total_score).toBeGreaterThan(0);
+  });
+
+  it("skips the global_mode gate entirely for local-mode jobs", async () => {
+    const job = makeJob({ mode: "local", title: "Frontend Engineer (US Only)" });
+    mockGemini.mockResolvedValue([passingDecision(job)]);
+
+    const { gateLog } = await buildFeed([job], settings, "key");
+
+    expect(gateLog.gates.global_mode.count).toBe(0);
+  });
+
+  it("caps each gate's sample at MAX_PIPELINE_SAMPLE while keeping the true count uncapped", async () => {
+    const jobs = Array.from({ length: 60 }, (_, i) =>
+      makeJob({ id: `job-${i}`, title: "Junior Developer" }),
+    );
+    const { gateLog } = await buildFeed([...jobs], settings, null);
+
+    expect(gateLog.gates.seniority.count).toBe(60);
+    expect(gateLog.gates.seniority.sample).toHaveLength(50);
   });
 });

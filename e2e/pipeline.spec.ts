@@ -23,69 +23,63 @@ test.describe("pipeline — funnel visualisation", () => {
     await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 8_000 });
   });
 
-  test("pipeline renders stage counters — fetched → date-filtered → settings-filtered → AI-filtered", async ({
-    page,
-  }) => {
+  // UPDATED: buildFeed no longer lumps seniority/keyword/location/skill gates
+  // into one "Settings filter" — they're individually tracked accordion rows
+  // now (see GATE_META in FunnelView.tsx). "Fetched"/"total" became "Scraped
+  // this run" / "Matched your pipelines" / "In candidate window".
+  test("pipeline renders its top-level stage labels", async ({ page }) => {
     await page.goto("/pipeline");
     await page.waitForLoadState("networkidle");
 
-    // The pipeline funnel shows how many jobs survived each filtering stage.
     // Numbers may be 0 if the cache hasn't been built yet, but the labels
     // for each stage should still be present.
-    const hasFetched = await page
-      .getByText(/fetched|total/i)
+    const hasTopFunnel = await page
+      .getByText(/scraped|matched your pipelines|candidate window/i)
       .first()
       .isVisible()
       .catch(() => false);
-    const hasDateFilter = await page
-      .getByText(/date|age/i)
+    const hasDateGate = await page
+      .getByText(/date filter/i)
       .first()
       .isVisible()
       .catch(() => false);
-    const hasSettingsFilter = await page
-      .getByText(/settings|filter/i)
+    // Any one of the 5 gates that used to be lumped into "Settings filter" is
+    // enough to confirm the split happened.
+    const hasSplitSettingsGate = await page
+      .getByText(
+        /seniority filter|excluded keyword|required keyword|blacklisted location|skill match/i,
+      )
       .first()
       .isVisible()
       .catch(() => false);
     const hasAiFilter = await page
-      .getByText(/gemini|ai|llm/i)
+      .getByText(/gemini/i)
       .first()
       .isVisible()
       .catch(() => false);
 
-    // At least two of the four stage labels must be visible
-    const visibleStageCount = [hasFetched, hasDateFilter, hasSettingsFilter, hasAiFilter].filter(
+    const visibleStageCount = [hasTopFunnel, hasDateGate, hasSplitSettingsGate, hasAiFilter].filter(
       Boolean,
     ).length;
     expect(visibleStageCount).toBeGreaterThanOrEqual(2);
   });
 
-  // FIX: The previous version of this test checked for "visa / local / global" text
-  // on the pipeline page. FunnelView does NOT render a per-pipeline breakdown —
-  // it shows stage labels: "Fetched", "Date filter", "Settings filter", "Your Gemini filter".
-  // The pipeline mode names (visa/local/global) only appear in SettingsForm and on
-  // the dashboard filter tabs, not in the funnel visualisation.
-  //
-  // This test is rewritten to verify what FunnelView actually renders:
-  // the four funnel stage nodes. Separately, the filter-tab test in
-  // dashboard.spec.ts covers the mode (visa/local/global) label rendering.
-  test("pipeline funnel renders the four stage nodes", async ({ page }) => {
+  // UPDATED: the funnel is now three connected tiles ("Scraped this run" →
+  // "Matched your pipelines" → "In candidate window"), not four flat stage
+  // nodes ("Fetched" / "Date filter" / ...) — date/seniority/keywords/etc.
+  // moved down into the per-gate accordion list below the funnel.
+  test("pipeline funnel renders the top three connected tiles", async ({ page }) => {
     await page.goto("/pipeline");
     await page.waitForLoadState("networkidle");
 
-    // FunnelView shows four stage nodes. Each stage has a label rendered
-    // via the STAGES constant in FunnelView.tsx:
-    //   "Fetched" | "Date filter" | "Settings filter" | "Your Gemini filter"
-    // If the cache has not been built yet, FunnelView renders an empty-state
-    // message instead — we accept either outcome.
-    const hasFunnelNodes =
+    const hasFunnelTiles =
       (await page
-        .getByText(/fetched/i)
+        .getByText(/scraped this run/i)
         .first()
         .isVisible()
         .catch(() => false)) &&
       (await page
-        .getByText(/date filter/i)
+        .getByText(/matched your pipelines/i)
         .first()
         .isVisible()
         .catch(() => false));
@@ -96,15 +90,27 @@ test.describe("pipeline — funnel visualisation", () => {
       .isVisible()
       .catch(() => false);
 
-    // One of the two states must be true — funnel nodes OR empty-state message.
-    expect(hasFunnelNodes || hasEmptyState).toBe(true);
+    // One of the two states must be true — funnel tiles OR empty-state message.
+    expect(hasFunnelTiles || hasEmptyState).toBe(true);
+  });
+
+  // NEW: the job-trace search box ("can't find it in the lists above?") is
+  // always rendered regardless of whether the cache has data yet — it
+  // queries raw_jobs directly and doesn't depend on pipeline_log.
+  test("job-trace search box is present with title and company inputs", async ({ page }) => {
+    await page.goto("/pipeline");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByPlaceholder(/job title/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/company/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /search/i })).toBeVisible();
   });
 
   // FIX: The API response shape is { ok: true, data: { pipeline_log, jobs, ... } }.
   // pipeline_log and jobs live under the `data` key, not at the top level.
-  // The previous test used expect(body).toHaveProperty("pipeline_log") which
-  // looked at the root object and found nothing; the correct path is body.data.
-  test("/api/dashboard response is 200 and contains pipeline_log", async ({ page }) => {
+  test("/api/dashboard response is 200 and contains the new pipeline_log shape", async ({
+    page,
+  }) => {
     // Directly verify the API that feeds the pipeline page
     const response = await page.request.get("/api/dashboard");
     expect(response.status()).toBe(200);
@@ -116,5 +122,25 @@ test.describe("pipeline — funnel visualisation", () => {
     expect(body.data).toHaveProperty("pipeline_log");
     expect(body.data).toHaveProperty("jobs");
     expect(Array.isArray(body.data.jobs)).toBe(true);
+
+    // Structural check on the new shape — top-level funnel counts and the
+    // 9-gate breakdown, not the old 5 flat integers.
+    const log = body.data.pipeline_log;
+    expect(log).toHaveProperty("total_scraped");
+    expect(log).toHaveProperty("matched_pipelines");
+    expect(log).toHaveProperty("candidate_window");
+    expect(log).toHaveProperty("on_dashboard");
+    expect(log).toHaveProperty("wrong_pipeline_mode");
+    expect(log).toHaveProperty("outside_candidate_window");
+    expect(log.gates).toHaveProperty("date");
+    expect(log.gates).toHaveProperty("gemini");
+    expect(log.gates).toHaveProperty("scoring");
+  });
+
+  // NEW: smoke-tests the search API directly — a query with neither title
+  // nor company must be rejected before it ever reaches raw_jobs.
+  test("/api/jobs/explain requires a title or company", async ({ page }) => {
+    const response = await page.request.get("/api/jobs/explain");
+    expect(response.status()).toBe(400);
   });
 });

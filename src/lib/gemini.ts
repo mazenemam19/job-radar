@@ -292,6 +292,25 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
 
 // ── Main export: filter all jobs ─────────────────────────────
 
+// Shared by filterJobsWithGemini and filterJobsWithGeminiVerbose: runs every
+// job through filterBatch in BATCH_SIZE chunks and returns one decision per
+// job (pass AND fail — filterBatch already fills in a fail-open entry for
+// every job, this just doesn't throw failures away). One batching loop,
+// two different assemblies of the same data — not two Gemini call sites.
+async function filterAllJobs(
+  apiKey: string,
+  jobs: RawJob[],
+  promptTemplate: string,
+): Promise<Map<string, FilterResult>> {
+  const allDecisions = new Map<string, FilterResult>();
+  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
+    const batch = jobs.slice(i, i + BATCH_SIZE);
+    const decisions = await filterBatch(apiKey, batch, promptTemplate);
+    for (const [id, d] of decisions) allDecisions.set(id, d);
+  }
+  return allDecisions;
+}
+
 /**
  * Filters a list of raw jobs using the user's Gemini API key and custom prompt.
  * Processes jobs in batches to stay within context window limits.
@@ -314,6 +333,7 @@ export async function filterJobsWithGemini(
 > {
   if (!apiKey || !jobs.length) return [];
 
+  const decisions = await filterAllJobs(apiKey, jobs, settings.gemini_filter_prompt);
   const results: Array<
     RawJob & {
       gemini_pass: boolean;
@@ -322,28 +342,56 @@ export async function filterJobsWithGemini(
       gemini_quota_exhausted: boolean;
     }
   > = [];
-  const prompt = settings.gemini_filter_prompt;
 
-  // Process in batches
-  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-    const batch = jobs.slice(i, i + BATCH_SIZE);
-    const decisions = await filterBatch(apiKey, batch, prompt);
-
-    for (const job of batch) {
-      const d = decisions.get(job.id);
-      if (d?.pass) {
-        results.push({
-          ...job,
-          gemini_pass: true,
-          gemini_reason: d.reason,
-          gemini_reviewed: d.reviewed,
-          gemini_quota_exhausted: d.quotaExhausted ?? false,
-        });
-      }
+  for (const job of jobs) {
+    const d = decisions.get(job.id);
+    if (d?.pass) {
+      results.push({
+        ...job,
+        gemini_pass: true,
+        gemini_reason: d.reason,
+        gemini_reviewed: d.reviewed,
+        gemini_quota_exhausted: d.quotaExhausted ?? false,
+      });
     }
   }
 
   return results;
+}
+
+export interface GeminiJobResult {
+  id: string;
+  pass: boolean;
+  reason: string | null;
+  reviewed: boolean;
+  quotaExhausted: boolean;
+}
+
+/**
+ * Same Gemini batch calls as filterJobsWithGemini — zero extra API cost —
+ * but returns a decision for EVERY job, pass or fail, instead of silently
+ * dropping failures. Used by the pipeline breakdown (buildFeed) and the
+ * job-trace search so the Gemini gate's drop reasons are visible, without
+ * re-querying Gemini a second time for the same jobs.
+ */
+export async function filterJobsWithGeminiVerbose(
+  apiKey: string,
+  jobs: RawJob[],
+  settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
+): Promise<GeminiJobResult[]> {
+  if (!apiKey || !jobs.length) return [];
+
+  const decisions = await filterAllJobs(apiKey, jobs, settings.gemini_filter_prompt);
+  return jobs.map((job) => {
+    const d = decisions.get(job.id);
+    return {
+      id: job.id,
+      pass: d?.pass ?? true,
+      reason: d?.reason ?? null,
+      reviewed: d?.reviewed ?? false,
+      quotaExhausted: d?.quotaExhausted ?? false,
+    };
+  });
 }
 
 // ── Strategy generation ───────────────────────────────────────

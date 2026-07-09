@@ -15,6 +15,13 @@ import {
   passesGlobalModeGate,
   getMatchedLevels,
   getDisplaySeniorityBadge,
+  explainDateGate,
+  explainSeniorityGate,
+  explainExcludedKeywordsGate,
+  explainRequiredKeywordsGate,
+  explainBlacklistedLocationsGate,
+  explainSkillMatchGate,
+  explainGlobalModeGate,
 } from "../scoring";
 import type { RawJob, ResolvedSettings } from "../types";
 
@@ -303,6 +310,26 @@ describe("passesSeniorityGate", () => {
   });
 });
 
+describe("explainSeniorityGate", () => {
+  it("returns pass:true, reason:null for an unlabelled job", () => {
+    const job = makeJob({ title: "Frontend Engineer" });
+    expect(explainSeniorityGate(job, DEFAULT_SETTINGS)).toEqual({ pass: true, reason: null });
+  });
+
+  it("returns pass:true, reason:null when a matched level is enabled", () => {
+    const job = makeJob({ title: "Senior React Developer" });
+    expect(explainSeniorityGate(job, DEFAULT_SETTINGS)).toEqual({ pass: true, reason: null });
+  });
+
+  it("returns pass:false with matched/enabled levels in the reason on failure", () => {
+    const job = makeJob({ title: "Junior Frontend Developer" });
+    const result = explainSeniorityGate(job, DEFAULT_SETTINGS);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("junior");
+    expect(result.reason).toContain("senior");
+  });
+});
+
 // ── passesDateGate ───────────────────────────────────────────
 // Date gate uses fetched_at as fallback when date_unknown = true.
 
@@ -343,6 +370,36 @@ describe("passesDateGate", () => {
       date_unknown: true,
     });
     expect(passesDateGate(job, 7)).toBe(false);
+  });
+});
+
+describe("explainDateGate", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns pass:true, reason:null within the window", () => {
+    const job = makeJob({ posted_at: new Date(NOW - 3 * 86_400_000).toISOString() });
+    expect(explainDateGate(job, 7)).toEqual({ pass: true, reason: null });
+  });
+
+  it("returns pass:false with age and limit in the reason when too old", () => {
+    const job = makeJob({ posted_at: new Date(NOW - 10 * 86_400_000).toISOString() });
+    const result = explainDateGate(job, 7);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("10d");
+    expect(result.reason).toContain("7d");
+  });
+
+  it("returns pass:false with an unparseable-date reason for a bad date string", () => {
+    const job = makeJob({ posted_at: "not-a-date" });
+    const result = explainDateGate(job, 7);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("could not be parsed");
   });
 });
 
@@ -618,5 +675,106 @@ describe("passesGlobalModeGate", () => {
   it("uses word boundaries — 'us only' should not match 'usability'", () => {
     const job = makeJob({ title: "Developer", description: "Build great usability into products" });
     expect(passesGlobalModeGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+});
+
+// ── Explain variants ──────────────────────────────────────────
+// These power the pipeline breakdown / job-trace search (explain.ts).
+// Each must: match its passesXGate sibling's pass/fail, and return
+// reason: null on pass (nothing downstream renders a reason for a survivor).
+
+describe("explainExcludedKeywordsGate", () => {
+  it("pass:true, reason:null when no excluded_keywords are set", () => {
+    const job = makeJob({ title: "Senior React Engineer" });
+    expect(explainExcludedKeywordsGate(job, DEFAULT_SETTINGS)).toEqual({
+      pass: true,
+      reason: null,
+    });
+  });
+
+  it("names the matched excluded keyword on failure", () => {
+    const job = makeJob({ title: "Senior Sales Engineer" });
+    const settings = { ...DEFAULT_SETTINGS, excluded_keywords: ["sales"] };
+    const result = explainExcludedKeywordsGate(job, settings);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("sales");
+  });
+});
+
+describe("explainRequiredKeywordsGate", () => {
+  it("pass:true, reason:null when expert_skills fallback matches", () => {
+    const job = makeJob({ description: "We need React and TypeScript" });
+    expect(explainRequiredKeywordsGate(job, DEFAULT_SETTINGS)).toEqual({
+      pass: true,
+      reason: null,
+    });
+  });
+
+  it("lists the checked keyword set on failure", () => {
+    const job = makeJob({ title: "Backend Engineer", description: "Go and Python" });
+    const settings = { ...DEFAULT_SETTINGS, required_keywords: ["Rust"] };
+    const result = explainRequiredKeywordsGate(job, settings);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("Rust");
+  });
+});
+
+describe("explainBlacklistedLocationsGate", () => {
+  it("pass:true, reason:null when no blacklisted_locations are set", () => {
+    const job = makeJob({ location: "London, UK" });
+    expect(explainBlacklistedLocationsGate(job, DEFAULT_SETTINGS)).toEqual({
+      pass: true,
+      reason: null,
+    });
+  });
+
+  it("names the matched blacklisted term on failure", () => {
+    const job = makeJob({ location: "San Francisco, US" });
+    const settings = { ...DEFAULT_SETTINGS, blacklisted_locations: ["US"] };
+    const result = explainBlacklistedLocationsGate(job, settings);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("US");
+  });
+});
+
+describe("explainSkillMatchGate", () => {
+  it("pass:true, reason:null when a skill matches", () => {
+    const job = makeJob({ description: "We use React heavily" });
+    expect(explainSkillMatchGate(job, DEFAULT_SETTINGS)).toEqual({ pass: true, reason: null });
+  });
+
+  it("returns a flat reason on failure (no single matched term to report)", () => {
+    const job = makeJob({ description: "We use Angular and Svelte" });
+    const settings = { ...DEFAULT_SETTINGS, expert_skills: ["Vue"], secondary_skills: [] };
+    const result = explainSkillMatchGate(job, settings);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toBe("no expert or secondary skill found in the job description");
+  });
+});
+
+describe("explainGlobalModeGate", () => {
+  it("pass:true, reason:null with no blocked or allowed keywords", () => {
+    const job = makeJob({
+      title: "Frontend Engineer",
+      description: "React + TypeScript",
+      location: "Porto, Portugal",
+    });
+    expect(explainGlobalModeGate(job, DEFAULT_SETTINGS)).toEqual({ pass: true, reason: null });
+  });
+
+  it("names the matched blocked region on failure", () => {
+    const job = makeJob({ title: "Frontend Engineer (US Only)", location: "New York" });
+    const result = explainGlobalModeGate(job, DEFAULT_SETTINGS);
+    expect(result.pass).toBe(false);
+    expect(result.reason).toContain("us only");
+  });
+
+  it("pass:true, reason:null when an allowed location short-circuits a blocked match", () => {
+    const job = makeJob({
+      title: "Developer",
+      description: "This is a worldwide remote role",
+      location: "US Only",
+    });
+    expect(explainGlobalModeGate(job, DEFAULT_SETTINGS)).toEqual({ pass: true, reason: null });
   });
 });
