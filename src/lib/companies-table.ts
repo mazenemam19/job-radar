@@ -22,6 +22,21 @@ export const EMPTY_FORM: CompanyForm = {
   is_active: true,
 };
 
+/**
+ * True when a company would be active with neither pipeline enabled — the
+ * state that gets zero fetch tasks queued in fetchAllCompanyJobs (see
+ * cron/fetch-jobs.ts) with nothing logged, not even a skip. Shared by the
+ * public submit route and both admin company routes so the rule lives in
+ * one place instead of three near-identical conditions.
+ */
+export function missingPipeline(
+  isActive: boolean,
+  pipelineLocal: boolean,
+  pipelineGlobal: boolean,
+): boolean {
+  return isActive && !pipelineLocal && !pipelineGlobal;
+}
+
 // ── Pure transforms ───────────────────────────────────────────
 
 /** Filters the company list by name, country, or ATS type (case-insensitive). */

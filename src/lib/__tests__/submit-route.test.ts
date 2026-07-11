@@ -16,6 +16,7 @@ describe("validateSubmitPost", () => {
     ats_type: VALID_ATS[0],
     slug: "acme",
     country: "EG",
+    pipeline_local: true,
   };
 
   it("returns ok for a complete valid body", () => {
@@ -59,6 +60,27 @@ describe("validateSubmitPost", () => {
     for (const ats of VALID_ATS) {
       expect(validateSubmitPost({ ...valid, ats_type: ats }).ok).toBe(true);
     }
+  });
+
+  it("rejects when neither pipeline is set", () => {
+    const result = validateSubmitPost({ ...valid, pipeline_local: undefined });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("At least one pipeline (local or global) is required");
+    }
+  });
+
+  it("accepts pipeline_global alone, with no pipeline_local", () => {
+    const result = validateSubmitPost({
+      ...valid,
+      pipeline_local: undefined,
+      pipeline_global: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts both pipelines set", () => {
+    expect(validateSubmitPost({ ...valid, pipeline_global: true }).ok).toBe(true);
   });
 });
 
@@ -159,6 +181,19 @@ describe("POST /api/submit", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when neither pipeline is set", async () => {
+    const { POST } = await import("../../app/api/submit/route");
+    const res = await POST(
+      makeRequest(
+        { company_name: "Acme", ats_type: VALID_ATS[0], slug: "acme", country: "EG" },
+        { "x-forwarded-for": "10.0.0.3" },
+      ),
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("At least one pipeline (local or global) is required");
+  });
+
   it("returns 201 and the new submission id on success", async () => {
     mockAdminDb.from.mockReturnValue(mockQuery({ id: "sub-1" }));
 
@@ -170,6 +205,7 @@ describe("POST /api/submit", () => {
           ats_type: VALID_ATS[0],
           slug: "acme",
           country: "EG",
+          pipeline_local: true,
         },
         { "x-forwarded-for": "10.0.0.1" },
       ),
@@ -191,6 +227,7 @@ describe("POST /api/submit", () => {
           ats_type: VALID_ATS[0],
           slug: "acme",
           country: "EG",
+          pipeline_local: true,
         },
         { "x-forwarded-for": "10.0.0.2" },
       ),

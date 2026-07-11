@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { VALID_ATS } from "@/lib/constants";
+import { missingPipeline } from "@/lib/companies-table";
 import type { ATSType } from "@/lib/types";
 
 export async function GET() {
@@ -35,6 +36,23 @@ export async function POST(request: NextRequest) {
   if (!body.name || !VALID_ATS.includes(body.ats as ATSType) || !body.slug || !body.country) {
     return NextResponse.json(
       { ok: false, error: "name, ats, slug, country are required" },
+      { status: 400 },
+    );
+  }
+
+  // A company with neither pipeline enabled gets zero fetch tasks queued in
+  // fetchAllCompanyJobs (see cron/fetch-jobs.ts's dispatch loop) — not
+  // skipped, not errored, just never dispatched or logged at all.
+  // is_active alone doesn't catch this, so it has to be rejected here.
+  if (
+    missingPipeline(
+      body.is_active !== false,
+      Boolean(body.pipeline_local),
+      Boolean(body.pipeline_global),
+    )
+  ) {
+    return NextResponse.json(
+      { ok: false, error: "An active company needs at least one pipeline (local or global)" },
       { status: 400 },
     );
   }

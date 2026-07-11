@@ -54,11 +54,13 @@ describe("POST /api/submit", () => {
 
   it("returns 400 when company_name is missing", async () => {
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      ats_type: "greenhouse",
-      slug: "test-co",
-      country: "Egypt",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        ats_type: "greenhouse",
+        slug: "test-co",
+        country: "Egypt",
+      }),
+    );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain("company_name");
@@ -66,12 +68,14 @@ describe("POST /api/submit", () => {
 
   it("returns 400 when ats_type is invalid", async () => {
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      company_name: "Test Co",
-      ats_type: "not-a-real-ats",
-      slug: "test-co",
-      country: "Egypt",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        company_name: "Test Co",
+        ats_type: "not-a-real-ats",
+        slug: "test-co",
+        country: "Egypt",
+      }),
+    );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain("ats_type");
@@ -79,21 +83,25 @@ describe("POST /api/submit", () => {
 
   it("returns 400 when slug is missing", async () => {
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      company_name: "Test Co",
-      ats_type: "greenhouse",
-      country: "Egypt",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        company_name: "Test Co",
+        ats_type: "greenhouse",
+        country: "Egypt",
+      }),
+    );
     expect(res.status).toBe(400);
   });
 
   it("returns 400 when country is missing", async () => {
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      company_name: "Test Co",
-      ats_type: "greenhouse",
-      slug: "test-co",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        company_name: "Test Co",
+        ats_type: "greenhouse",
+        slug: "test-co",
+      }),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -106,12 +114,15 @@ describe("POST /api/submit", () => {
     mockAdminDb.from.mockReturnValue(chain);
 
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      company_name: "Test Co",
-      ats_type: "greenhouse",
-      slug: "test-co",
-      country: "Egypt",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        company_name: "Test Co",
+        ats_type: "greenhouse",
+        slug: "test-co",
+        country: "Egypt",
+        pipeline_local: true,
+      }),
+    );
 
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -123,12 +134,15 @@ describe("POST /api/submit", () => {
     mockAdminDb.from.mockReturnValue(mockQuery(null, { message: "duplicate key" }));
 
     const { POST } = await import("./route");
-    const res = await POST(makeSubmitRequest({
-      company_name: "Test Co",
-      ats_type: "greenhouse",
-      slug: "test-co",
-      country: "Egypt",
-    }));
+    const res = await POST(
+      makeSubmitRequest({
+        company_name: "Test Co",
+        ats_type: "greenhouse",
+        slug: "test-co",
+        country: "Egypt",
+        pipeline_local: true,
+      }),
+    );
 
     expect(res.status).toBe(500);
     const body = await res.json();
@@ -143,22 +157,33 @@ describe("POST /api/submit", () => {
 
     // Submit 5 times successfully
     for (let i = 0; i < 5; i++) {
-      const res = await POST(makeSubmitRequest({
-        company_name: `Co ${i}`,
-        ats_type: "greenhouse",
-        slug: `co-${i}`,
-        country: "Egypt",
-      }, { "x-forwarded-for": "1.2.3.4" }));
+      const res = await POST(
+        makeSubmitRequest(
+          {
+            company_name: `Co ${i}`,
+            ats_type: "greenhouse",
+            slug: `co-${i}`,
+            country: "Egypt",
+            pipeline_local: true,
+          },
+          { "x-forwarded-for": "1.2.3.4" },
+        ),
+      );
       expect(res.status).toBe(201);
     }
 
     // 6th should be rate limited
-    const limited = await POST(makeSubmitRequest({
-      company_name: "Rate Limited Co",
-      ats_type: "greenhouse",
-      slug: "rate-limited",
-      country: "Egypt",
-    }, { "x-forwarded-for": "1.2.3.4" }));
+    const limited = await POST(
+      makeSubmitRequest(
+        {
+          company_name: "Rate Limited Co",
+          ats_type: "greenhouse",
+          slug: "rate-limited",
+          country: "Egypt",
+        },
+        { "x-forwarded-for": "1.2.3.4" },
+      ),
+    );
 
     expect(limited.status).toBe(429);
     const body = await limited.json();

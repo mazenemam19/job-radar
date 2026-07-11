@@ -4,6 +4,7 @@
 // mocking Next.js or Supabase.
 
 import { VALID_ATS, COUNTRY_FLAGS } from "@/lib/constants";
+import { missingPipeline } from "@/lib/companies-table";
 import type { ATSType } from "@/lib/types";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -43,6 +44,9 @@ export function validateSubmitPost(body: SubmitPostBody): SubmitValidationResult
   }
   if (!body.country?.trim()) {
     return { ok: false, error: "country is required" };
+  }
+  if (missingPipeline(true, Boolean(body.pipeline_local), Boolean(body.pipeline_global))) {
+    return { ok: false, error: "At least one pipeline (local or global) is required" };
   }
   return { ok: true };
 }

@@ -214,10 +214,16 @@ describe("PUT /api/admin/companies/[id]", () => {
       is_active: true,
     };
     const updateQuery = mockQuery(updatedRow);
+    const currentRowQuery = mockQuery({
+      pipeline_local: true,
+      pipeline_global: false,
+      is_active: true,
+    });
 
     mockAdminDb.from = vi
       .fn()
       .mockReturnValueOnce(mockQuery({ role: "admin" })) // user_profiles (requireAdmin)
+      .mockReturnValueOnce(currentRowQuery) // fetch current row for merge validation
       .mockReturnValueOnce(updateQuery); // update company
 
     const { PUT } = await import("../../app/api/admin/companies/[id]/route");
@@ -240,10 +246,16 @@ describe("PUT /api/admin/companies/[id]", () => {
     (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
 
     const updateQuery = mockQuery(null, null); // no row returned → 404
+    const currentRowQuery = mockQuery({
+      pipeline_local: true,
+      pipeline_global: false,
+      is_active: true,
+    });
 
     mockAdminDb.from = vi
       .fn()
       .mockReturnValueOnce(mockQuery({ role: "admin" }))
+      .mockReturnValueOnce(currentRowQuery)
       .mockReturnValueOnce(updateQuery);
 
     const { PUT } = await import("../../app/api/admin/companies/[id]/route");

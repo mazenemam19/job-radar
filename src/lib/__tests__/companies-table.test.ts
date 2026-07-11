@@ -3,7 +3,7 @@
 // lib/companies-table.ts (audit row #21): filterCompanies and formFromRow.
 
 import { describe, it, expect } from "vitest";
-import { filterCompanies, formFromRow, EMPTY_FORM } from "../companies-table";
+import { filterCompanies, formFromRow, EMPTY_FORM, missingPipeline } from "../companies-table";
 import type { ATSCompanyRow } from "../types";
 
 function makeCompany(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
@@ -116,5 +116,38 @@ describe("EMPTY_FORM", () => {
     expect(EMPTY_FORM.pipeline_local).toBe(false);
     expect(EMPTY_FORM.pipeline_global).toBe(false);
     expect(EMPTY_FORM.is_active).toBe(true);
+  });
+
+  // EMPTY_FORM itself is exactly the state missingPipeline flags — this is
+  // the shape a brand-new "Add company" form starts in before either
+  // pipeline checkbox is touched (see issue-52 act 7).
+  it("is itself a missingPipeline state", () => {
+    expect(
+      missingPipeline(EMPTY_FORM.is_active, EMPTY_FORM.pipeline_local, EMPTY_FORM.pipeline_global),
+    ).toBe(true);
+  });
+});
+
+// ── missingPipeline ───────────────────────────────────────────
+
+describe("missingPipeline", () => {
+  it("is true for an active company with neither pipeline enabled", () => {
+    expect(missingPipeline(true, false, false)).toBe(true);
+  });
+
+  it("is false when only pipeline_local is enabled", () => {
+    expect(missingPipeline(true, true, false)).toBe(false);
+  });
+
+  it("is false when only pipeline_global is enabled", () => {
+    expect(missingPipeline(true, false, true)).toBe(false);
+  });
+
+  it("is false when both pipelines are enabled", () => {
+    expect(missingPipeline(true, true, true)).toBe(false);
+  });
+
+  it("is false for an inactive company regardless of pipeline flags", () => {
+    expect(missingPipeline(false, false, false)).toBe(false);
   });
 });
