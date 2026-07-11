@@ -7,9 +7,9 @@ files:
     src/lib/runner.ts,
     src/lib/cron/fetch-jobs.ts,
     src/lib/sources/ats/workable.ts,
-    src/lib/cron/upsert-raw-jobs.ts,
-    src/lib/types.ts,
+    src/lib/sources/ats/known-jobs.ts,
     src/lib/__tests__/cron-fetch-jobs.test.ts,
+    src/lib/__tests__/workable-known-jobs.test.ts,
   ]
 ---
 
