@@ -21,7 +21,7 @@ Continues from `issue-52-504-recurrence-part5.md` (jittered Workable cooldown
 expiry + gave Workable its own concurrency pool). That fix landed on `main`
 at `0a06148` and shipped explicitly unvalidated against a live cron run —
 its own "Not Yet Confirmed" section flagged that the underlying question of
-*why* Workable batches 429 together was still open. The 504 came back.
+_why_ Workable batches 429 together was still open. The 504 came back.
 This session found two separate, previously-undiagnosed root causes.
 
 ## Symptoms
@@ -37,7 +37,7 @@ close, resurfacing on its own.
 Two independent bugs, both real, neither addressed by any prior act in
 this series.
 
-### Bug 1 — the deadline only gates *starting* work, not *finishing* it
+### Bug 1 — the deadline only gates _starting_ work, not _finishing_ it
 
 `runner.ts` set `FETCH_TIME_BUDGET_MS = 270_000` (30s under the 300s
 `maxDuration`). `fetch-jobs.ts`'s `makeFetchTask` checked it, but that only
@@ -55,7 +55,7 @@ by X" guarantee.
 
 Every request — list or detail, any company — hits the same host,
 `apply.workable.com`. Jitter and lane counts (part 5) only changed our own
-concurrency and *when* a blocked slug came back — neither reduced total
+concurrency and _when_ a blocked slug came back — neither reduced total
 request volume to that host, which is the signal a rate limiter actually
 watches. Every cron run re-fetched the full detail page for every open role
 at every Workable company, every run, forever — including roles already
@@ -88,7 +88,7 @@ getting rate-limited, not how often it got rate-limited.
   `makeFetchTask`'s new `onSettle` hook) instead of only assembling the
   return value after every task in the batch resolves — this is what gives
   the hard-cutoff race something to hand back when the cutoff wins.
-- `HARD_FETCH_CUTOFF_MS` (250s) is deliberately set *below*
+- `HARD_FETCH_CUTOFF_MS` (250s) is deliberately set _below_
   `FETCH_TIME_BUDGET_MS` (270s), not above it — see the comment on both
   constants in `runner.ts`. The two numbers now do different jobs: the hard
   cutoff bounds what the caller waits for; the soft deadline bounds what the

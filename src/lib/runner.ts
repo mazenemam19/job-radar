@@ -74,7 +74,7 @@ export async function runCronJob(
   // Load descriptions for Workable jobs already on file, so fetchWorkable can
   // skip re-fetching a detail page it already has the text for — this is
   // most of the request volume that trips Workable's rate limiter in the
-  // first place (see docs/solutions/bugs/Issue 52 504 recurrence part6).
+  // first place (see docs/solutions/bugs/issue-52-504-recurrence-part6.md).
   await loadKnownWorkableJobsFromDB();
   console.log(`[cron] known workable jobs loaded (+${Date.now() - startMs}ms)`);
 

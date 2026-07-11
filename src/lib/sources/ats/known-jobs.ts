@@ -3,7 +3,7 @@
 // keyed by raw_jobs.id. Populated once per cron run (loadKnownWorkableJobsFromDB,
 // called from runner.ts before dispatch) so fetchWorkable can skip a job's
 // detail-page fetch when it already has that job's description on file — see
-// docs/solutions/bugs/Issue 52 504 recurrence part6, Task 2. Follows the same
+// docs/solutions/bugs/issue-52-504-recurrence-part6.md, Task 2. Follows the same
 // module-level-cache-plus-loader pattern as run-state.ts, deliberately, so
 // fetchWorkable's signature never has to change.
 
