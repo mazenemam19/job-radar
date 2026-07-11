@@ -1,0 +1,170 @@
+---
+date: 2026-07-11
+category: bugs
+tags: [ats, concurrency, cron, workable, timeout, deadline, request-volume, testing]
+files:
+  [
+    src/lib/runner.ts,
+    src/lib/cron/fetch-jobs.ts,
+    src/lib/sources/ats/workable.ts,
+    src/lib/cron/upsert-raw-jobs.ts,
+    src/lib/types.ts,
+    src/lib/__tests__/cron-fetch-jobs.test.ts,
+  ]
+---
+
+# Issue #52, act 6 — the deadline that only stopped starting, never stopped running
+
+## Context
+
+Continues from `issue-52-504-recurrence-part5.md` (jittered Workable cooldown
+expiry + gave Workable its own concurrency pool). That fix landed on `main`
+at `0a06148` and shipped explicitly unvalidated against a live cron run —
+its own "Not Yet Confirmed" section flagged that the underlying question of
+_why_ Workable batches 429 together was still open. The 504 came back.
+This session found two separate, previously-undiagnosed root causes.
+
+## Symptoms
+
+Cron endpoint (`/api/cron`) 504'd again, after part 5's fix had already
+shipped to `main`. Zero commits landed on `main` in the window between part
+5 shipping and the recurrence, and none since — this isn't a new regression
+from a code change, it's the same class of problem part 5 didn't fully
+close, resurfacing on its own.
+
+## Root Cause
+
+Two independent bugs, both real, neither addressed by any prior act in
+this series.
+
+### Bug 1 — the deadline only gates _starting_ work, not _finishing_ it
+
+`runner.ts` set `FETCH_TIME_BUDGET_MS = 270_000` (30s under the 300s
+`maxDuration`). `fetch-jobs.ts`'s `makeFetchTask` checked it, but that only
+ever blocked **new** tasks from starting once the deadline had passed —
+anything already dispatched was left to run to completion, with no ceiling
+on total duration. A company with many open Workable roles, hitting
+retries, dispatched right at the 269,999ms mark, could run well past 300s
+with nothing capping it. Most likely during a 429 storm specifically, since
+storms make individual fetches slower and push more tasks to still be
+in-flight (or just starting) right as the 270s mark arrived. The old
+deadline was a "stop queueing new work" gate, never a "the function returns
+by X" guarantee.
+
+### Bug 2 — most Workable request volume is redundant, and volume is what trips their limiter
+
+Every request — list or detail, any company — hits the same host,
+`apply.workable.com`. Jitter and lane counts (part 5) only changed our own
+concurrency and _when_ a blocked slug came back — neither reduced total
+request volume to that host, which is the signal a rate limiter actually
+watches. Every cron run re-fetched the full detail page for every open role
+at every Workable company, every run, forever — including roles already
+fetched last time, unchanged, even though `raw_jobs.id` is deterministic
+and the row already stores the description from the last fetch. This is
+very likely the majority of the request volume tripping the limiter in the
+first place; every prior fix changed how gracefully the code handled
+getting rate-limited, not how often it got rate-limited.
+
+## Plan and status
+
+### Task 1 — Hard deadline on the whole run — DONE, this session
+
+**Files:** `src/lib/runner.ts`, `src/lib/cron/fetch-jobs.ts`,
+`src/lib/__tests__/cron-fetch-jobs.test.ts`
+
+- `fetchAllCompanyJobs` now races the fetch phase against a real, enforced
+  hard cutoff (`HARD_FETCH_CUTOFF_MS = 250_000`, in `runner.ts`), instead of
+  only checking a soft deadline before dispatching each new task.
+- Abandons in-flight requests in place when the cutoff hits — no
+  `AbortSignal` threaded through every fetcher. Already-dispatched fetches
+  keep running in the background (Vercel Fluid Compute keeps the invocation
+  alive after the response is sent, up to `maxDuration`); the existing soft
+  `FETCH_TIME_BUDGET_MS` deadline still governs when that background
+  continuation stops queueing brand-new company fetches. Revisit only if
+  abandon-in-place turns out to leak resources across warm invocations in a
+  way that shows up in logs — not yet observed, not yet instrumented for.
+- `fetchAllCompanyJobs` accumulates jobs/health/errors/warnings
+  incrementally as each task settles (`recordResult`, called via
+  `makeFetchTask`'s new `onSettle` hook) instead of only assembling the
+  return value after every task in the batch resolves — this is what gives
+  the hard-cutoff race something to hand back when the cutoff wins.
+- `HARD_FETCH_CUTOFF_MS` (250s) is deliberately set _below_
+  `FETCH_TIME_BUDGET_MS` (270s), not above it — see the comment on both
+  constants in `runner.ts`. The two numbers now do different jobs: the hard
+  cutoff bounds what the caller waits for; the soft deadline bounds what the
+  abandoned background continuation keeps dispatching. Landing the hard
+  cutoff below 270s buys the post-fetch upsert/app_config/log/email steps
+  ~50s of margin under the 300s ceiling instead of the 30s they had before.
+- Tests: `fetchAllCompanyJobs — hard cutoff` in `cron-fetch-jobs.test.ts`
+  covers a task that never resolves (asserts the function still returns
+  within the simulated cutoff with results from the tasks that did settle)
+  and a regression guard (asserts nothing gets cut short when every fetch
+  finishes before the cutoff).
+- Gates: `pnpm test` (410/410), `pnpm lint`, `pnpm build` all clean on this
+  change; verified against the pre-existing baseline on `main` (408/408,
+  same lint/build noise) to confirm nothing here is inherited breakage.
+
+### Task 2 — Skip detail-fetch for already-known jobs — DONE, this session
+
+**Files:** `src/lib/sources/ats/workable.ts`, `src/lib/runner.ts`, new
+`src/lib/sources/ats/known-jobs.ts`, new
+`src/lib/__tests__/workable-known-jobs.test.ts`
+
+- `known-jobs.ts` follows the `run-state.ts` pattern exactly, as planned
+  below: a module-level `Map<id, description>`, a `loadKnownWorkableJobsFromDB()`
+  populate step called once from `runner.ts` before dispatch, and a plain
+  getter (`getKnownWorkableDescription`) read from inside `fetchWorkable`.
+  No signature change to `fetchWorkable` or the shared `Fetcher` type.
+- One query, scoped to `ats_type = 'workable'`, not per-company — loads
+  every known Workable job's `id`/`description` into the map.
+- `fetchWorkable` computes each job's id up front and checks the map before
+  building the detail URL. A hit skips `fetchWorkableUrl` and reuses the
+  stored description (no network call, no domain-request tracking, no
+  detail-failure warning); a miss fetches the detail page exactly as
+  before. The job is still returned and upserted either way, so
+  `fetched_at` still refreshes on every run.
+- Tests: `known-jobs.test.ts` covers the loader's query shape, the
+  known/unknown getter, and a select failure leaving the cache empty; an
+  integration test on `fetchWorkable` asserts a known id's detail URL is
+  never requested while an unseen id's still is, and that the known job's
+  description comes from the stored map, not the list-call fallback.
+- Gates: `pnpm test` (415/415, 5 new), `pnpm lint`, `pnpm build` all clean;
+  no new lint warnings beyond the pre-existing baseline.
+
+### Task 3 — The soak test
+
+Covered by Task 1's "hard cutoff" tests above — no separate work needed.
+
+## Not Yet Confirmed
+
+Both tasks are gated on `pnpm test && pnpm lint && pnpm build`, not on a live
+cron run. Neither the hard cutoff (Task 1) nor the known-jobs skip (Task 2)
+has been observed against real `cron_logs_v2` data yet — specifically:
+
+- Whether the hard cutoff actually keeps `/api/cron` under 300s during a
+  real 429 storm, not just in the simulated-never-resolves test.
+- How much the known-jobs skip actually cuts Workable request volume on a
+  live run, and whether that's enough on its own to stop 429s recurring,
+  or whether Workable's limiter is keyed on something this doesn't touch
+  (e.g. IP-based, not just request-count-based).
+
+Validate both against `cron_logs_v2` duration and 429 count after this
+ships and a few scheduled runs have happened — same caveat part 5 shipped
+with and that this session's recurrence is a direct consequence of
+skipping.
+
+## Constraints (from `.agents/AGENTS.md` — do not violate)
+
+- No `any`, no `as any`.
+- Comments describe current behavior, not history.
+- `pnpm test && pnpm lint && pnpm build` clean before considering any task
+  done.
+- Never push without the user's explicit confirmation.
+- Worktree: `git worktree add -b fix/issue-52-hard-deadline ../job-radar-issue52 main`.
+
+## Related
+
+- `docs/solutions/bugs/issue-52-504-recurrence-part5.md` — the fix this
+  session found gaps in.
+- `docs/solutions/bugs/issue-52-504-recurrence-part4.md`,
+  `-part3.md`, `issue-52-workable-429.md` — earlier acts in this chain.

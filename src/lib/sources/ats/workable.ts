@@ -11,6 +11,7 @@ import {
   incrementWorkableUsed,
   markWorkable429,
 } from "./run-state";
+import { getKnownWorkableDescription } from "./known-jobs";
 
 // Every Workable request — list or detail, local or global mode — hits the
 // same host (apply.workable.com). A single fully-serial queue is safe from
@@ -219,22 +220,33 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
   // the crash class this migration targets, and parseJsonBody's stricter
   // content-type check would turn today's "fallback to list description"
   // outcome into an identical outcome by a longer path for no gain.
+  //
+  // Jobs already on file (raw_jobs.id matches a row loaded by
+  // loadKnownWorkableJobsFromDB) skip the network call entirely and reuse
+  // that row's stored description — this is most of the request volume
+  // that trips Workable's limiter, since every prior run re-fetched every
+  // open role's detail page unconditionally, unchanged or not.
   let detailFailures = 0;
   let rateLimitedFailures = 0;
   const withDesc = await pLimit(
     jobs.map((r) => async () => {
-      const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-      const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
-      const { description, detailFailed, failureReason } = await resolveJobDescription(
-        dr,
-        stripHtml(r.description || ""),
-      );
-      if (detailFailed) {
-        detailFailures += 1;
-        if (failureReason === "rate-limited") rateLimitedFailures += 1;
+      const id = `${mode}_workable_${c.slug}_${r.shortcode}`;
+      const known = getKnownWorkableDescription(id);
+      let description: string;
+      if (known !== undefined) {
+        description = known;
+      } else {
+        const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
+        const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
+        const resolved = await resolveJobDescription(dr, stripHtml(r.description || ""));
+        description = resolved.description;
+        if (resolved.detailFailed) {
+          detailFailures += 1;
+          if (resolved.failureReason === "rate-limited") rateLimitedFailures += 1;
+        }
       }
       return {
-        id: `${mode}_workable_${c.slug}_${r.shortcode}`,
+        id,
         title: r.title,
         location: r.city ?? c.city ?? c.country,
         url: r.url,
