@@ -17,10 +17,25 @@ import type { ATSCompanyRow, CronRunResult } from "./types";
 
 // Vercel Hobby + Fluid Compute caps this route at 300s (see maxDuration in
 // src/app/api/cron/route.ts) — there is no larger number to reach for on
-// this plan. 270s leaves a 30s buffer for the upsert/email/logging steps
-// that run after the fetch phase, so a slow fetch phase degrades to partial
-// results instead of the whole run getting hard-killed mid-upsert.
+// this plan. FETCH_TIME_BUDGET_MS only ever stops *new* company fetches from
+// being queued (see makeFetchTask in cron/fetch-jobs.ts) — already-dispatched
+// fetches are left to run to completion, so on its own this number was never
+// a guarantee the fetch phase actually finished by 270s. HARD_FETCH_CUTOFF_MS
+// below is what makes that a real guarantee to the rest of runCronJob.
 const FETCH_TIME_BUDGET_MS = 270_000;
+
+// The actual ceiling on how long runCronJob waits for the fetch phase before
+// moving on with whatever's been fetched so far (see fetchAllCompanyJobs'
+// hardCutoffAt param). Deliberately set below FETCH_TIME_BUDGET_MS, not at
+// or above it: fetches still in flight when this hits keep running in the
+// background rather than being cancelled (Vercel Fluid Compute keeps the
+// invocation alive after the response is sent, up to maxDuration), so this
+// number governs what the *caller* waits for, while FETCH_TIME_BUDGET_MS
+// separately governs when that background continuation stops queueing more
+// work on its own. Landing this below 270s buys the upsert/app_config/log/
+// email steps below a full 50s of margin under the 300s ceiling instead of
+// the 30s they had when 270s was the only number in play.
+const HARD_FETCH_CUTOFF_MS = 250_000;
 
 /**
  * Runs the global cron job:
@@ -70,12 +85,15 @@ export async function runCronJob(
   // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited,
   // degrading to partial results if the fetch phase runs past its time budget.
   const deadline = startMs + FETCH_TIME_BUDGET_MS;
+  const hardCutoffAt = startMs + HARD_FETCH_CUTOFF_MS;
   console.log(
-    `[cron] fetch phase starting, deadline in ${deadline - Date.now()}ms (+${Date.now() - startMs}ms)`,
+    `[cron] fetch phase starting, deadline in ${deadline - Date.now()}ms, ` +
+      `hard cutoff in ${hardCutoffAt - Date.now()}ms (+${Date.now() - startMs}ms)`,
   );
   const { allJobs, sourceHealth, errors, warnings } = await fetchAllCompanyJobs(
     companies as ATSCompanyRow[],
     deadline,
+    hardCutoffAt,
   );
   console.log(
     `[cron] fetch phase done: ${allJobs.length} jobs, ${errors.length} errors, ${warnings.length} warnings (+${Date.now() - startMs}ms)`,

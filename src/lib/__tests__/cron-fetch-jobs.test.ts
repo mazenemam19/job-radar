@@ -104,9 +104,11 @@ describe("withConcurrencyLimit", () => {
 });
 
 describe("fetchAllCompanyJobs", () => {
-  // Deadline far in the future — these tests aren't exercising the time
-  // budget, so nothing should ever be skipped.
+  // Deadline/cutoff far in the future — these tests aren't exercising the
+  // time budget or the hard cutoff, so nothing should ever be skipped or
+  // cut off early.
   const FAR_FUTURE_DEADLINE = Date.now() + 60_000;
+  const FAR_FUTURE_CUTOFF = Date.now() + 120_000;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,7 +127,7 @@ describe("fetchAllCompanyJobs", () => {
       error: null,
     }));
 
-    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE);
+    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE, FAR_FUTURE_CUTOFF);
 
     expect(fetchCompany).toHaveBeenCalledTimes(3); // a:local, a:global, b:local
     expect(result.allJobs).toHaveLength(3);
@@ -144,7 +146,7 @@ describe("fetchAllCompanyJobs", () => {
       return { company: row.name, mode: "local", jobs: [makeRawJob("b-local")], error: null };
     });
 
-    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE);
+    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE, FAR_FUTURE_CUTOFF);
 
     expect(result.errors).toEqual(["Test Corp (local): timeout"]);
     expect(result.allJobs).toHaveLength(1);
@@ -153,7 +155,7 @@ describe("fetchAllCompanyJobs", () => {
 
   it("returns empty results when no company has an enabled pipeline", async () => {
     const companies = [makeCompanyRow({ pipeline_local: false, pipeline_global: false })];
-    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE);
+    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE, FAR_FUTURE_CUTOFF);
 
     expect(fetchCompany).not.toHaveBeenCalled();
     expect(result.allJobs).toHaveLength(0);
@@ -177,7 +179,7 @@ describe("fetchAllCompanyJobs", () => {
       ],
     }));
 
-    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE);
+    const result = await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE, FAR_FUTURE_CUTOFF);
 
     expect(result.errors).toHaveLength(0); // succeeded — must not read as a failure
     expect(result.allJobs).toHaveLength(1); // and the jobs still made it through
@@ -201,6 +203,7 @@ describe("fetchAllCompanyJobs — time budget", () => {
     // reaches its deadline check in the same synchronous dispatch pass —
     // this isolates the deadline check from the concurrency throttle.
     const deadline = start + 5000;
+    const hardCutoff = start + 60_000; // far beyond this test's ~6s of simulated time
     const companies = Array.from({ length: 5 }, (_, i) =>
       makeCompanyRow({ id: `c${i}`, name: `Company ${i}`, pipeline_local: true }),
     );
@@ -213,7 +216,7 @@ describe("fetchAllCompanyJobs — time budget", () => {
     });
 
     try {
-      const result = await fetchAllCompanyJobs(companies, deadline);
+      const result = await fetchAllCompanyJobs(companies, deadline, hardCutoff);
 
       // 2 real fetches fit inside the 5s budget (0s, 3s); the 3rd task
       // starts at 6s, past the deadline, so it and everything after it
@@ -231,6 +234,7 @@ describe("fetchAllCompanyJobs — time budget", () => {
 
   it("does not skip anything when every fetch finishes inside the deadline", async () => {
     const deadline = Date.now() + 60_000;
+    const hardCutoff = Date.now() + 120_000;
     const companies = [makeCompanyRow({ pipeline_local: true, pipeline_global: true })];
 
     vi.mocked(fetchCompany).mockImplementation(async (row, mode) => ({
@@ -240,10 +244,72 @@ describe("fetchAllCompanyJobs — time budget", () => {
       error: null,
     }));
 
-    const result = await fetchAllCompanyJobs(companies, deadline);
+    const result = await fetchAllCompanyJobs(companies, deadline, hardCutoff);
 
     expect(fetchCompany).toHaveBeenCalledTimes(2);
     expect(result.errors).toHaveLength(0);
+  });
+});
+
+describe("fetchAllCompanyJobs — hard cutoff", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns within the hard cutoff with partial results when some fetches never resolve", async () => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    const deadline = start + 60_000; // soft deadline never reached in this test
+    const hardCutoff = start + 10_000;
+
+    // 2 companies resolve quickly; 1 never resolves at all (simulates the
+    // "dispatched right before the deadline, then runs long" scenario from
+    // docs/solutions/bugs/issue-52-504-recurrence-part6.md — a single
+    // company task with no ceiling on its own total duration).
+    const companies = [
+      makeCompanyRow({ id: "fast-1", name: "Fast One", pipeline_local: true }),
+      makeCompanyRow({ id: "fast-2", name: "Fast Two", pipeline_local: true }),
+      makeCompanyRow({ id: "stuck", name: "Stuck Co", pipeline_local: true }),
+    ];
+
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
+      if (row.id === "stuck") return new Promise(() => {}); // never settles
+      return { company: row.name, mode, jobs: [makeRawJob(`${row.id}-${mode}`)], error: null };
+    });
+
+    try {
+      const resultPromise = fetchAllCompanyJobs(companies, deadline, hardCutoff);
+      // Let the two fast fetches settle (real microtask resolution, not tied
+      // to the fake clock), then advance the fake clock past the cutoff so
+      // hardCutoffSignal's setTimeout actually fires.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      const result = await resultPromise;
+
+      expect(result.allJobs.map((j) => j.id).sort()).toEqual(["fast-1-local", "fast-2-local"]);
+      expect(result.errors).toHaveLength(0); // the stuck task simply never reported in — not a failure
+      expect(fetchCompany).toHaveBeenCalledTimes(3); // all 3 were dispatched; "stuck" just never finished
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not cut off early when every fetch settles before the hard cutoff", async () => {
+    const deadline = Date.now() + 60_000;
+    const hardCutoff = Date.now() + 60_000;
+    const companies = [makeCompanyRow({ id: "a", pipeline_local: true, pipeline_global: true })];
+
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => ({
+      company: row.name,
+      mode,
+      jobs: [makeRawJob(`${row.id}-${mode}`)],
+      error: null,
+    }));
+
+    const result = await fetchAllCompanyJobs(companies, deadline, hardCutoff);
+
+    expect(result.allJobs).toHaveLength(2); // both pipelines' jobs made it through, not cut short
   });
 });
 
@@ -300,7 +366,8 @@ describe("fetchAllCompanyJobs — Workable gets its own concurrency pool", () =>
     ];
 
     const deadline = Date.now() + 60_000;
-    const pending = fetchAllCompanyJobs(companies, deadline);
+    const hardCutoff = Date.now() + 120_000; // real timer, unref'd — never actually waited on
+    const pending = fetchAllCompanyJobs(companies, deadline, hardCutoff);
 
     // Let dispatch actually happen without waiting on the stuck Workable
     // promises, which never resolve on their own.
