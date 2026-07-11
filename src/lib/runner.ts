@@ -11,6 +11,7 @@ import {
   flushWorkable429sToDB,
   flushDomainCountsToDB,
 } from "./sources/ats-utils";
+import { loadKnownWorkableJobsFromDB } from "./sources/ats/known-jobs";
 import type { ATSCompanyRow, CronRunResult } from "./types";
 
 // ── Main cron function ───────────────────────────────────────
@@ -69,6 +70,13 @@ export async function runCronJob(
   // since serverless invocations don't share memory or /tmp.
   await loadWorkableStateFromDB();
   console.log(`[cron] workable state loaded (+${Date.now() - startMs}ms)`);
+
+  // Load descriptions for Workable jobs already on file, so fetchWorkable can
+  // skip re-fetching a detail page it already has the text for — this is
+  // most of the request volume that trips Workable's rate limiter in the
+  // first place (see docs/solutions/bugs/Issue 52 504 recurrence part6).
+  await loadKnownWorkableJobsFromDB();
+  console.log(`[cron] known workable jobs loaded (+${Date.now() - startMs}ms)`);
 
   if (companiesError || !companies?.length) {
     const msg = companiesError?.message ?? "No active companies found";

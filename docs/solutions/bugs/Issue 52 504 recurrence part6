@@ -104,40 +104,54 @@ getting rate-limited, not how often it got rate-limited.
   change; verified against the pre-existing baseline on `main` (408/408,
   same lint/build noise) to confirm nothing here is inherited breakage.
 
-### Task 2 — Skip detail-fetch for already-known jobs — NOT YET BUILT
+### Task 2 — Skip detail-fetch for already-known jobs — DONE, this session
 
 **Files:** `src/lib/sources/ats/workable.ts`, `src/lib/runner.ts`, new
-`src/lib/sources/ats/known-jobs.ts`
+`src/lib/sources/ats/known-jobs.ts`, new
+`src/lib/__tests__/workable-known-jobs.test.ts`
 
-- The original version of this plan called this "a signature change" to
-  `fetchWorkable()`, since all 8 ATS fetchers share one `Fetcher` type in
-  `ats-bridge.ts` (`(config: ATSConfig, mode: JobMode) => Promise<FetcherResult>`)
-  and changing `fetchWorkable`'s signature alone would break that contract.
-  That's not actually how this codebase solves this class of problem:
-  `run-state.ts` already carries exactly this kind of run-scoped,
-  Workable-specific state (blocked slugs, budget/used counters) as a
-  module-level cache with a `loadXFromDB()` populate step called once from
-  `runner.ts` before dispatch, read via plain getters inside
-  `fetchWorkable` — no signature change anywhere. `known-jobs.ts` should
-  follow that same pattern instead of the signature-change approach
-  originally proposed.
-- One query, scoped to `ats_type = 'workable'` (not per-company, and not
-  attempting to pre-filter by slug via `raw_jobs.id` string matching, since
-  the shortcode segment of that id isn't known until the list call
-  returns) — load into an in-memory `Map<id, description>`.
-- Skip the detail-page fetch when a job's id is already in that map; reuse
-  the stored description from the map (not just a boolean "known" check —
-  the fallback needs the actual text, since `upsertRawJobs` writes
-  whatever's in `RawJob.description` unconditionally on every upsert).
-  Still upsert the job (refreshes `fetched_at`); just skip the network call
-  for its detail page.
-- Test: assert a known job id doesn't trigger a detail-page fetch; assert
-  an unseen id still does; assert the reused description matches what was
-  stored, not the list-call fallback description.
+- `known-jobs.ts` follows the `run-state.ts` pattern exactly, as planned
+  below: a module-level `Map<id, description>`, a `loadKnownWorkableJobsFromDB()`
+  populate step called once from `runner.ts` before dispatch, and a plain
+  getter (`getKnownWorkableDescription`) read from inside `fetchWorkable`.
+  No signature change to `fetchWorkable` or the shared `Fetcher` type.
+- One query, scoped to `ats_type = 'workable'`, not per-company — loads
+  every known Workable job's `id`/`description` into the map.
+- `fetchWorkable` computes each job's id up front and checks the map before
+  building the detail URL. A hit skips `fetchWorkableUrl` and reuses the
+  stored description (no network call, no domain-request tracking, no
+  detail-failure warning); a miss fetches the detail page exactly as
+  before. The job is still returned and upserted either way, so
+  `fetched_at` still refreshes on every run.
+- Tests: `known-jobs.test.ts` covers the loader's query shape, the
+  known/unknown getter, and a select failure leaving the cache empty; an
+  integration test on `fetchWorkable` asserts a known id's detail URL is
+  never requested while an unseen id's still is, and that the known job's
+  description comes from the stored map, not the list-call fallback.
+- Gates: `pnpm test` (415/415, 5 new), `pnpm lint`, `pnpm build` all clean;
+  no new lint warnings beyond the pre-existing baseline.
 
 ### Task 3 — The soak test
 
 Covered by Task 1's "hard cutoff" tests above — no separate work needed.
+
+## Not Yet Confirmed
+
+Both tasks are gated on `pnpm test && pnpm lint && pnpm build`, not on a live
+cron run. Neither the hard cutoff (Task 1) nor the known-jobs skip (Task 2)
+has been observed against real `cron_logs_v2` data yet — specifically:
+
+- Whether the hard cutoff actually keeps `/api/cron` under 300s during a
+  real 429 storm, not just in the simulated-never-resolves test.
+- How much the known-jobs skip actually cuts Workable request volume on a
+  live run, and whether that's enough on its own to stop 429s recurring,
+  or whether Workable's limiter is keyed on something this doesn't touch
+  (e.g. IP-based, not just request-count-based).
+
+Validate both against `cron_logs_v2` duration and 429 count after this
+ships and a few scheduled runs have happened — same caveat part 5 shipped
+with and that this session's recurrence is a direct consequence of
+skipping.
 
 ## Constraints (from `.agents/AGENTS.md` — do not violate)
 
