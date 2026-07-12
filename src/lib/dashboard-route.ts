@@ -7,41 +7,46 @@ import { filterJobsWithGemini } from "@/lib/gemini";
 import {
   scoreJob,
   mergeJobs,
-  passesDateGate,
-  passesSettingsGate,
-  passesGlobalModeGate,
+  passesRequiredKeywordsGate,
+  passesSkillMatchGate,
 } from "@/lib/scoring";
 import type { RawJob, ScoredJob, PipelineLog, ResolvedSettings } from "@/lib/types";
+import type { RawJobsFunnel } from "@/lib/raw-jobs-query";
 
 export type FeedResult = {
   finalJobs: ScoredJob[];
   pipelineLog: PipelineLog;
 };
 
-/** Applies every pipeline stage (date → settings → global-mode → Gemini → score → merge)
- *  to the supplied raw job pool and returns the final job list with its pipeline log. */
+/**
+ * Applies the remaining pipeline stages (precision recheck → Gemini → score →
+ * merge) to a raw job pool that has ALREADY passed date, seniority, excluded-
+ * keywords, blacklisted-locations, and global-mode filtering at the DB level
+ * (see fetchFilteredRawJobs() in raw-jobs-query.ts). `rawJobs` here also
+ * carries a COARSE superset for required-keywords/skill-match -- the precision
+ * recheck below is what actually enforces hasMeaningfulKeywordMatch()'s
+ * boilerplate-window logic, which the SQL deliberately does not replicate
+ * (see docs/plans/2026-07-11-db-level-job-filtering.md §2.3).
+ *
+ * `dbFunnelCounts` carries total_fetched/after_date_filter through from the
+ * RPC's funnel object -- this function no longer has enough information to
+ * compute them itself, since it never sees the unfiltered pool.
+ */
 export async function buildFeed(
   rawJobs: RawJob[],
+  dbFunnelCounts: Pick<RawJobsFunnel, "total_fetched" | "after_date_filter">,
   settings: ResolvedSettings,
   geminiApiKey: string | null | undefined,
 ): Promise<FeedResult> {
-  const totalFetched = rawJobs.length;
-
-  // Stage 1: Date filter
-  const afterDateFilter = rawJobs.filter((j) => passesDateGate(j, settings.job_age_days));
-
-  // Stage 2: Settings filter (seniority + tech stack + regex gates)
-  const afterSettingsFilter = afterDateFilter.filter((j) => passesSettingsGate(j, settings));
-
-  // Stage 3: Global-mode timezone/region filter (only for "global" pipeline jobs)
-  const afterGlobalModeFilter = afterSettingsFilter.filter((j) =>
-    j.mode === "global" ? passesGlobalModeGate(j, settings) : true,
+  // Stage: exact precision recheck for required-keywords/skill-match.
+  const afterPrecisionFilter = rawJobs.filter(
+    (j) => passesRequiredKeywordsGate(j, settings) && passesSkillMatchGate(j, settings),
   );
 
-  // Stage 4: Gemini filter — skipped when no key, fails open on error
+  // Stage: Gemini filter — skipped when no key, fails open on error
   const geminiFiltered = geminiApiKey
-    ? await filterJobsWithGemini(geminiApiKey, afterGlobalModeFilter, settings)
-    : afterGlobalModeFilter.map((j) => ({
+    ? await filterJobsWithGemini(geminiApiKey, afterPrecisionFilter, settings)
+    : afterPrecisionFilter.map((j) => ({
         ...j,
         gemini_pass: true,
         gemini_reason: null,
@@ -49,7 +54,7 @@ export async function buildFeed(
         gemini_quota_exhausted: false,
       }));
 
-  // Stage 5: Score — jobs with total_score ≤ 0 are discarded here
+  // Stage: Score — jobs with total_score ≤ 0 are discarded here
   const scoredJobs: ScoredJob[] = [];
   for (const job of geminiFiltered) {
     const scored = scoreJob(
@@ -65,15 +70,18 @@ export async function buildFeed(
     }
   }
 
-  // Stage 6: Merge — deduplicates and sorts by total_score descending.
+  // Stage: Merge — deduplicates and sorts by total_score descending.
   // Empty first arg is intentional: this is a full rebuild path, not an
   // incremental merge — there are no pre-existing cached jobs to preserve.
   const finalJobs = mergeJobs([], scoredJobs);
 
   const pipelineLog: PipelineLog = {
-    total_fetched: totalFetched,
-    after_date_filter: afterDateFilter.length,
-    after_settings_filter: afterSettingsFilter.length,
+    total_fetched: dbFunnelCounts.total_fetched,
+    after_date_filter: dbFunnelCounts.after_date_filter,
+    // NOTE: this now includes global-mode attrition, which used to be
+    // invisibly bundled into "after your Gemini filter" -- a deliberate,
+    // disclosed redefinition, not an accident. See plan §4.2.
+    after_settings_filter: afterPrecisionFilter.length,
     after_gemini_filter: geminiFiltered.length,
     after_scoring: finalJobs.length,
     cached_at: new Date().toISOString(),
