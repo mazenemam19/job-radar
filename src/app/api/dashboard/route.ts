@@ -11,11 +11,12 @@
 import { NextResponse } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { dbErrorResponse } from "@/lib/api-errors";
+import { catchErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
 import { isCacheFresh } from "@/lib/runner";
 import { buildFeed, enabledModes } from "@/lib/dashboard-route";
-import type { RawJob, ScoredJob, PipelineLog } from "@/lib/types";
+import { fetchFilteredRawJobs } from "@/lib/raw-jobs-query";
+import type { ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
 export const maxDuration = 60; // Vercel: allow up to 60s for Gemini filter
@@ -67,21 +68,23 @@ export async function GET() {
     }
   }
 
-  // ── Fetch raw jobs for enabled pipelines ─────────────────────
-  const { data: rawJobsData, error: rawError } = await adminDb
-    .from("raw_jobs")
-    .select("*")
-    .in("mode", enabledModes(settings))
-    .order("fetched_at", { ascending: false })
-    .limit(2000); // hard cap to keep Gemini context manageable
-
-  if (rawError) {
-    return dbErrorResponse("dashboard:GET", rawError);
+  // ── Fetch raw jobs for enabled pipelines, pre-filtered at the DB level ─
+  // Date, seniority, excluded-keywords, blacklisted-locations, and global-mode
+  // filtering now happen inside this call (see raw-jobs-query.ts and
+  // docs/plans/2026-07-11-db-level-job-filtering.md). Required-keywords and
+  // skill-match get a coarse superset here; buildFeed() below applies the
+  // exact precision recheck.
+  let rawJobsResult;
+  try {
+    rawJobsResult = await fetchFilteredRawJobs(enabledModes(settings), settings);
+  } catch (err) {
+    return catchErrorResponse("dashboard:GET:fetchFilteredRawJobs", err);
   }
 
-  // ── Run pipeline (date → settings → global-mode → Gemini → score → merge) ─
+  // ── Run pipeline (precision recheck → Gemini → score → merge) ───────
   const { finalJobs, pipelineLog } = await buildFeed(
-    (rawJobsData ?? []) as RawJob[],
+    rawJobsResult.jobs,
+    rawJobsResult.funnel,
     settings,
     profile?.gemini_api_key,
   );
