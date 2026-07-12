@@ -6,6 +6,7 @@
 
 import { fetchCompany } from "../ats-bridge";
 import { WORKABLE_LANE_COUNT } from "../sources/ats/workable";
+import { sortAndRotate, recordDispatchCursor } from "./dispatch-cursor";
 import type { ATSCompanyRow, CronRunResult, RawJob, JobMode } from "../types";
 
 const CONCURRENCY_LIMIT = 8; // max parallel ATS fetches, non-Workable
@@ -81,12 +82,19 @@ export interface FetchAllCompanyJobsResult {
  * useful: without it, racing the batch against a timeout would have nothing
  * to hand back except whatever the winning promise resolved to, which is
  * exactly nothing when the timeout is the winner.
+ *
+ * `onDispatch`, if given, fires synchronously the instant this task is
+ * handed to fetchCompany — before that fetch is awaited, not when it
+ * settles. The dispatch-rotation cursor (see dispatch-cursor.ts) needs to
+ * know "was this handed off at all", per FR2, independent of whether the
+ * fetch resolves before or after fetchAllCompanyJobs' hard cutoff returns.
  */
 function makeFetchTask(
   row: ATSCompanyRow,
   mode: JobMode,
   deadline: number,
   onSettle: (result: FetchTaskResult) => void,
+  onDispatch?: () => void,
 ): () => Promise<FetchTaskResult> {
   return () => {
     if (Date.now() >= deadline) {
@@ -100,6 +108,7 @@ function makeFetchTask(
       onSettle(result);
       return Promise.resolve(result);
     }
+    onDispatch?.();
     const t0 = Date.now();
     console.log(`[cron] ${row.name} (${mode}): dispatching (ats=${row.ats})`);
     return fetchCompany(row, mode).then((result) => {
@@ -180,10 +189,25 @@ export async function fetchAllCompanyJobs(
   const workableTasks: Array<() => Promise<FetchTaskResult>> = [];
   const otherTasks: Array<() => Promise<FetchTaskResult>> = [];
 
+  // Workable keeps whatever order `companies` arrived in — its dispatch
+  // order is explicitly out of scope for this rotation (FR6). Only the
+  // "other" bucket gets resorted into FR1's stable order and rotated to
+  // resume right after the persisted cursor (FR3/FR4).
+  const otherRows = sortAndRotate(companies.filter((row) => row.ats !== "workable"));
+  const dispatchedOtherIds = new Set<string>();
+
   for (const row of companies) {
-    const bucket = row.ats === "workable" ? workableTasks : otherTasks;
-    if (row.pipeline_local) bucket.push(makeFetchTask(row, "local", deadline, recordResult));
-    if (row.pipeline_global) bucket.push(makeFetchTask(row, "global", deadline, recordResult));
+    if (row.ats !== "workable") continue;
+    if (row.pipeline_local) workableTasks.push(makeFetchTask(row, "local", deadline, recordResult));
+    if (row.pipeline_global)
+      workableTasks.push(makeFetchTask(row, "global", deadline, recordResult));
+  }
+  for (const row of otherRows) {
+    const onDispatch = () => dispatchedOtherIds.add(row.id);
+    if (row.pipeline_local)
+      otherTasks.push(makeFetchTask(row, "local", deadline, recordResult, onDispatch));
+    if (row.pipeline_global)
+      otherTasks.push(makeFetchTask(row, "global", deadline, recordResult, onDispatch));
   }
 
   // Two independent pools, not one shared one: Workable's own pool is capped
@@ -201,6 +225,11 @@ export async function fetchAllCompanyJobs(
   // executing and keep calling recordResult, but nothing reads the
   // accumulator again after this function returns.
   await Promise.race([dispatchComplete, hardCutoffSignal(hardCutoffAt - Date.now())]);
+
+  // FR2: record the last "other"-bucket company (in this run's rotated
+  // order) that actually got dispatched, so the next run resumes right
+  // after it instead of restarting from the top of FR1's order.
+  recordDispatchCursor(otherRows, dispatchedOtherIds);
 
   return { allJobs, sourceHealth, errors, warnings };
 }

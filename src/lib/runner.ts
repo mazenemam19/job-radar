@@ -12,6 +12,7 @@ import {
   flushDomainCountsToDB,
 } from "./sources/ats-utils";
 import { loadKnownWorkableJobsFromDB } from "./sources/ats/known-jobs";
+import { loadDispatchCursorFromDB, flushDispatchCursorToDB } from "./cron/dispatch-cursor";
 import type { ATSCompanyRow, CronRunResult } from "./types";
 
 // ── Main cron function ───────────────────────────────────────
@@ -78,6 +79,10 @@ export async function runCronJob(
   await loadKnownWorkableJobsFromDB();
   console.log(`[cron] known workable jobs loaded (+${Date.now() - startMs}ms)`);
 
+  // Load the "other"-bucket dispatch rotation cursor — see dispatch-cursor.ts.
+  await loadDispatchCursorFromDB();
+  console.log(`[cron] dispatch cursor loaded (+${Date.now() - startMs}ms)`);
+
   if (companiesError || !companies?.length) {
     const msg = companiesError?.message ?? "No active companies found";
     return {
@@ -134,6 +139,11 @@ export async function runCronJob(
   // Persist domain request counts for rate-limiting accuracy across runs.
   await flushDomainCountsToDB();
   console.log(`[cron] domain counts flush done (+${Date.now() - startMs}ms)`);
+
+  // Persist where "other"-bucket dispatch stopped this run, so a skip from
+  // exceeding the time budget doesn't land on the same companies next run.
+  await flushDispatchCursorToDB();
+  console.log(`[cron] dispatch cursor flush done (+${Date.now() - startMs}ms)`);
 
   const durationMs = Date.now() - startMs;
 

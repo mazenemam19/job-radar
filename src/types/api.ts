@@ -189,3 +189,8 @@ export interface WorkableCooldownEntry {
 }
 
 export type WorkableBudgetConfig = { global: number; local: number };
+
+export interface DispatchCursor {
+  companyId: string;
+  createdAt: string;
+}
