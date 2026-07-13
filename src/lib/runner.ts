@@ -39,6 +39,11 @@ const FETCH_TIME_BUDGET_MS = 270_000;
 // the 30s they had when 270s was the only number in play.
 const HARD_FETCH_CUTOFF_MS = 250_000;
 
+/** Pushes message onto errors if non-null. Keeps null-check branches out of runCronJob itself. */
+function pushError(errors: string[], message: string | null): void {
+  if (message) errors.push(message);
+}
+
 /**
  * Runs the global cron job:
  *  1. Fetches all active companies from public.ats_companies
@@ -142,7 +147,7 @@ export async function runCronJob(
 
   // Persist where "other"-bucket dispatch stopped this run, so a skip from
   // exceeding the time budget doesn't land on the same companies next run.
-  await flushDispatchCursorToDB();
+  pushError(errors, await flushDispatchCursorToDB());
   console.log(`[cron] dispatch cursor flush done (+${Date.now() - startMs}ms)`);
 
   const durationMs = Date.now() - startMs;

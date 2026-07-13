@@ -97,10 +97,17 @@ export async function loadDispatchCursorFromDB(): Promise<void> {
   cursorDirty = false;
 }
 
-export async function flushDispatchCursorToDB(): Promise<void> {
+/**
+ * Returns null on success (including the no-op "nothing to flush" case).
+ * Returns an error message on failure — callers should push this into their
+ * own error-reporting path (see runCronJob), since console.error alone left
+ * a failed flush indistinguishable from a legitimately quiet run in
+ * cron_logs_v2 (see docs/solutions/bugs/issue-52-dispatch-rotation-cursor.md).
+ */
+export async function flushDispatchCursorToDB(): Promise<string | null> {
   if (!cursorDirty) {
     console.log("[dispatch-cursor] flushDispatchCursorToDB: nothing to flush, skipping");
-    return;
+    return null;
   }
   const { createAdminClient } = await import("../supabase/admin");
   const db = createAdminClient();
@@ -113,8 +120,9 @@ export async function flushDispatchCursorToDB(): Promise<void> {
     .eq("id", 1);
   if (error) {
     console.error("[dispatch-cursor] flushDispatchCursorToDB update failed:", error.message);
-    return; // keep cursorDirty true so a retry on a warm process can still send it
+    return `Failed to persist dispatch cursor: ${error.message}`; // keep cursorDirty true so a retry on a warm process can still send it
   }
   console.log(`[dispatch-cursor] flushDispatchCursorToDB: persisted ${cursorCache?.companyId}`);
   cursorDirty = false;
+  return null;
 }

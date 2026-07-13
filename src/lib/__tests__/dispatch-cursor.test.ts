@@ -215,7 +215,8 @@ describe("flushDispatchCursorToDB", () => {
 
   it("skips the write when nothing was recorded this run", async () => {
     const { flushDispatchCursorToDB } = await import("../cron/dispatch-cursor");
-    await flushDispatchCursorToDB();
+    const result = await flushDispatchCursorToDB();
+    expect(result).toBeNull();
     expect(mockDb.from).not.toHaveBeenCalled();
   });
 
@@ -226,8 +227,9 @@ describe("flushDispatchCursorToDB", () => {
 
     const rows = makeRows(["a"]);
     recordDispatchCursor(rows, new Set(["a"]));
-    await flushDispatchCursorToDB();
+    const result = await flushDispatchCursorToDB();
 
+    expect(result).toBeNull();
     expect(mockDb.from).toHaveBeenCalledWith("app_config");
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -253,9 +255,11 @@ describe("flushDispatchCursorToDB", () => {
     const rows = makeRows(["a"]);
     recordDispatchCursor(rows, new Set(["a"]));
 
-    await flushDispatchCursorToDB(); // fails — must not clear the pending cursor
-    await flushDispatchCursorToDB(); // retry — should still attempt the write
+    const firstResult = await flushDispatchCursorToDB(); // fails — must not clear the pending cursor
+    const secondResult = await flushDispatchCursorToDB(); // retry — should still attempt the write
 
+    expect(firstResult).toBe("Failed to persist dispatch cursor: conn reset");
+    expect(secondResult).toBeNull();
     expect(mockDb.from).toHaveBeenCalledTimes(2);
     consoleErrorSpy.mockRestore();
   });
@@ -268,8 +272,9 @@ describe("flushDispatchCursorToDB", () => {
     const rows = makeRows(["a"]);
     recordDispatchCursor(rows, new Set(["a"]));
     await flushDispatchCursorToDB();
-    await flushDispatchCursorToDB(); // nothing new recorded since — must not re-send
+    const secondResult = await flushDispatchCursorToDB(); // nothing new recorded since — must not re-send
 
+    expect(secondResult).toBeNull();
     expect(update).toHaveBeenCalledTimes(1);
   });
 });
