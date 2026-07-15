@@ -321,8 +321,8 @@ survived the free stages:
    rather than being silently dropped; any job whose `idx` Gemini's response doesn't
    address, or returns invalid/duplicate, also defaults to pass — but this is now logged
    loudly (`console.error` with the raw response attached), not silent.
-   - Model fallback queue: `gemini-3.1-pro-preview` → `gemini-3.1-flash-lite-preview` →
-     `gemini-2.5-pro` → `gemini-2.5-flash` → `gemini-2.5-flash-lite`. Auth errors
+   - Model fallback queue: `gemini-3.5-flash` → `gemini-3.1-flash-lite-preview` → `gemini-2.5-pro` →
+     `gemini-2.5-flash` → `gemini-2.5-flash-lite`. Auth errors
      (invalid key) abort immediately rather than cycling models; other errors (429,
      unsupported model, server error) advance to the next model in the queue.
 4. **Scoring** (`scoreJob`) — applied to everything that survived stage 3:

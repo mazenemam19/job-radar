@@ -214,7 +214,7 @@ describe("generateApplicationStrategy", () => {
       "Highlight your React experience",
       "Ask about the team's stack",
     ]);
-    expect(result.model_used).toBe("gemini-3.1-pro-preview");
+    expect(result.model_used).toBe("gemini-3.5-flash");
   });
 
   it("falls back to the next model on failure and reports it as model_used", async () => {
@@ -241,8 +241,10 @@ describe("generateApplicationStrategy", () => {
     generateContentMock.mockRejectedValue(new Error("429 RESOURCE_EXHAUSTED"));
 
     await expect(generateApplicationStrategy("key", job, skills)).rejects.toThrow("quota");
-    // MODEL_QUEUE isn't exported; 5 is its current length (see gemini.ts) —
-    // asserts every model in the queue was tried before giving up.
+    // MODEL_QUEUE isn't exported; 5 is its current length (gemini-3.1-pro-preview
+    // was removed 2026-07-15 and replaced with gemini-3.5-flash — see
+    // gemini-model-fallback.ts) — asserts every model in the queue was tried
+    // before giving up.
     expect(generateContentMock).toHaveBeenCalledTimes(5);
   });
 });

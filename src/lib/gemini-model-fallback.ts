@@ -8,9 +8,16 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Models tried in order; falls back to next on quota/error
+// Models tried in order; falls back to next on quota/error.
+// gemini-3.1-pro-preview was removed: this project's Gemini
+// account is unbilled, and 3.1-pro sits in Google's zero-allocation
+// "Free Tier" bucket (not the real "Free Usage Allowance" bucket) --
+// every call returns 429 limit:0 regardless of usage, load, or pacing.
+// It isn't rate-limited, it's structurally inaccessible on this billing
+// tier, so keeping it in the queue only bought a guaranteed-failed round
+// trip on every single batch before falling through to a model that works.
 export const MODEL_QUEUE = [
-  "gemini-3.1-pro-preview",
+  "gemini-3.5-flash",
   "gemini-3.1-flash-lite-preview",
   "gemini-2.5-pro",
   "gemini-2.5-flash",

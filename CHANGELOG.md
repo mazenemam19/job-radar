@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `gemini-3.1-pro-preview` was removed and replaced by free model `gemini-3.5-flash`
+  2026-07-15 — this project's unbilled Gemini account sits in Google's zero-allocation
+  free-tier bucket for that model, so every call to `gemini-3.1-pro-preview` returned 429 `limit: 0` regardless of
+  usage; not rate-limited, structurally inaccessible on this billing tier.
 - `jr_get_filtered_raw_jobs`'s `patterns` CTE wasn't materialized, so
   Postgres inlined it and re-ran every `jr_word_boundary_pattern()`/
   `jr_substring_pattern()` call (a `string_agg` + per-term `regexp_replace`
