@@ -2,337 +2,85 @@
 // Per-user Gemini filtering and strategy generation.
 // Each user's API key is fetched from user_profiles.gemini_api_key.
 // Falls back to the environment GEMINI_API_KEY for admin/default operations only.
+//
+// Split across a few files by concern:
+//   gemini-model-fallback.ts  -- try-each-model-in-order infrastructure
+//   gemini-batch-filter.ts    -- call Gemini for one batch, parse/validate response
+//   gemini-review-cache.ts    -- persistent per-(user,job,prompt) decision cache
+//   gemini.ts (this file)     -- public API: filterJobsWithGemini, generateApplicationStrategy
 
-import { GoogleGenAI } from "@google/genai";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RawJob, ResolvedSettings } from "./types";
+import type { Database } from "./database.types";
+import { hashPrompt, loadCachedDecisions, persistDecisions } from "./gemini-review-cache";
+import type { CachedDecision } from "./gemini-review-cache";
+import { BATCH_SIZE, BATCH_DELAY_MS, delay, filterBatch } from "./gemini-batch-filter";
+import { callWithModelFallback } from "./gemini-model-fallback";
 
-// Models tried in order; falls back to next on quota/error
-const MODEL_QUEUE = [
-  "gemini-3.1-pro-preview",
-  "gemini-3.1-flash-lite-preview",
-  "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-];
+type GeminiReviewedJob = RawJob & {
+  gemini_pass: boolean;
+  gemini_reason: string | null;
+  gemini_reviewed: boolean;
+  gemini_quota_exhausted: boolean;
+};
 
-const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the larger per-job char window below)
-
-// Fixed, code-owned response-format contract. Deliberately NOT part of
-// gemini_filter_prompt (which is user-editable).
-// A stored, user-editable JSON contract is how this broke in the first place.
-// Index-based (not job.id) because asking a model to echo back long,
-// opaque composite ID strings character-for-character is fragile; a short
-// integer it can't mangle is not.
-const RESPONSE_FORMAT_INSTRUCTIONS = `Respond with ONLY a JSON array, no markdown, no preamble. Each element must be:
-{ "idx": <number>, "pass": true/false, "reason": "<one short sentence>" }
-"idx" must exactly match the "idx" field given for that job below. Include a decision for every job listed — do not skip any.`;
-
-interface GeminiDecision {
-  idx: number;
-  pass: boolean;
-  reason: string;
-}
-
-// Recognizable shape of a Gemini quota/rate-limit error — shared by the
-// model-fallback loop's quota tracking below.
-function isQuotaError(msg: string): boolean {
-  return msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
-}
-
-// Thrown by callWithModelFallback only when every model in MODEL_QUEUE failed
-// and every one of those failures was specifically a quota/rate-limit error —
-// as opposed to a network error, bad response, or other transient failure.
-// Lets filterBatch's catch block surface a distinct "quota exhausted" badge
-// instead of the generic "not AI-reviewed" one.
-class GeminiQuotaExhaustedError extends Error {
-  constructor() {
-    super("All Gemini models exhausted their quota");
-    this.name = "GeminiQuotaExhaustedError";
-  }
-}
-
-interface FilterResult {
-  id: string;
-  pass: boolean;
-  reason: string | null;
-  // true only when Gemini returned a real, matched decision for this job's
-  // idx. false for both fail-open paths (missing idx in an otherwise-valid
-  // response, or total batch failure).
-
-  reviewed: boolean;
-  // true only when the batch failed open specifically because every model
-  // was quota-exhausted (see GeminiQuotaExhaustedError). Optional because
-  // most FilterResult constructions never hit that path.
-  quotaExhausted?: boolean;
-}
-
-// ── Shared model-fallback loop ───────────────────────────────
-// callGemini and generateApplicationStrategy both need "try each model in
-// MODEL_QUEUE, bail immediately on an invalid key, otherwise fall through to
-// the next model, and report whether every failure was quota-related" — that
-// shared shape lived duplicated in both functions and pushed each over the
-// complexity limit on its own. Extracted once here instead.
-
-type ModelAttempt<T> = { value: T } | { retry: true; quota: boolean; msg: string };
-
-async function tryModelCall<T>(
-  genAI: GoogleGenAI,
-  model: string,
-  temperature: number,
-  prompt: string,
-  parse: (text: string) => T | null,
-): Promise<ModelAttempt<T>> {
-  try {
-    const response = await genAI.models.generateContent({
-      model,
-      contents: prompt,
-      config: { temperature },
-    });
-    const parsed = parse(response.text ?? "");
-    if (parsed !== null) return { value: parsed };
-    return { retry: true, quota: false, msg: "empty or invalid response" };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-
-    // If the API key is completely invalid or unauthorized, fail immediately
-    if (
-      msg.includes("401") ||
-      msg.includes("API_KEY_INVALID") ||
-      msg.includes("INVALID_ARGUMENT")
-    ) {
-      throw err;
-    }
-
-    return { retry: true, quota: isQuotaError(msg), msg };
-  }
-}
-
-/**
- * Tries each model in MODEL_QUEUE in order against `prompt`, using `parse` to
- * validate/extract a result from the raw text. Returns the first successful
- * `{ value, model }` pair. Throws GeminiQuotaExhaustedError if every model
- * failed and every failure was quota-related, otherwise a generic Error with
- * `exhaustedMessage`.
- */
-async function callWithModelFallback<T>(
-  apiKey: string,
-  temperature: number,
-  prompt: string,
-  parse: (text: string) => T | null,
-  label: string,
-  exhaustedMessage: string,
-): Promise<{ value: T; model: string }> {
-  const genAI = new GoogleGenAI({ apiKey });
-  let allFailuresWereQuota = true;
-
-  for (const model of MODEL_QUEUE) {
-    const result = await tryModelCall(genAI, model, temperature, prompt, parse);
-    if ("value" in result) return { value: result.value, model };
-
-    if (!result.quota) allFailuresWereQuota = false;
-    console.warn(`[gemini] ${label} — model ${model} failed, trying next... Error:`, result.msg);
-  }
-
-  throw allFailuresWereQuota ? new GeminiQuotaExhaustedError() : new Error(exhaustedMessage);
-}
-
-// ── Core call with model fallback ────────────────────────────
-
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
-  const { value } = await callWithModelFallback(
-    apiKey,
-    0,
-    prompt,
-    (text) => (text.trim() ? text : null),
-    "callGemini",
-    "All Gemini models exhausted",
-  );
-  return value;
-}
-
-// ── Parse Gemini JSON response ────────────────────────────────
-
-function parseDecisions(text: string): GeminiDecision[] {
-  // Strip markdown fences if present
-  const clean = text
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-
-  try {
-    const parsed = JSON.parse(clean);
-    if (Array.isArray(parsed)) return parsed as GeminiDecision[];
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-// ── Batch filtering ───────────────────────────────────────────
-
-// Turns Gemini's raw decisions into a resultMap, validating/deduping idx and
-// logging (loudly) any job that never got a matched decision. Split out of
-// filterBatch so the batch-level try/catch stays simple.
-function buildResultMap(
+// Splits jobs into ones with a usable cached decision (mapped straight to
+// the final output shape) and ones that still need a real Gemini call.
+function partitionByCache(
   jobs: RawJob[],
-  decisions: GeminiDecision[],
-  raw: string,
-): Map<string, FilterResult> {
-  const resultMap = new Map<string, FilterResult>();
-  const seenIdx = new Set<number>();
+  cached: Map<string, CachedDecision>,
+): { fromCache: GeminiReviewedJob[]; jobsNeedingReview: RawJob[] } {
+  const fromCache: GeminiReviewedJob[] = [];
+  const jobsNeedingReview: RawJob[] = [];
 
-  for (const d of decisions) {
-    const idx = d.idx;
-    const isValidIdx =
-      typeof idx === "number" && Number.isInteger(idx) && idx >= 0 && idx < jobs.length;
-
-    if (!isValidIdx) {
-      console.error(
-        `[gemini] Decision with invalid/out-of-range idx (${JSON.stringify(idx)}) for a batch of ${jobs.length}. Raw response:`,
-        raw,
-      );
+  for (const job of jobs) {
+    const decision = cached.get(job.id);
+    if (!decision) {
+      jobsNeedingReview.push(job);
       continue;
     }
-    if (seenIdx.has(idx)) {
-      console.error(
-        `[gemini] Duplicate idx ${idx} in response, ignoring repeat. Raw response:`,
-        raw,
-      );
-      continue;
+    // A cached "fail" means Gemini already rejected this job under this
+    // exact prompt -- honor it without spending another call. A cached
+    // "pass" gets included, same as a fresh pass would be.
+    if (decision.pass) {
+      fromCache.push({
+        ...job,
+        gemini_pass: true,
+        gemini_reason: decision.reason,
+        gemini_reviewed: true,
+        gemini_quota_exhausted: false,
+      });
     }
-    seenIdx.add(idx);
-
-    const job = jobs[idx];
-    resultMap.set(job.id, {
-      id: job.id,
-      pass: Boolean(d.pass),
-      reason: d.reason ?? null,
-      reviewed: true,
-    });
   }
-
-  // Any job whose idx never appeared in a valid decision → fail open,
-  // but loudly (logged to console.error).
-  const missing = jobs.filter((j) => !resultMap.has(j.id));
-  if (missing.length > 0) {
-    console.error(
-      `[gemini] ${missing.length}/${jobs.length} jobs had no matching decision in Gemini's response (failing open). Raw response:`,
-      raw,
-    );
-  }
-
-  return resultMap;
+  return { fromCache, jobsNeedingReview };
 }
 
-// If Gemini fails for the whole batch, every job passes through (fail-open),
-// tagged with why.
-function failOpenResultMap(jobs: RawJob[], err: unknown): Map<string, FilterResult> {
-  console.error("[gemini] Batch filter failed:", err);
-  const quotaExhausted = err instanceof GeminiQuotaExhaustedError;
-  const resultMap = new Map<string, FilterResult>();
-  for (const j of jobs) {
-    resultMap.set(j.id, {
-      id: j.id,
-      pass: true,
-      reason: quotaExhausted ? "gemini-quota-exhausted" : "gemini-unavailable",
-      reviewed: false,
-      quotaExhausted,
-    });
-  }
-  return resultMap;
-}
-
-/**
- * Filters a batch of raw jobs using Gemini with the user's custom prompt.
- * Called once per batch (BATCH_SIZE jobs).
- *
- * Returns a map of job.id → { pass, reason }.
- */
-async function filterBatch(
+// Runs the uncached jobs through Gemini in paced batches, returning both the
+// passing jobs (final shape) and the real decisions that should be persisted.
+async function reviewUncachedJobs(
   apiKey: string,
-  jobs: RawJob[],
-  promptTemplate: string,
-): Promise<Map<string, FilterResult>> {
-  const jobSummaries = jobs.map((j, idx) => ({
-    idx,
-    title: j.title,
-    company: j.company,
-    location: j.location,
-    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs. 48.8%
-    // at the previous 6000-char ceiling; pushing past 10k buys only 8.2% more
-    // coverage for a disproportionate token-cost increase). No ingestion
-    // ceiling — processJobs stores the full description.
-    description: j.description.slice(0, 10000),
-  }));
+  jobsNeedingReview: RawJob[],
+  prompt: string,
+): Promise<{
+  reviewed: GeminiReviewedJob[];
+  toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }>;
+}> {
+  const reviewed: GeminiReviewedJob[] = [];
+  const toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }> =
+    [];
 
-  const prompt = `${promptTemplate}
-
-${RESPONSE_FORMAT_INSTRUCTIONS}
-
-Jobs to evaluate:
-${JSON.stringify(jobSummaries, null, 2)}`;
-
-  let resultMap: Map<string, FilterResult>;
-  try {
-    const raw = await callGemini(apiKey, prompt);
-    resultMap = buildResultMap(jobs, parseDecisions(raw), raw);
-  } catch (err) {
-    resultMap = failOpenResultMap(jobs, err);
-  }
-
-  // Any job not in Gemini's response → default to pass (fail-open)
-  for (const j of jobs) {
-    if (!resultMap.has(j.id)) {
-      resultMap.set(j.id, { id: j.id, pass: true, reason: null, reviewed: false });
-    }
-  }
-
-  return resultMap;
-}
-
-// ── Main export: filter all jobs ─────────────────────────────
-
-/**
- * Filters a list of raw jobs using the user's Gemini API key and custom prompt.
- * Processes jobs in batches to stay within context window limits.
- *
- * Returns the subset of jobs that passed, annotated with pass/reason.
- */
-export async function filterJobsWithGemini(
-  apiKey: string,
-  jobs: RawJob[],
-  settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
-): Promise<
-  Array<
-    RawJob & {
-      gemini_pass: boolean;
-      gemini_reason: string | null;
-      gemini_reviewed: boolean;
-      gemini_quota_exhausted: boolean;
-    }
-  >
-> {
-  if (!apiKey || !jobs.length) return [];
-
-  const results: Array<
-    RawJob & {
-      gemini_pass: boolean;
-      gemini_reason: string | null;
-      gemini_reviewed: boolean;
-      gemini_quota_exhausted: boolean;
-    }
-  > = [];
-  const prompt = settings.gemini_filter_prompt;
-
-  // Process in batches
-  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-    const batch = jobs.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < jobsNeedingReview.length; i += BATCH_SIZE) {
+    if (i > 0) await delay(BATCH_DELAY_MS);
+    const batch = jobsNeedingReview.slice(i, i + BATCH_SIZE);
     const decisions = await filterBatch(apiKey, batch, prompt);
 
     for (const job of batch) {
       const d = decisions.get(job.id);
+      if (d?.reviewed) {
+        toPersist.push({ job_id: job.id, gemini_pass: d.pass, gemini_reason: d.reason });
+      }
       if (d?.pass) {
-        results.push({
+        reviewed.push({
           ...job,
           gemini_pass: true,
           gemini_reason: d.reason,
@@ -342,8 +90,43 @@ export async function filterJobsWithGemini(
       }
     }
   }
+  return { reviewed, toPersist };
+}
 
-  return results;
+// ── Main export: filter all jobs ─────────────────────────────
+
+/**
+ * Filters a list of raw jobs using the user's Gemini API key and custom prompt.
+ * Consults the persistent review cache first (gemini-review-cache.ts) so a job
+ * already reviewed under this exact prompt doesn't cost another API call.
+ * Processes only the remaining jobs in batches to stay within context limits.
+ *
+ * Returns the subset of jobs that passed, annotated with pass/reason.
+ */
+export async function filterJobsWithGemini(
+  apiKey: string,
+  jobs: RawJob[],
+  settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
+  userId: string,
+  db: SupabaseClient<Database>,
+): Promise<GeminiReviewedJob[]> {
+  if (!apiKey || !jobs.length) return [];
+
+  const prompt = settings.gemini_filter_prompt;
+  const promptHash = hashPrompt(prompt);
+  const cached = await loadCachedDecisions(
+    db,
+    userId,
+    jobs.map((j) => j.id),
+    promptHash,
+  );
+
+  const { fromCache, jobsNeedingReview } = partitionByCache(jobs, cached);
+  const { reviewed, toPersist } = await reviewUncachedJobs(apiKey, jobsNeedingReview, prompt);
+
+  await persistDecisions(db, userId, promptHash, toPersist);
+
+  return [...fromCache, ...reviewed];
 }
 
 // ── Strategy generation ───────────────────────────────────────

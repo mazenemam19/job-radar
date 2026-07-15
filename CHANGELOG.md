@@ -6,6 +6,40 @@ All notable changes to this project are documented in this file.
 
 ### Fixes
 
+- `jr_get_filtered_raw_jobs`'s `patterns` CTE wasn't materialized, so
+  Postgres inlined it and re-ran every `jr_word_boundary_pattern()`/
+  `jr_substring_pattern()` call (a `string_agg` + per-term `regexp_replace`
+  over the settings arrays) once per row of `raw_jobs` instead of once per
+  query — confirmed as `SQLSTATE 57014` ("canceling statement due to
+  statement timeout") in Supabase's Postgres logs immediately after PR #60
+  merged and its migration was applied. Reproduced and fixed locally via
+  `EXPLAIN (analyze, buffers)` against the real schema at 30k/200k-row
+  synthetic scale: 935ms → 544ms at 30k rows, 4,059ms → 1,413ms at 200k
+  (gap widens with scale, as expected for an O(rows) cost being removed).
+  Added `MATERIALIZED` to the CTE; also tightened the function's grants
+  (`revoke ... from public, anon, authenticated`, previously only
+  `public`). See
+  `docs/solutions/bugs/db-filtering-timeout-and-gemini-quota.md`.
+- `filterJobsWithGemini` had no persistent decision cache — every cache
+  rebuild (every cron run, twice daily) re-sent every still-in-window job
+  to Gemini from scratch, even ones already reviewed under the identical
+  prompt, in an unpaced sequential batch loop that could burn through a
+  model's per-minute quota partway through a cold rebuild — the direct
+  cause of jobs randomly showing "⚠ Not AI-reviewed"/"⚠ Gemini quota
+  exhausted" despite a valid key. New `user_job_gemini_reviews` table,
+  keyed by `(user_id, job_id)` and scoped by a hash of
+  `gemini_filter_prompt` (so editing the prompt naturally invalidates old
+  decisions); only real decisions are ever persisted, so a job that failed
+  open retries on the next rebuild instead of staying stuck unreviewed.
+  Added 300ms pacing between batches. `gemini.ts` split into
+  `gemini-model-fallback.ts`, `gemini-batch-filter.ts`, and
+  `gemini-review-cache.ts` to stay under this project's own
+  `max-lines`/`complexity` lint limits once the new logic pushed both over
+  their caps. Also fixed `/pipeline`'s "Settings filter" tooltip, which
+  still described pre-PR#60 behavior (seniority gate only) instead of the
+  five gates it now actually covers. See
+  `docs/solutions/bugs/db-filtering-timeout-and-gemini-quota.md`.
+
 - Teamtailor's public `jobs.json` now serves JSON Feed
   (`Content-Type: application/feed+json`) for at least some companies
   (confirmed: Full Fabric), which the shared `parseJsonBody()` content-type
@@ -175,6 +209,21 @@ text[]` column) and the `cron:log` console summary.
 
 ### Refactoring
 
+- Moved date, seniority, excluded-keywords, blacklisted-locations, and
+  global-mode filtering out of `buildFeed()`/JS and into a single Postgres
+  RPC, `jr_get_filtered_raw_jobs` (PR #60,
+  `docs/solutions/features/2026-07-11-db-level-job-filtering.md`) —
+  replaces the old `.select("*").in("mode", ...).order().limit(2000)` call
+  in `dashboard/route.ts` with pre-filtered results plus a funnel object
+  (`total_fetched`, `after_date_filter`, `after_settings_filter_coarse`).
+  Required-keywords and skill-match stay in JS as a precision recheck on
+  the DB's coarse superset — the boilerplate-window/distinct-match logic
+  behind `hasMeaningfulKeywordMatch` doesn't translate cleanly to SQL (see
+  the plan doc, §2.3). Shipped without its own regression test for the RPC
+  call path and without the query-performance check the plan doc itself
+  flagged as outstanding (Task 1's `EXPLAIN ANALYZE`) — both gaps, and
+  their consequences, are covered in
+  `docs/solutions/bugs/db-filtering-timeout-and-gemini-quota.md`.
 - `e2e-login/route.ts` (`POST`): kept unchanged per the safety rules in `AGENTS.md`
   ("The e2e-login route works as-is. Do not modify it") (row #24 exempt).
 - `verify-domain-counts-coverage.ts`: decomposed IIFE complexity by splitting
@@ -239,6 +288,13 @@ text[]` column) and the `cron:log` console summary.
 
 ### Testing
 
+- Added `gemini-review-cache.test.ts` (9 tests): cache-hit reuse without
+  calling Gemini, cache-hit on a cached fail, only-uncached-jobs-get-called,
+  fail-open results (quota exhausted, missing idx) deliberately never
+  persisted, cache-read failure treated as empty rather than blocking the
+  request, a prompt change reaching Gemini again, and multi-batch handling
+  — direct coverage for the persistent review cache added in
+  `docs/solutions/bugs/db-filtering-timeout-and-gemini-quota.md`.
 - `workable-rate-limit.test.ts`: replaced tests asserting full serialization
   (`spread > Nms`) with tests asserting a `maxActive` concurrency counter
   bounded by `WORKABLE_LANE_COUNT` — the old assertions defined "correct" as

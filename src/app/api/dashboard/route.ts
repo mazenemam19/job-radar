@@ -87,6 +87,8 @@ export async function GET() {
     rawJobsResult.funnel,
     settings,
     profile?.gemini_api_key,
+    user.id,
+    db,
   );
 
   // ── Write cache ──────────────────────────────────────────────

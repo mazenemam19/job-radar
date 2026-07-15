@@ -14,6 +14,29 @@ vi.mock("@google/genai", () => ({
   }),
 }));
 
+// Minimal chainable mock matching exactly the shape gemini.ts calls:
+//   .from(...).select(...).eq(...).eq(...).in(...)   -- cache read
+//   .from(...).upsert(...)                            -- cache write
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeMockDb(
+  options: {
+    cachedRows?: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }>;
+    selectError?: { message: string } | null;
+    upsertError?: { message: string } | null;
+  } = {},
+) {
+  const upsertMock = vi.fn().mockResolvedValue({ error: options.upsertError ?? null });
+  const inMock = vi
+    .fn()
+    .mockResolvedValue({ data: options.cachedRows ?? [], error: options.selectError ?? null });
+  const eq2Mock = vi.fn(() => ({ in: inMock }));
+  const eq1Mock = vi.fn(() => ({ eq: eq2Mock }));
+  const selectMock = vi.fn(() => ({ eq: eq1Mock }));
+  const fromMock = vi.fn(() => ({ select: selectMock, upsert: upsertMock }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: fromMock, __upsertMock: upsertMock, __inMock: inMock } as any;
+}
+
 function makeJob(overrides: Partial<RawJob> = {}): RawJob {
   return {
     id: "visa_gh_acme_1",
@@ -67,7 +90,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
       ]),
     });
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("visa_gh_acme_1");
@@ -82,7 +105,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
       // idx 1 never comes back
     });
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     // job "b" still fails open (passes), but it's now logged instead of silent
     expect(result.map((j) => j.id).sort()).toEqual(["a", "b"]);
@@ -102,7 +125,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
       ]),
     });
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("real decision");
@@ -114,7 +137,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
     const jobs = [makeJob({ id: "a" })];
     generateContentMock.mockRejectedValue(new Error("API_KEY_INVALID"));
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("gemini-unavailable");
@@ -126,7 +149,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
     const jobs = [makeJob({ id: "a" })];
     generateContentMock.mockRejectedValue(new Error("429 RESOURCE_EXHAUSTED: quota exceeded"));
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_pass).toBe(true);
@@ -145,7 +168,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
       .mockRejectedValueOnce(new Error("500 internal server error"))
       .mockRejectedValueOnce(new Error("429 quota exceeded"));
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     expect(result).toHaveLength(1);
     expect(result[0].gemini_reason).toBe("gemini-unavailable");
@@ -156,7 +179,7 @@ describe("filterJobsWithGemini — index-based matching", () => {
     const jobs = [makeJob({ id: "a" })];
     generateContentMock.mockResolvedValue({ text: "not json at all" });
 
-    const result = await filterJobsWithGemini("key", jobs, settings);
+    const result = await filterJobsWithGemini("key", jobs, settings, "user-1", makeMockDb());
 
     // fails open since no decisions parsed
     expect(result).toHaveLength(1);

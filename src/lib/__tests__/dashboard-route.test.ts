@@ -24,6 +24,12 @@ const mockGemini = filterJobsWithGemini as ReturnType<typeof vi.fn>;
 
 import { buildFeed, enabledModes } from "../dashboard-route";
 
+// buildFeed just threads userId/db through to filterJobsWithGemini, which is
+// mocked above -- these never touch a real Supabase client in this file.
+const testUserId = "test-user-1";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const testDb = {} as any;
+
 // ── Fixtures ──────────────────────────────────────────────────
 
 function makeJob(overrides: Partial<RawJob> = {}): RawJob {
@@ -120,7 +126,14 @@ describe("buildFeed", () => {
 
   it("returns an empty feed when no raw jobs are provided", async () => {
     mockGemini.mockResolvedValue([]);
-    const { finalJobs, pipelineLog } = await buildFeed([], makeDbFunnel(), settings, "key-abc");
+    const { finalJobs, pipelineLog } = await buildFeed(
+      [],
+      makeDbFunnel(),
+      settings,
+      "key-abc",
+      testUserId,
+      testDb,
+    );
 
     expect(finalJobs).toEqual([]);
     expect(pipelineLog.total_fetched).toBe(0);
@@ -135,6 +148,8 @@ describe("buildFeed", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settings,
       null,
+      testUserId,
+      testDb,
     );
 
     // Gemini must not be called
@@ -162,9 +177,11 @@ describe("buildFeed", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settings,
       "user-api-key",
+      testUserId,
+      testDb,
     );
 
-    expect(mockGemini).toHaveBeenCalledWith("user-api-key", [job], settings);
+    expect(mockGemini).toHaveBeenCalledWith("user-api-key", [job], settings, testUserId, testDb);
     expect(finalJobs.length).toBe(1);
     expect(finalJobs[0].gemini_reviewed).toBe(true);
   });
@@ -186,6 +203,8 @@ describe("buildFeed", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settings,
       "key",
+      testUserId,
+      testDb,
     );
 
     expect(pipelineLog.total_fetched).toBe(1);
@@ -226,6 +245,8 @@ describe("buildFeed", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settingsWideAge,
       "key",
+      testUserId,
+      testDb,
     );
 
     // Both skill_match_score and recency_score are 0 → total_score = 0 → dropped
@@ -259,6 +280,8 @@ describe("buildFeed", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settingsNoMatch,
       "key",
+      testUserId,
+      testDb,
     );
 
     // skill_match_score = 0 but recency_score is high (job is from today)
@@ -300,6 +323,8 @@ describe("buildFeed - DB-prefiltered input contract", () => {
       makeDbFunnel({ total_fetched: 500, after_date_filter: 42 }),
       settings,
       "key",
+      testUserId,
+      testDb,
     );
 
     expect(pipelineLog.total_fetched).toBe(500);
@@ -331,6 +356,8 @@ describe("buildFeed - DB-prefiltered input contract", () => {
       makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
       settingsWithRequired,
       null,
+      testUserId,
+      testDb,
     );
 
     expect(finalJobs).toHaveLength(0);

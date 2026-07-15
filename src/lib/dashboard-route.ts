@@ -12,6 +12,8 @@ import {
 } from "@/lib/scoring";
 import type { RawJob, ScoredJob, PipelineLog, ResolvedSettings } from "@/lib/types";
 import type { RawJobsFunnel } from "@/lib/raw-jobs-query";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 export type FeedResult = {
   finalJobs: ScoredJob[];
@@ -37,6 +39,8 @@ export async function buildFeed(
   dbFunnelCounts: Pick<RawJobsFunnel, "total_fetched" | "after_date_filter">,
   settings: ResolvedSettings,
   geminiApiKey: string | null | undefined,
+  userId: string,
+  db: SupabaseClient<Database>,
 ): Promise<FeedResult> {
   // Stage: exact precision recheck for required-keywords/skill-match.
   const afterPrecisionFilter = rawJobs.filter(
@@ -45,7 +49,7 @@ export async function buildFeed(
 
   // Stage: Gemini filter — skipped when no key, fails open on error
   const geminiFiltered = geminiApiKey
-    ? await filterJobsWithGemini(geminiApiKey, afterPrecisionFilter, settings)
+    ? await filterJobsWithGemini(geminiApiKey, afterPrecisionFilter, settings, userId, db)
     : afterPrecisionFilter.map((j) => ({
         ...j,
         gemini_pass: true,

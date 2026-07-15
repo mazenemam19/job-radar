@@ -19,7 +19,8 @@ const STAGES: Stage[] = [
   {
     key: "total_fetched",
     label: "Fetched",
-    filterLabel: "All raw jobs from ATS sources this cron run",
+    filterLabel:
+      "Raw jobs from ATS sources this cron run, already scoped to your enabled pipelines",
     color: "#6366f1",
   },
   {
@@ -31,7 +32,8 @@ const STAGES: Stage[] = [
   {
     key: "after_settings_filter",
     label: "Settings filter",
-    filterLabel: "Removed jobs that failed seniority gate or disabled pipelines",
+    filterLabel:
+      "Removed by seniority, excluded keywords, blacklisted locations, and global-mode gate (all run in the database), plus the exact required-keywords/skill-match recheck",
     color: "#a78bfa",
   },
   {
