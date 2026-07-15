@@ -40,6 +40,44 @@ All notable changes to this project are documented in this file.
   five gates it now actually covers. See
   `docs/solutions/bugs/db-filtering-timeout-and-gemini-quota.md`.
 
+- The same tail companies (SmartNews, Elements Interactive, Learnosity, Plan A)
+  got skipped on every cron run that hit its time budget, regardless of batch
+  size (39 companies one day, 23 the next, same losers both times) — the
+  non-Workable dispatch order had no stable sort, so the same companies
+  landed in the same array position every run, and the time-budget skip logic
+  always drops whichever tasks haven't been dispatched yet. Added a rotating
+  dispatch cursor (`dispatch-cursor.ts`): sorts that bucket into a stable
+  order and resumes right after the last company actually dispatched last
+  run, persisted in `app_config.dispatch_cursor`. Proven (not just asserted)
+  to cycle every company through the skipped position exactly once per full
+  rotation under a sustained partial-skip pattern — the naive "resume by
+  canonical order" version gets stuck oscillating between two companies
+  forever. Workable's own dispatch bucket is untouched. See
+  `docs/solutions/bugs/issue-52-dispatch-rotation-cursor.md`.
+- An active company with both pipelines (`pipeline_local`, `pipeline_global`)
+  disabled got zero fetch tasks queued in `fetchAllCompanyJobs`, silently —
+  not skipped, not errored, just never dispatched or logged at all.
+  `is_active` alone didn't catch this. Added a shared `missingPipeline()`
+  check (`companies-table.ts`) used by the public submit route and both admin
+  company routes (`POST`, and `PUT` — merged against the row's current state
+  first, so a patch touching only one field still gets validated against the
+  state it would produce), rejecting the combination instead of accepting it
+  silently.
+- `FETCH_TIME_BUDGET_MS` only ever stopped _new_ company fetches from being
+  queued — already-dispatched fetches ran to completion regardless, so on its
+  own it was never a guarantee the fetch phase actually finished by 270s.
+  Added `HARD_FETCH_CUTOFF_MS` (250s), a real ceiling on how long
+  `runCronJob` waits for the fetch phase before moving on with whatever's
+  been fetched so far, landed below the soft budget so in-flight fetches keep
+  running in the background instead of being cancelled. Separately: most
+  Workable request volume was redundant — every cron run re-fetched every
+  open role's detail page unconditionally, even for jobs already on file with
+  an unchanged description, very likely most of what tripped Workable's rate
+  limiter in the first place. New `known-jobs.ts`: a run-scoped
+  `Map<id, description>` loaded once before dispatch; `fetchWorkable` reuses
+  the stored description and skips the detail-page network call on a hit. See
+  `docs/solutions/bugs/issue-52-504-recurrence-part6.md`.
+
 - Teamtailor's public `jobs.json` now serves JSON Feed
   (`Content-Type: application/feed+json`) for at least some companies
   (confirmed: Full Fabric), which the shared `parseJsonBody()` content-type
