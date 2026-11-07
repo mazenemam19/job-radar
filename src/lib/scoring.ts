@@ -365,17 +365,36 @@ export function scoreJob(
 
 /**
  * Merges new scored jobs into an existing array.
- * Deduplication by job.id (URL hash).
+ * Deduplicates by normalized posting URL so legacy local/global IDs for the
+ * same posting collapse together. Falls back to job.id when the URL is invalid.
  */
 export function mergeJobs(existing: ScoredJob[], incoming: ScoredJob[]): ScoredJob[] {
-  const map = new Map(existing.map((j) => [j.id, j]));
+  function identity(job: ScoredJob): string {
+    try {
+      const url = new URL(job.url.trim());
+      url.hash = "";
+      url.search = "";
+      url.hostname = url.hostname.toLowerCase();
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+      return "url:" + url.toString();
+    } catch {
+      return "id:" + job.id;
+    }
+  }
+
+  const map = new Map<string, ScoredJob>();
+
+  function keepFresher(job: ScoredJob): void {
+    const key = identity(job);
+    const previous = map.get(key);
+    if (!previous || job.fetched_at > previous.fetched_at) map.set(key, job);
+  }
+
+  existing.forEach(keepFresher);
 
   for (const job of incoming) {
     if (job.total_score <= 0) continue;
-    const prev = map.get(job.id);
-    if (!prev || job.fetched_at > prev.fetched_at) {
-      map.set(job.id, job);
-    }
+    keepFresher(job);
   }
 
   return Array.from(map.values()).sort((a, b) => b.total_score - a.total_score);

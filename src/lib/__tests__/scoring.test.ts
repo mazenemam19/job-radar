@@ -428,7 +428,11 @@ describe("scoreJob", () => {
 describe("mergeJobs", () => {
   function makeScoredJob(id: string, score: number, fetchedAt = NOW) {
     return {
-      ...makeJob({ id, fetched_at: new Date(fetchedAt).toISOString() }),
+      ...makeJob({
+        id,
+        url: "https://jobs.example.com/" + id,
+        fetched_at: new Date(fetchedAt).toISOString(),
+      }),
       skill_match_score: score,
       recency_score: 80,
       relocation_bonus: 0,
@@ -461,6 +465,19 @@ describe("mergeJobs", () => {
     const newer = makeScoredJob("dup", 65, NOW);
     const result = mergeJobs([older], [newer]);
     expect(result).toHaveLength(1);
+    expect(result[0].fetched_at).toBe(newer.fetched_at);
+  });
+
+  it("deduplicates legacy local/global IDs by normalized posting URL", () => {
+    const older = makeScoredJob("local_gh_1", 70, NOW - 86_400_000);
+    older.url = "https://jobs.example.com/1?source=local#details";
+    const newer = makeScoredJob("global_gh_1", 65, NOW);
+    newer.url = "https://jobs.example.com/1?source=global";
+
+    const result = mergeJobs([older], [newer]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("global_gh_1");
     expect(result[0].fetched_at).toBe(newer.fetched_at);
   });
 });
