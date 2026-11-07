@@ -142,6 +142,25 @@ export default function SettingsForm() {
         onChange={(profile) => update("searchProfile", profile)}
       />
 
+      <Section title="Source pipelines">
+        <p className="mb-3 text-[13px] text-[#64748b]">
+          Choose which legacy source groups feed your dashboard. These controls affect source
+          intake, not your country, city, workplace, or job-category preferences above.
+        </p>
+        <Toggle
+          checked={fields.pipelineLocal}
+          onChange={(value) => update("pipelineLocal", value)}
+          label="Local source pipeline"
+          description="Include sources that use the legacy local fetch path."
+        />
+        <Toggle
+          checked={fields.pipelineGlobal}
+          onChange={(value) => update("pipelineGlobal", value)}
+          label="Global source pipeline"
+          description="Include sources that use the legacy global fetch path."
+        />
+      </Section>
+
       <SeniorityLevelsSection
         levels={SENIORITY_LEVELS}
         selected={fields.seniorityLevels}

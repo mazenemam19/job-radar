@@ -78,6 +78,35 @@ test.describe("settings — save round-trip via real API", () => {
     await onSite.click();
   });
 
+  test("source pipeline controls can be saved and restored", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+
+    const localPipeline = page.getByRole("switch", { name: /local source pipeline/i });
+    await expect(localPipeline).toBeVisible({ timeout: 8_000 });
+    const initialChecked = await localPipeline.getAttribute("aria-checked");
+
+    await localPipeline.click();
+    const save = page.getByRole("button", { name: /save settings/i });
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/settings") && response.request().method() === "PATCH",
+      { timeout: 8_000 },
+    );
+    await save.click();
+    expect((await saveResponse).status()).toBe(200);
+
+    await localPipeline.click();
+    const restoreResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/settings") && response.request().method() === "PATCH",
+      { timeout: 8_000 },
+    );
+    await save.click();
+    expect((await restoreResponse).status()).toBe(200);
+    expect(await localPipeline.getAttribute("aria-checked")).toBe(initialChecked);
+  });
+
   test("renders seniority level toggle buttons", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
