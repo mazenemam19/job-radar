@@ -2,9 +2,9 @@
 
 **Goal:** Make Job Radar a useful, location-agnostic job-search tool, starting with a Germany pilot for an international candidate who does not speak German.
 
-**Branch:** `codex/ashby-posting-location`
+**Branch:** `main` (PR #64 merged)
 
-**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61) and [#62](https://github.com/mazenemam19/job-radar/pull/62) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup is complete. The current review slice corrects ATS source adapters before applying a focused batch of verified React/frontend feeds.
+**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61), [#62](https://github.com/mazenemam19/job-radar/pull/62), and [#64](https://github.com/mazenemam19/job-radar/pull/64) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup is complete. The focused frontend-source batch is live and its measured impact is recorded below.
 
 ## Done locally
 
@@ -26,11 +26,12 @@
 - [x] Make dashboard filtering use each user's country, cities, workplace choices, and job types before the database limit; keep uncertain rows visible.
 - [x] Show language and work-authorization clues with their evidence and uncertainty on job results/details.
 - [x] Explain briefly why each posting matched the user's search profile.
-- [x] Measure Germany coverage in the ATS company catalog: before intake, 239 active sources and 17 with a German company country produced 1,848 stored German-located postings from 32 companies. The catalog now has 244 active sources, including 22 with a German company country.
+- [x] Measure Germany coverage in the ATS company catalog: before intake, 239 active sources and 17 with a German company country produced 1,848 stored German-located postings from 32 companies. After the reviewed source intakes, the live catalog measured 262 active sources, including 40 with a German company country.
 - [x] Add verified German ATS employers where coverage is missing: AutoScout24, Alpine Eagle, Orcrist Technologies, ecosio, and think-cell are active Greenhouse sources in the global pipeline. The additive, idempotent SQL is tracked in `20261107300000_add_germany_ats_sources.sql` and was applied manually.
 - [x] Verify eight currently relevant frontend feeds that were absent from the live catalog: ResearchGate, AMBOSS, Trading 212, Plentific, Constructor Tech, Almedia, Peec AI, and bunch. Their public feeds expose Berlin, Germany-wide, or Germany-eligible React/frontend roles. The idempotent source migration is `20261107900000_add_verified_germany_frontend_sources.sql`.
 - [x] Correct ATS ingestion before enabling that batch: use Ashby's current posting location field, retain Lever requirement sections, prioritize Greenhouse posting locations over board labels, and normalize Bulgaria rather than treating it as an uncertain location.
-- [ ] Merge the adapter corrections, manually apply `20261107900000_add_verified_germany_frontend_sources.sql`, backfill its feeds without notifications, and then measure the real profile's post-backfill match count.
+- [x] Merge the adapter corrections (PR #64), add the eight approved source records, and backfill their feeds without notifications. On 2026-11-08: all eight fetches/upserts succeeded (220 postings: 1 ResearchGate, 18 AMBOSS, 58 Trading 212, 20 Plentific, 32 Constructor Tech, 30 Almedia, 29 Peec AI, and 32 bunch). The Supabase SQL editor repeatedly ran a stale draft and rejected it before mutation, so the idempotent, row-equivalent insert was verified and applied through the configured service-role connection after confirming no records existed.
+- [x] Measure the real profile's post-backfill match count. The production-equivalent rebuild invalidated caches, ran the profile's database filters, Gemini review, scoring, and deduplication, and wrote the account cache. Of the new feeds, 25 postings reached the profile's coarse pool, one passed the fast text check, and zero passed the precise gates; the dashboard therefore remains at 12 matches. This is an availability result, not evidence of a stale cache or a claimed shortlist increase.
 - [x] Fold company validation into the ATS intake work; #48 is consolidated into #43.
 - [x] Manually verify Settings save/readback, dashboard rebuild, job detail, and tracker in the browser. On 2026-11-07, an unchanged save at the real 11-day setting returned the success toast and rebuilt the dashboard to 12 matches; the corrected Doctolib card displayed 🇩🇪 Berlin. That count predates the later source backfills and must not be attributed to them.
 - [ ] Verify profile isolation with a second user.
@@ -73,3 +74,4 @@
 - [x] Database report inspection: `raw_jobs` occupies 278 MB for 27,609 rows and drives the 0.31 GB database size. The report shows severe memory commitment (1.43 GB) while physical memory use was about 401 MB; this needs operational follow-up before increasing cron load. A live snapshot showed 1 active and 9 idle client connections, so it does not indicate a connection surge.
 - [x] Legacy-ID cleanup preview: 2,891 logical postings are duplicated across historical `local`, `global`, and `visa` pipeline IDs. All 216 Gemini reviews already point at retained rows, so no live review needs moving for the current database. The retained source identity is provider-specific; this avoids treating query-string posting IDs as tracking noise.
 - [x] Retention preview: live production counts confirm that a 90-day `fetched_at` cutoff removes 8,154 untracked rows without touching a tracker entry. The full suite passed with 53 test files / 503 tests after adding the cron retention call and its failure path.
+- [x] Frontend-source rollout: all eight verified provider endpoints returned HTTP 200 and wrote without upsert errors. A direct reconstruction using the same dashboard functions and the real saved profile completed in 17.2 seconds; its funnel was 20,251 total / 5,395 date-qualified / 1,928 DB-side coarse / 61 exact pre-Gemini / 12 Gemini-and-score-qualified. The cached dashboard result is 12, unchanged from before this source batch.
