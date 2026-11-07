@@ -87,6 +87,21 @@ async function e2eLogin(overrides: { onboardingComplete?: boolean; isActive?: bo
   return state;
 }
 
+// Update the test profile without minting another magic-link session. The
+// blocked-user test needs its browser's current session to remain valid until
+// the proxy sees the now-inactive profile.
+async function updateE2eProfile(overrides: { onboardingComplete?: boolean; isActive?: boolean }) {
+  const ctx = await pwRequest.newContext({ baseURL: BASE_URL });
+  const res = await ctx.post("/api/test/e2e-login", {
+    headers: { "x-e2e-secret": SECRET! },
+    data: { onboardingComplete: true, ...overrides, updateOnly: true },
+  });
+  if (!res.ok()) {
+    throw new Error(`e2e test-profile update failed: ${res.status()} ${await res.text()}`);
+  }
+  await ctx.dispose();
+}
+
 // ---------------------------------------------------------------------------
 // Part 1: Unauthenticated redirects
 // ---------------------------------------------------------------------------
@@ -198,11 +213,10 @@ test.describe("middleware — blocked user redirect", () => {
     await nav.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/settings/);
 
-    // Simulate an admin blocking this account mid-session: flip is_active
-    // in the DB directly, without touching this page's existing cookies.
-    // The browser still has a completely normal, valid session — only the
-    // DB row changed underneath it, exactly like a real admin action would.
-    await e2eLogin({ isActive: false });
+    // Simulate an admin blocking this account mid-session without minting a
+    // new token. The browser keeps its valid session while only the DB row
+    // changes underneath it, exactly like a real admin action would.
+    await updateE2eProfile({ isActive: false });
 
     // Another soft nav to a sibling route under the same layout. Before
     // the middleware fix, this could silently reuse the cached layout and

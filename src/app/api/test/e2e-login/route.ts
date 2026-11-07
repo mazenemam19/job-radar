@@ -58,8 +58,43 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const onboardingComplete = body?.onboardingComplete ?? true;
   const isActive = body?.isActive ?? true;
+  const updateOnly = body?.updateOnly === true;
 
   const admin = createAdminClient();
+
+  // The blocked-user E2E test must change the profile beneath an existing
+  // browser session. Minting a magic-link session just to do that can revoke
+  // the session under test, turning a blocked-user assertion into an
+  // unauthenticated redirect race. This narrow test-only path updates the
+  // configured test user's existing profile without issuing any auth token.
+  if (updateOnly) {
+    const { data: profile, error: profileLookupError } = await admin
+      .from("user_profiles")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (profileLookupError || !profile) {
+      console.error("[test/e2e-login] could not find test profile:", profileLookupError?.message);
+      return NextResponse.json({ error: "could not find test profile" }, { status: 500 });
+    }
+
+    const { error: profileUpdateError } = await admin
+      .from("user_profiles")
+      .update({
+        onboarding_complete: onboardingComplete,
+        is_active: isActive,
+        last_active_at: new Date().toISOString(),
+      })
+      .eq("id", profile.id);
+
+    if (profileUpdateError) {
+      console.error("[test/e2e-login] could not update test profile:", profileUpdateError.message);
+      return NextResponse.json({ error: "could not update test profile" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, userId: profile.id });
+  }
 
   // type: "magiclink" auto-creates the user if they don't already exist —
   // no separate createUser step needed.
