@@ -53,4 +53,40 @@ describe("fetchGreenhouse location normalization", () => {
       isRemote: true,
     });
   });
+
+  it("prioritizes a posting location over a non-geographic board office", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: async () =>
+          JSON.stringify({
+            jobs: [
+              {
+                id: 2,
+                title: "Frontend Engineer (Intern)",
+                location: { name: "Bremen, Germany" },
+                offices: [{ name: "Constructor TECH", location: null }],
+                absolute_url: "https://boards.greenhouse.io/acme/jobs/2",
+                updated_at: "2026-11-07T00:00:00Z",
+                content: "<p>React and TypeScript</p>",
+              },
+            ],
+          }),
+      }),
+    );
+
+    const { fetchGreenhouse } = await import("../sources/ats/greenhouse");
+    const result = await fetchGreenhouse(company, "global");
+
+    expect(result.ok).toBe(true);
+    expect(result.jobs[0]).toMatchObject({
+      location: "Bremen, Germany",
+      city: "Bremen",
+      country: "Germany",
+      countryCode: "DE",
+    });
+  });
 });

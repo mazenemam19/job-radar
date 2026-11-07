@@ -68,12 +68,22 @@ export interface LeverJob {
   hostedUrl: string;
   createdAt: number;
   description: string;
+  descriptionBody?: string | null;
+  opening?: string | null;
+  additional?: string | null;
+  lists?: Array<{ text?: string | null; content?: string | null }>;
 }
 
 export interface AshbyJob {
   id: string;
   title: string;
-  locationName: string;
+  /**
+   * Ashby's current public posting API exposes the primary location as
+   * `location`. `locationName` is retained as an optional compatibility
+   * fallback for older responses.
+   */
+  location?: string | null;
+  locationName?: string | null;
   jobUrl: string;
   publishedAt: string;
   descriptionHtml: string;

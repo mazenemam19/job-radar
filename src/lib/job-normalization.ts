@@ -31,6 +31,7 @@ const COUNTRY_CODES: Record<string, string> = {
   austria: "AT",
   switzerland: "CH",
   belgium: "BE",
+  bulgaria: "BG",
   norway: "NO",
   canada: "CA",
   australia: "AU",
@@ -70,6 +71,7 @@ const COUNTRY_NAMES: Record<string, string> = {
   AT: "Austria",
   CH: "Switzerland",
   BE: "Belgium",
+  BG: "Bulgaria",
   NO: "Norway",
   CA: "Canada",
   AU: "Australia",
@@ -92,6 +94,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
   berlin: { country: "Germany", code: "DE" },
+  bremen: { country: "Germany", code: "DE" },
   hamburg: { country: "Germany", code: "DE" },
   munich: { country: "Germany", code: "DE" },
   münchen: { country: "Germany", code: "DE" },
@@ -117,6 +120,7 @@ const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
   zurich: { country: "Switzerland", code: "CH" },
   stockholm: { country: "Sweden", code: "SE" },
   copenhagen: { country: "Denmark", code: "DK" },
+  sofia: { country: "Bulgaria", code: "BG" },
   warsaw: { country: "Poland", code: "PL" },
   prague: { country: "Czechia", code: "CZ" },
   rome: { country: "Italy", code: "IT" },
@@ -159,6 +163,7 @@ function matchCountry(location: string): { country: string; code: string } | nul
 function cleanCityCandidate(value: string): string | null {
   const candidate = value
     .replace(/\b(remote|hybrid|on[ -]?site|work from home)\b/gi, " ")
+    .replace(/\b(office|headquarters|hq)\b/gi, " ")
     .replace(/[()]/g, " ")
     .trim()
     .replace(/\s+/g, " ");

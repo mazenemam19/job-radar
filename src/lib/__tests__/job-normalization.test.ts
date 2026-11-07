@@ -42,6 +42,8 @@ describe("posting location normalization", () => {
     ["Mumbai, India", "IN", "Mumbai"],
     ["Jakarta, Indonesia", "ID", "Jakarta"],
     ["Paris, FR", "FR", "Paris"],
+    ["Sofia, Bulgaria", "BG", "Sofia"],
+    ["London Office", "GB", "London"],
   ])("normalizes %s", (location, countryCode, city) => {
     const result = normalizePostingLocation(location);
     expect(result.countryCode).toBe(countryCode);

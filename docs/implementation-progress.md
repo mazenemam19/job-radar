@@ -2,9 +2,9 @@
 
 **Goal:** Make Job Radar a useful, location-agnostic job-search tool, starting with a Germany pilot for an international candidate who does not speak German.
 
-**Branch:** `codex/raw-job-retention`
+**Branch:** `codex/ashby-posting-location`
 
-**Current state:** PR [#61](https://github.com/mazenemam19/job-radar/pull/61) is merged. The Germany pilot migrations are live, and Settings saves/reloads the per-user profile correctly, including the 11-day search window that previously exposed a dashboard query timeout. Storage-retention draft PR [#62](https://github.com/mazenemam19/job-radar/pull/62) is in progress on Project #3; its additive migration is live, and its one-time cleanup awaits destructive-action confirmation.
+**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61) and [#62](https://github.com/mazenemam19/job-radar/pull/62) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup is complete. The current review slice corrects ATS source adapters before applying a focused batch of verified React/frontend feeds.
 
 ## Done locally
 
@@ -28,8 +28,11 @@
 - [x] Explain briefly why each posting matched the user's search profile.
 - [x] Measure Germany coverage in the ATS company catalog: before intake, 239 active sources and 17 with a German company country produced 1,848 stored German-located postings from 32 companies. The catalog now has 244 active sources, including 22 with a German company country.
 - [x] Add verified German ATS employers where coverage is missing: AutoScout24, Alpine Eagle, Orcrist Technologies, ecosio, and think-cell are active Greenhouse sources in the global pipeline. The additive, idempotent SQL is tracked in `20261107300000_add_germany_ats_sources.sql` and was applied manually.
+- [x] Verify eight currently relevant frontend feeds that were absent from the live catalog: ResearchGate, AMBOSS, Trading 212, Plentific, Constructor Tech, Almedia, Peec AI, and bunch. Their public feeds expose Berlin, Germany-wide, or Germany-eligible React/frontend roles. The idempotent source migration is `20261107900000_add_verified_germany_frontend_sources.sql`.
+- [x] Correct ATS ingestion before enabling that batch: use Ashby's current posting location field, retain Lever requirement sections, prioritize Greenhouse posting locations over board labels, and normalize Bulgaria rather than treating it as an uncertain location.
+- [ ] Merge the adapter corrections, manually apply `20261107900000_add_verified_germany_frontend_sources.sql`, backfill its feeds without notifications, and then measure the real profile's post-backfill match count.
 - [x] Fold company validation into the ATS intake work; #48 is consolidated into #43.
-- [x] Manually verify Settings save/readback, dashboard rebuild, job detail, and tracker in the browser. On 2026-11-07, an unchanged save at the real 11-day setting returned the success toast and rebuilt the dashboard to 12 matches; the corrected Doctolib card displayed 🇩🇪 Berlin.
+- [x] Manually verify Settings save/readback, dashboard rebuild, job detail, and tracker in the browser. On 2026-11-07, an unchanged save at the real 11-day setting returned the success toast and rebuilt the dashboard to 12 matches; the corrected Doctolib card displayed 🇩🇪 Berlin. That count predates the later source backfills and must not be attributed to them.
 - [ ] Verify profile isolation with a second user.
 - [x] Update GitHub issues and Project #3: #47 is closed, #43 is the active Germany ATS intake issue, and #48 is closed as consolidated work.
 - [ ] Apply and verify the manual rekey script in `supabase/manual-migrations/20261107400000_rekey_and_deduplicate_legacy_raw_jobs.sql`. Read-only analysis identified 2,891 pipeline-specific duplicate source records; it preserves the newest tracker state and Gemini review before removal, makes review IDs update-cascading, and invalidates result caches for a normal rebuild.
@@ -41,7 +44,7 @@
 - [x] Measure production `raw_jobs`: 27,717 rows and 280 MB. 15,173 rows were unseen for 30 days, 11,440 for 60 days, and 8,154 for 90 days; every 90-day candidate is untracked. No rows were unseen for 180 days.
 - [x] Add a 90-day tracked-job-safe retention function and invoke it after each cron scrape. The database operation is atomic: it excludes `tracker_entries` within the same delete statement.
 - [x] Apply and verify additive migration `20261107700000_prune_stale_raw_jobs.sql` in production. The tracker-ID index and tracked-job-safe retention function were installed on 2026-11-07; no rows were deleted during this step.
-- [ ] Execute the one-time production cleanup of the verified 8,154 untracked 90-day rows, invalidate cached dashboards, and record before/after counts. This is destructive and requires confirmation at execution time.
+- [x] Execute the one-time production cleanup after explicit confirmation: deleted 8,154 untracked 90-day rows, invalidated three dashboard caches, and refreshed the scheduler timestamp. `raw_jobs` fell from 27,717 to 19,563 rows; no stale untracked 90-day candidate remains.
 - [ ] Check the database-size trend after the next cron runs. A normal vacuum makes deleted space reusable; it does not necessarily reduce the allocated-disk chart immediately.
 
 ## Deferred
