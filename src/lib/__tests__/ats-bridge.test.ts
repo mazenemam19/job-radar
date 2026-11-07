@@ -131,6 +131,61 @@ describe("fetchCompany", () => {
     expect(result.jobs[0].company).toBe("FallbackCo");
   });
 
+  it("uses the posting's normalized country instead of the company's registered country", async () => {
+    mockFetchResponse([
+      {
+        id: "local_gh_testco_5",
+        title: "Frontend Engineer",
+        location: "Erlangen, Germany",
+        country: "Germany",
+        countryFlag: "🇩🇪",
+        countryCode: "DE",
+        city: "Erlangen",
+        workplaceType: "hybrid",
+        employmentTypes: ["working_student"],
+        languageRequirements: ["English"],
+        languageEvidence: "English is our working language.",
+        url: "https://jobs.example.com/5",
+        description: "English is our working language.",
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+        isRemote: false,
+        mode: "local",
+      },
+    ]);
+
+    const result = await fetchCompany(makeRow({ country: "Egypt", country_flag: "🇪🇬" }), "local");
+
+    expect(result.jobs[0]).toMatchObject({
+      country: "Germany",
+      country_flag: "🇩🇪",
+      country_code: "DE",
+      city: "Erlangen",
+      workplace_type: "hybrid",
+      employment_types: ["working_student"],
+      language_requirements: ["English"],
+    });
+  });
+
+  it("assigns a stable posting id when the same URL is fetched in both legacy modes", async () => {
+    mockFetchResponse([
+      {
+        id: "mode_specific_id",
+        title: "Engineer",
+        location: "Berlin, Germany",
+        url: "https://jobs.example.com/6/?utm_source=feed#apply",
+        description: "React TypeScript",
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+        mode: "local",
+      },
+    ]);
+
+    const local = await fetchCompany(makeRow(), "local");
+    const global = await fetchCompany(makeRow(), "global");
+
+    expect(local.jobs[0].id).toBe(global.jobs[0].id);
+    expect(local.jobs[0].id).toMatch(/^greenhouse_[a-f0-9]{40}$/);
+  });
+
   it.each([
     ["lever", atsUtils.fetchLever],
     ["ashby", atsUtils.fetchAshby],

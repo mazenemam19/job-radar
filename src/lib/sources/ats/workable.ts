@@ -248,10 +248,12 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
       return {
         id,
         title: r.title,
-        location: r.city ?? c.city ?? c.country,
+        location: r.city ?? "",
         url: r.url,
         postedAt: r.published_on,
         description,
+        employmentType: r.employment_type ?? undefined,
+        workplaceType: r.workplace ?? undefined,
       };
     }),
     5,

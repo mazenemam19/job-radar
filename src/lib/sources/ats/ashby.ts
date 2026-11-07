@@ -25,10 +25,12 @@ export async function fetchAshby(c: ATSConfig, mode: JobMode): Promise<FetcherRe
     jobs.map((r) => ({
       id: `${mode}_ashby_${c.slug}_${r.id}`,
       title: r.title,
-      location: r.locationName ?? c.city ?? c.country,
+      location: r.locationName ?? "",
       url: r.jobUrl,
       postedAt: r.publishedAt,
       description: stripHtml(r.descriptionHtml || ""),
+      employmentType: r.employmentType ?? undefined,
+      workplaceType: r.workplaceType ?? undefined,
     })),
     c,
     mode,

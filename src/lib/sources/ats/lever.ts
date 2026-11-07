@@ -28,10 +28,11 @@ export async function fetchLever(c: ATSConfig, mode: JobMode): Promise<FetcherRe
     jobs.map((r) => ({
       id: `${mode}_lever_${c.slug}_${r.id}`,
       title: r.text,
-      location: r.categories?.location ?? c.city ?? c.country,
+      location: r.categories?.location ?? "",
       url: r.hostedUrl,
       postedAt: new Date(r.createdAt).toISOString(),
       description: stripHtml(r.description || ""),
+      employmentType: r.categories?.commitment ?? undefined,
     })),
     c,
     mode,
