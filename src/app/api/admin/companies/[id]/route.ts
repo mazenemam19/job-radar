@@ -7,7 +7,7 @@ import { dbErrorResponse } from "@/lib/api-errors";
 import { buildCompanyPatch } from "@/lib/admin/build-company-patch";
 import { missingPipeline } from "@/lib/companies-table";
 
-type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;

@@ -56,7 +56,9 @@ describe("DELETE /api/admin/companies/[id]", () => {
 
     const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
     const req = new Request("http://localhost/api/admin/companies/123", { method: "DELETE" });
-    const res = await DELETE(req as unknown as NextRequest, { params: { id: "123" } });
+    const res = await DELETE(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "123" }),
+    });
     expect(res.status).toBe(403);
   });
 
@@ -83,7 +85,9 @@ describe("DELETE /api/admin/companies/[id]", () => {
 
     const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
     const req = new Request("http://localhost/api/admin/companies/abc-123", { method: "DELETE" });
-    const res = await DELETE(req as unknown as NextRequest, { params: { id: "abc-123" } });
+    const res = await DELETE(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "abc-123" }),
+    });
 
     expect(res.status).toBe(200);
 
@@ -118,7 +122,9 @@ describe("DELETE /api/admin/companies/[id]", () => {
 
     const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
     const req = new Request("http://localhost/api/admin/companies/ghost-id", { method: "DELETE" });
-    const res = await DELETE(req as unknown as NextRequest, { params: { id: "ghost-id" } });
+    const res = await DELETE(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "ghost-id" }),
+    });
 
     // Deleting a non-existent company is idempotent → 200
     expect(res.status).toBe(200);
@@ -145,7 +151,9 @@ describe("DELETE /api/admin/companies/[id]", () => {
 
     const { DELETE } = await import("../../app/api/admin/companies/[id]/route");
     const req = new Request("http://localhost/api/admin/companies/abc-123", { method: "DELETE" });
-    const res = await DELETE(req as unknown as NextRequest, { params: { id: "abc-123" } });
+    const res = await DELETE(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "abc-123" }),
+    });
 
     expect(res.status).toBe(500);
   });
@@ -165,7 +173,9 @@ describe("PUT /api/admin/companies/[id]", () => {
       method: "PUT",
       body: JSON.stringify({ name: "New Name" }),
     });
-    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    const res = await PUT(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "123" }),
+    });
     expect(res.status).toBe(403);
   });
 
@@ -181,7 +191,9 @@ describe("PUT /api/admin/companies/[id]", () => {
       method: "PUT",
       body: "not json",
     });
-    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    const res = await PUT(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "123" }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -197,7 +209,9 @@ describe("PUT /api/admin/companies/[id]", () => {
       method: "PUT",
       body: JSON.stringify({ ats: "invalid_ats" }),
     });
-    const res = await PUT(req as unknown as NextRequest, { params: { id: "123" } });
+    const res = await PUT(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "123" }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -231,7 +245,9 @@ describe("PUT /api/admin/companies/[id]", () => {
       method: "PUT",
       body: JSON.stringify({ name: "Updated Corp", country: "US" }),
     });
-    const res = await PUT(req as unknown as NextRequest, { params: { id: "comp-123" } });
+    const res = await PUT(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "comp-123" }),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -263,7 +279,9 @@ describe("PUT /api/admin/companies/[id]", () => {
       method: "PUT",
       body: JSON.stringify({ name: "Ghost" }),
     });
-    const res = await PUT(req as unknown as NextRequest, { params: { id: "ghost-id" } });
+    const res = await PUT(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "ghost-id" }),
+    });
     const json = await res.json();
 
     expect(res.status).toBe(404);

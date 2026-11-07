@@ -7,7 +7,7 @@ import { dbErrorResponse } from "@/lib/api-errors";
 import { buildSubmissionPatch } from "@/lib/admin/build-submission-patch";
 import { approveSubmission } from "@/lib/admin/approve-submission";
 
-type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+type RouteContext = { params: Promise<{ id: string }> };
 
 // ── PATCH — approve / reject / edit a submission ─────────────
 

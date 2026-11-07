@@ -6,7 +6,7 @@ import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { buildTrackerPatch, type TrackerPatchBody } from "@/lib/tracker-route";
 
-type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+type RouteContext = { params: Promise<{ id: string }> };
 
 // ── PATCH /api/tracker/[id] ───────────────────────────────
 

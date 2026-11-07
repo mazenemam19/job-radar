@@ -92,7 +92,7 @@ describe("tracker/[id] route handlers", () => {
         body: JSON.stringify({ status: "applied" }),
       }) as unknown as NextRequest;
 
-      const res = await PATCH(req, { params: { id: "t1" } });
+      const res = await PATCH(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(401);
     });
 
@@ -106,7 +106,7 @@ describe("tracker/[id] route handlers", () => {
         body: "bad-json",
       }) as unknown as NextRequest;
 
-      const res = await PATCH(req, { params: { id: "t1" } });
+      const res = await PATCH(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(400);
     });
 
@@ -123,7 +123,7 @@ describe("tracker/[id] route handlers", () => {
         body: JSON.stringify({ status: "applied" }),
       }) as unknown as NextRequest;
 
-      const res = await PATCH(req, { params: { id: "t1" } });
+      const res = await PATCH(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.ok).toBe(true);
@@ -142,7 +142,7 @@ describe("tracker/[id] route handlers", () => {
         body: JSON.stringify({ status: "applied" }),
       }) as unknown as NextRequest;
 
-      const res = await PATCH(req, { params: { id: "t1" } });
+      const res = await PATCH(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(404);
     });
 
@@ -158,7 +158,7 @@ describe("tracker/[id] route handlers", () => {
         body: JSON.stringify({ status: "applied" }),
       }) as unknown as NextRequest;
 
-      const res = await PATCH(req, { params: { id: "t1" } });
+      const res = await PATCH(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(500);
     });
   });
@@ -173,7 +173,7 @@ describe("tracker/[id] route handlers", () => {
         method: "DELETE",
       }) as unknown as NextRequest;
 
-      const res = await DELETE(req, { params: { id: "t1" } });
+      const res = await DELETE(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(401);
     });
 
@@ -188,7 +188,7 @@ describe("tracker/[id] route handlers", () => {
         method: "DELETE",
       }) as unknown as NextRequest;
 
-      const res = await DELETE(req, { params: { id: "t1" } });
+      const res = await DELETE(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.ok).toBe(true);
@@ -205,7 +205,7 @@ describe("tracker/[id] route handlers", () => {
         method: "DELETE",
       }) as unknown as NextRequest;
 
-      const res = await DELETE(req, { params: { id: "t1" } });
+      const res = await DELETE(req, { params: Promise.resolve({ id: "t1" }) });
       expect(res.status).toBe(500);
     });
   });

@@ -8,7 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { dbErrorResponse } from "@/lib/api-errors";
 import type { Database } from "@/lib/database.types";
 
-type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
