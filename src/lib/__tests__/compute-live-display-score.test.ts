@@ -98,6 +98,20 @@ describe("computeLiveDisplayScore", () => {
     expect(live.recencyScore).toBe(scored.recency_score);
   });
 
+  it("carries custom weights onto the scored job so the live display matches", () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      scoring_weights: { skill: 1, recency: 0, relocation: 0 },
+    };
+    const scored = scoreJob(
+      makeJob({ description: "React TypeScript", posted_at: new Date(NOW).toISOString() }),
+      settings,
+    )!;
+
+    expect(scored.scoring_weights).toEqual(settings.scoring_weights);
+    expect(computeLiveDisplayScore(scored).totalScore).toBe(scored.total_score);
+  });
+
   it("uses fetched_at for recency when date_unknown = true", () => {
     const job = makeDisplayJob({
       date_unknown: true,

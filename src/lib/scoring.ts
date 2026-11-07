@@ -8,13 +8,12 @@
 //             Junior is just another selectable level.
 
 import type { RawJob, ResolvedSettings, ScoredJob, ScoringWeights, SeniorityLevel } from "./types";
+import { detectWorkAuthorizationSignal, hasRelocationSupportEvidence } from "./job-signals";
 
 // ── Seniority: term-array classification ─────────────────────
 
 /** Ordinal rank for display badge purposes only (highest-wins). */
 const SENIORITY_RANK: SeniorityLevel[] = ["junior", "mid", "senior", "staff"];
-
-const VISA_SPONSORSHIP_PATTERN = /visa\s+sponsorship|relocation|work\s+permit/i;
 
 /**
  * Build a word-boundary regex from a term array. Each term is escaped;
@@ -193,11 +192,11 @@ export function computeSkillMatchScore(
 // ── Relocation bonus ─────────────────────────────────────────
 
 export function hasRelocationSupport(job: RawJob): boolean {
-  return (
-    job.visa_sponsorship ||
-    VISA_SPONSORSHIP_PATTERN.test(job.description) ||
-    VISA_SPONSORSHIP_PATTERN.test(job.title)
-  );
+  const text = `${job.title}\n${job.description}`;
+  const signal = detectWorkAuthorizationSignal(text);
+  if (signal.status === "sponsorship_unavailable") return false;
+  if (signal.status === "sponsorship_available") return true;
+  return job.visa_sponsorship || hasRelocationSupportEvidence(text);
 }
 
 // ── Settings gate & Pre-filters ──────────────────────────────
@@ -241,8 +240,11 @@ export function passesBlacklistedLocationsGate(job: RawJob, settings: ResolvedSe
   }
   const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
   const hasBlacklisted = settings.blacklisted_locations.some(
+    // Work authorization belongs in the evidence panel. Older per-user
+    // blacklist values are ignored so they cannot silently hide postings.
     (word) =>
-      matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase()),
+      !/visa|sponsor|work permit|relocation/i.test(word) &&
+      (matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase())),
   );
   return !hasBlacklisted;
 }
@@ -355,6 +357,7 @@ export function scoreJob(
     gemini_reason: geminiReason,
     gemini_reviewed: geminiReviewed,
     gemini_quota_exhausted: geminiQuotaExhausted,
+    scoring_weights: { ...settings.scoring_weights },
   };
 }
 

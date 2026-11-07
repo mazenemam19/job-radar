@@ -509,12 +509,29 @@ describe("passesSettingsGate", () => {
     expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(false);
   });
 
-  it("filters out roles with citizenship/clearance requirements", () => {
+  it("does not treat no-visa-sponsorship text as a blacklist match", () => {
     const job = makeJob({
-      title: "React Developer",
-      description: "Requires security clearance. No visa sponsorship.",
+      title: "Senior React Developer",
+      description: "React TypeScript. No visa sponsorship.",
+    });
+    expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("still filters explicit location and clearance blacklist entries", () => {
+    const job = makeJob({
+      title: "Senior React Developer",
+      description: "React TypeScript. US only.",
     });
     expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("does not award a relocation bonus for unavailable sponsorship", () => {
+    const job = makeJob({
+      title: "Senior React Developer",
+      description: "React TypeScript. No visa sponsorship.",
+      visa_sponsorship: true,
+    });
+    expect(scoreJob(job, DEFAULT_SETTINGS)?.relocation_bonus).toBe(0);
   });
 
   it("filters out roles with 0 matched skills", () => {
