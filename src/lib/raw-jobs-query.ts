@@ -1,15 +1,8 @@
 // src/lib/raw-jobs-query.ts
-// Replaces the .select("*").in("mode",...).order().limit(2000) call that used
-// to live in src/app/api/dashboard/route.ts. Filtering that previously ran in
-// Node, per user, per request (date, seniority, excluded keywords, blacklisted
-// locations, and a coarse pass of required-keywords/skill-match) now happens in
-// the jr_get_filtered_raw_jobs() Postgres function -- see
-// docs/plans/2026-07-11-db-level-job-filtering.md for the full rationale.
-//
-// The Gemini gate, scoreJob(), and mergeJobs() are NOT part of this -- they stay
-// in buildFeed() exactly as before. The exact hasMeaningfulKeywordMatch() recheck
-// for required-keywords/skill-match also stays in buildFeed(): this module only
-// returns a coarse superset for those two gates (see plan §2.3).
+// Fetches the bounded candidate pool for the dashboard. The database applies
+// pipeline, date, location, and job-type criteria before its row limit. Text
+// settings gates remain in buildFeed(), where their existing semantics can run
+// without a wider age range causing a Postgres statement timeout.
 
 import { createAdminClient } from "./supabase/admin";
 import { filterWorkAuthorizationBlacklistTerms } from "./job-signals";
@@ -26,11 +19,9 @@ export interface RawJobsFunnel {
   total_fetched: number;
   after_date_filter: number;
   /**
-   * Rows passing date + seniority + excluded-keywords + blacklist + global-mode,
-   * plus a COARSE ("any keyword, anywhere") superset for required-keywords and
-   * skill-match. NOT the same number as PipelineLog.after_settings_filter --
-   * buildFeed() must recompute that from the array length after running the
-   * exact hasMeaningfulKeywordMatch() precision recheck. See plan §4.2.
+   * Rows passing the DB-side date/location/job-type filters. This is not the
+   * same as PipelineLog.after_settings_filter: buildFeed() applies every text
+   * settings and global-mode gate in memory.
    */
   after_settings_filter_coarse: number;
 }
@@ -44,8 +35,6 @@ export interface FilteredRawJobsResult {
  * Fetches raw_jobs pre-filtered at the DB level for the given modes and
  * settings. The user's location and job-type profile is applied before the
  * row limit; unknown location or type values remain visible for review.
- * Returns a coarse superset for required-keywords/skill-match -- callers MUST
- * still run the exact hasMeaningfulKeywordMatch() check (see plan §2.3 and §3.2).
  */
 export async function fetchFilteredRawJobs(
   modes: string[],

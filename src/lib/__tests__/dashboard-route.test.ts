@@ -3,13 +3,10 @@
 // (audit row #18). Gemini is mocked; gate functions run from their real
 // implementations so the pipeline integration is exercised end-to-end.
 //
-// Date, seniority, excluded-keywords, blacklisted-locations, and global-mode
-// filtering moved to the DB level (jr_get_filtered_raw_jobs(), see
-// raw-jobs-query.ts and docs/plans/2026-07-11-db-level-job-filtering.md).
-// buildFeed() no longer applies those gates itself, so tests that exercised
-// them here were removed -- that coverage already lives in scoring.test.ts's
-// own passesDateGate/passesExcludedKeywordsGate/etc. describe() blocks, which
-// test those gate functions directly and are unaffected by this refactor.
+// Date/location/job-type filtering stays in the DB query. The textual settings
+// gates run here on that bounded pool so a larger age window cannot cause a DB
+// statement timeout. This suite exercises the integration, while scoring.test
+// covers each individual gate's edge cases.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RawJob, ResolvedSettings } from "../types";
@@ -290,6 +287,40 @@ describe("buildFeed", () => {
     expect(finalJobs[0].recency_score).toBeGreaterThan(0);
     expect(finalJobs[0].total_score).toBeGreaterThan(0);
   });
+
+  it("applies all text settings and global-mode gates before Gemini", async () => {
+    const validJob = makeJob({ mode: "local", location: "Erlangen, Germany" });
+    const excludedJob = makeJob({
+      id: "excluded",
+      title: "Senior Backend Engineer",
+      mode: "local",
+    });
+    const blacklistedJob = makeJob({ id: "blacklisted", location: "US only" });
+    const blockedGlobalJob = makeJob({
+      id: "blocked-global",
+      mode: "global",
+      location: "United States only",
+    });
+    const restrictiveSettings = makeSettings({
+      excluded_keywords: ["backend"],
+      blacklisted_locations: ["us only"],
+      global_mode_allowed_locations: [],
+      global_mode_blocked_regions: ["united states only"],
+    });
+
+    const { finalJobs, pipelineLog } = await buildFeed(
+      [validJob, excludedJob, blacklistedJob, blockedGlobalJob],
+      makeDbFunnel({ total_fetched: 4, after_date_filter: 4 }),
+      restrictiveSettings,
+      null,
+      testUserId,
+      testDb,
+    );
+
+    expect(finalJobs.map((job) => job.id)).toEqual([validJob.id]);
+    expect(pipelineLog.after_settings_filter).toBe(1);
+    expect(mockGemini).not.toHaveBeenCalled();
+  });
 });
 
 // These two are a separate top-level suite (rather than nested inside
@@ -331,7 +362,7 @@ describe("buildFeed - DB-prefiltered input contract", () => {
     expect(pipelineLog.after_date_filter).toBe(42);
   });
 
-  it("rejects a job that coarse-passes required-keywords but fails the exact precision recheck", async () => {
+  it("rejects a job that arrives from the DB pool but fails exact keyword matching", async () => {
     // "react" appears exactly once, within the first 600 characters (the
     // boilerplate window hasMeaningfulKeywordMatch ignores unless a second
     // distinct keyword also matches, or a match lands past the window). A
