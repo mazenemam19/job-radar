@@ -163,6 +163,7 @@ function matchCountry(location: string): { country: string; code: string } | nul
 function cleanCityCandidate(value: string): string | null {
   const candidate = value
     .replace(/\b(remote|hybrid|on[ -]?site|work from home)\b/gi, " ")
+    .replace(/\b(office|headquarters|hq)\b/gi, " ")
     .replace(/[()]/g, " ")
     .trim()
     .replace(/\s+/g, " ");
