@@ -57,30 +57,25 @@ test.describe("settings — save round-trip via real API", () => {
     await restorePromise;
   });
 
-  test("pipeline toggles are independent controls (local / global)", async ({ page }) => {
+  test("workplace choices are independent controls", async ({ page }) => {
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
-    // The settings page renders two pipeline switch controls.
-    // They correspond to pipeline_local, pipeline_global in user_settings.
-    // Accessible names: "🇪🇬 Local pipeline. Egypt-based companies" and "🌐 Global pipeline. Worldwide remote companies"
-    const localToggle = page.getByRole("switch", { name: /local pipeline|egypt-based/i }).first();
-    const globalToggle = page
-      .getByRole("switch", { name: /global pipeline|worldwide remote/i })
-      .first();
+    const onSite = page.getByRole("switch", { name: "On-site", exact: true });
+    const remote = page.getByRole("switch", { name: "Remote", exact: true });
 
-    // Both must be visible and be distinct DOM nodes
-    await expect(localToggle).toBeVisible({ timeout: 8_000 });
-    await expect(globalToggle).toBeVisible({ timeout: 8_000 });
+    await expect(onSite).toBeVisible({ timeout: 8_000 });
+    await expect(remote).toBeVisible({ timeout: 8_000 });
 
-    // Playwright returns the same element when two locators resolve to the same node.
-    // Verify both are different elements.
-    const localBox = await localToggle.boundingBox();
-    const globalBox = await globalToggle.boundingBox();
+    const originalOnSite = await onSite.getAttribute("aria-checked");
+    const originalRemote = await remote.getAttribute("aria-checked");
 
-    expect(localBox).not.toBeNull();
-    expect(globalBox).not.toBeNull();
-    expect(localBox!.y).not.toBeCloseTo(globalBox!.y, 5);
+    await onSite.click();
+    expect(await onSite.getAttribute("aria-checked")).not.toBe(originalOnSite);
+    expect(await remote.getAttribute("aria-checked")).toBe(originalRemote);
+
+    // Restore local form state; this test deliberately does not save.
+    await onSite.click();
   });
 
   test("renders seniority level toggle buttons", async ({ page }) => {
