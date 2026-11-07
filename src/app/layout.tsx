@@ -12,8 +12,7 @@ export const metadata: Metadata = {
 // favicon.ico, icon.png, apple-icon.png, and manifest.ts are all picked up
 // automatically by Next's file-convention metadata — nothing to wire up
 // here for those. themeColor lives in `viewport`, not `metadata`, per
-// Next 14's split (an old `metadata.themeColor` still type-checks but is
-// deprecated). Matches --bg in globals.css — the same background color
+// the current App Router metadata API. Matches --bg in globals.css — the same background color
 // the app, the email templates, and the icon's own flatten background all
 // already use.
 export const viewport: Viewport = {

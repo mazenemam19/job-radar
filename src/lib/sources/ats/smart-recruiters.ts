@@ -1,6 +1,6 @@
 // src/lib/sources/ats/smart-recruiters.ts
 // Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change.
-import type { ATSConfig, ATSRawInput, FetcherResult, SRJob, SRDetail } from "@/types";
+import type { ATSConfig, FetcherResult, SRJob, SRDetail } from "@/types";
 import type { JobMode } from "@/lib/types";
 import { safeFetch, safeFetchJson } from "./http";
 import { processJobs, stripHtml, pLimit } from "./job-processing";
@@ -41,10 +41,12 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise
         return {
           id: `${mode}_sr_${c.slug}_${r.id}`,
           title: r.name,
-          location: r.location.fullLocation ?? c.city ?? c.country,
+          location: r.location.fullLocation ?? "",
           url: `https://jobs.smartrecruiters.com/${c.slug}/${r.id}`,
           postedAt: r.releasedDate,
           description: stripHtml(detail.jobAd?.sections?.jobDescription?.content || ""),
+          employmentType: r.typeOfEmployment ?? r.employmentType ?? undefined,
+          workplaceType: r.workplaceType ?? undefined,
         };
       } catch {
         return null;
@@ -53,7 +55,7 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise
     5,
   );
   const processed = processJobs(
-    detailedJobs.filter((j): j is ATSRawInput => j !== null),
+    detailedJobs.filter((j): j is NonNullable<typeof j> => j !== null),
     c,
     mode,
   );

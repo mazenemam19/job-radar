@@ -43,10 +43,11 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
       return {
         id: `${mode}_bamboohr_${c.slug}_${r.id}`,
         title: r.jobOpeningName,
-        location: r.city ? `${r.city}, ${r.country}` : (c.city ?? c.country),
+        location: [r.city, r.country].filter(Boolean).join(", "),
         url: `https://${c.slug}.bamboohr.com/careers/${r.id}`,
         postedAt: r.datePosted,
         description,
+        employmentType: r.employmentType ?? r.employmentStatus ?? undefined,
       };
     }),
     5,

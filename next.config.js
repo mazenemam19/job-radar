@@ -26,7 +26,7 @@ const connectSrc = [
 // here because it looks like a downgrade and isn't an oversight:
 //
 // A nonce-based CSP was tried first (the "correct" modern answer, threaded
-// through src/middleware.ts so Next could nonce its own RSC-hydration
+// through src/proxy.ts so Next could nonce its own RSC-hydration
 // <script> tags). It broke in production specifically on this app's
 // statically-prerendered routes (/, /login, /submit — the ○ entries in
 // `next build`'s route table). Those are rendered once at build time, so
@@ -83,9 +83,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["nodemailer"],
-  },
+  serverExternalPackages: ["nodemailer"],
   async headers() {
     return [
       {

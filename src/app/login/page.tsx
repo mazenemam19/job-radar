@@ -47,12 +47,6 @@ function LoginContent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#08080f] p-4 font-sans">
       <div className="w-full max-w-[400px] rounded-2xl border border-[#1e1e30] bg-[#0d0d1a] px-9 py-10 text-center">
-        <Link
-          href="/"
-          className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-slate-500 no-underline"
-        >
-          ← Back
-        </Link>
         <Image
           src="/icon-192.png"
           alt=""
@@ -74,7 +68,6 @@ function LoginContent() {
             {errorMessage}
           </div>
         )}
-
         <button
           onClick={signInWithGoogle}
           className="flex w-full items-center justify-center gap-3 rounded-[10px] border-none bg-white py-3.5 text-[15px] font-semibold text-[#1a1a2e] cursor-pointer"
@@ -99,7 +92,12 @@ function LoginContent() {
           </svg>
           Continue with Google
         </button>
-
+        <Link
+          href="/"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-[10px] border border-[#1e1e30] bg-[#1e1e30] py-3.5 text-[15px] font-semibold text-slate-200 transition-colors hover:bg-[#2a2a40] hover:text-white no-underline"
+        >
+          Back
+        </Link>
         <p className="m-0 mt-6 text-[11px] leading-relaxed text-slate-600">
           By signing in you agree that this is a personal tool. No data is sold. Your Gemini API key
           is stored securely and used only for your own filtering.

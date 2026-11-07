@@ -4,6 +4,7 @@
 import type { SeniorityLevel } from "@/lib/types";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import DeleteAccountSection from "@/components/settings/DeleteAccountSection";
+import SearchProfileSection from "@/components/settings/SearchProfileSection";
 import {
   Section,
   KeywordField,
@@ -136,18 +137,27 @@ export default function SettingsForm() {
         helperText="Describe what makes a job a good fit. Response formatting is handled automatically — no need to specify JSON shape here."
       />
 
-      <Section title="Pipelines">
+      <SearchProfileSection
+        profile={fields.searchProfile}
+        onChange={(profile) => update("searchProfile", profile)}
+      />
+
+      <Section title="Source pipelines">
+        <p className="mb-3 text-[13px] text-[#64748b]">
+          Choose which legacy source groups feed your dashboard. These controls affect source
+          intake, not your country, city, workplace, or job-category preferences above.
+        </p>
         <Toggle
           checked={fields.pipelineLocal}
-          onChange={(v) => update("pipelineLocal", v)}
-          label="🇪🇬 Local pipeline"
-          description="Egypt-based companies"
+          onChange={(value) => update("pipelineLocal", value)}
+          label="Local source pipeline"
+          description="Include sources that use the legacy local fetch path."
         />
         <Toggle
           checked={fields.pipelineGlobal}
-          onChange={(v) => update("pipelineGlobal", v)}
-          label="🌐 Global pipeline"
-          description="Worldwide remote companies"
+          onChange={(value) => update("pipelineGlobal", value)}
+          label="Global source pipeline"
+          description="Include sources that use the legacy global fetch path."
         />
       </Section>
 

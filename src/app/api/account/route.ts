@@ -87,11 +87,7 @@ export async function DELETE() {
   try {
     const { error: authError } = await db.auth.admin.deleteUser(user.id);
     if (authError) {
-      console.error("[account:DELETE:auth_user]", authError.message);
-      return NextResponse.json(
-        { ok: false, error: "Something went wrong. Please try again." },
-        { status: 500 },
-      );
+      return dbErrorResponse("account:DELETE:auth_user", authError);
     }
   } catch (err) {
     return catchErrorResponse("account:DELETE:auth_user", err);

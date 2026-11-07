@@ -9,8 +9,11 @@
  * exercises the onboarding gate or the complete-onboarding redirect.
  *
  * Flips the shared test account to onboarding_complete: false for this
- * file's own tests, restores it to true in afterAll. Safe only because
- * playwright.config.ts runs workers: 1 / fullyParallel: false.
+ * file's own tests, then restores it after each one. The storage-state file
+ * is read when the next browser context is created, so restoring only in
+ * afterAll can leak an incomplete-onboarding session into the next spec.
+ * Safe only because playwright.config.ts runs workers: 1 / fullyParallel:
+ * false.
  */
 
 import { test, expect, request as pwRequest } from "@playwright/test";
@@ -38,7 +41,7 @@ async function loginAs(onboardingComplete: boolean) {
 }
 
 test.describe("onboarding — new user redirect", () => {
-  test.afterAll(async () => {
+  test.afterEach(async () => {
     if (!canRun) return;
     // loginAs() mints a new session via verifyOtp, which invalidates the
     // previous one. AUTH_FILE must be refreshed here — the same reason

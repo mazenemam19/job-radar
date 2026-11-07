@@ -25,18 +25,19 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const profile: UserProfile | null = await getUserProfile(user.id);
 
   // ── Blocked user ─────────────────────────────────────────────
-  // Redundant fallback: middleware.ts now enforces this on every request,
+  // Redundant fallback: proxy.ts now enforces this on every request,
   // immune to the Router Cache staleness this layout-level check alone
   // was exposed to. Kept here too in case a route ever reaches this layout
-  // without passing through middleware.
+  // without passing through the proxy.
   if (profile && !profile.is_active) {
+    const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookies().getAll();
+            return cookieStore.getAll();
           },
           setAll() {
             // no-op: we're about to redirect anyway
@@ -44,7 +45,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         },
       },
     );
-    // Explicit global scope, matching middleware.ts — revokes every
+    // Explicit global scope, matching proxy.ts — revokes every
     // session this user has, not just this one.
     await supabase.auth.signOut({ scope: "global" });
     redirect("/login?error=blocked");

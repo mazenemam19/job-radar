@@ -17,6 +17,7 @@ import {
   fetchSmartRecruiters,
   fetchBambooHR,
 } from "@/lib/sources/ats-utils";
+import { createHash } from "node:crypto";
 
 import type { ATSCompanyRow, RawJob, JobMode } from "./types";
 import type { Job } from "@/types";
@@ -36,6 +37,26 @@ const FETCHERS: Record<ATSConfig["ats"], Fetcher> = {
   smartrecruiters: fetchSmartRecruiters,
   bamboohr: fetchBambooHR,
 };
+
+function canonicalPostingId(ats: string, sourceId: string, url: string): string {
+  // Fetchers historically prefixed their provider job IDs with the pipeline
+  // name (for example `local_gh_acme_42` and `global_gh_acme_42`). The
+  // provider ID is the durable identity; URLs are only a fallback. In
+  // particular, some boards put that ID in a query parameter, so stripping
+  // every query parameter would incorrectly collapse different postings.
+  let identity = sourceId.trim().replace(/^(?:local|global|visa)_/, "") || url.trim();
+  try {
+    const parsed = new URL(identity);
+    parsed.hash = "";
+    parsed.hostname = parsed.hostname.toLowerCase();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    identity = parsed.toString();
+  } catch {
+    identity = identity.toLowerCase();
+  }
+  const digest = createHash("sha256").update(`${ats}:${identity}`).digest("hex").slice(0, 40);
+  return `${ats}_${digest}`;
+}
 
 /** Convert a DB row + pipeline mode to the ATSConfig shape. */
 function toATSConfig(row: ATSCompanyRow): ATSConfig {
@@ -94,12 +115,13 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
       const dateUnknown = Number.isNaN(postedMs) || Math.abs(postedMs - fetchedMs) < 30_000;
 
       return {
-        id: j.id,
+        id: canonicalPostingId(row.ats, j.id, j.url),
+        source_id: j.id,
         title: j.title,
         company: j.company ?? row.name,
         location: j.location ?? "",
-        country: row.country,
-        country_flag: row.country_flag,
+        country: j.country,
+        country_flag: j.countryFlag,
         url: j.url,
         description: j.description ?? "",
         posted_at: dateUnknown ? fetchedAt : postedAt,
@@ -107,8 +129,17 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
         date_unknown: dateUnknown,
         is_remote: Boolean(j.isRemote ?? false),
         salary: j.salary ?? null,
-        mode,
+        mode: j.mode ?? mode,
         visa_sponsorship: Boolean(j.visaSponsorship ?? false),
+        work_authorization_status: j.workAuthorizationStatus ?? "unclear",
+        work_authorization_evidence: j.workAuthorizationEvidence ?? null,
+        source_location: j.sourceLocation ?? j.location,
+        country_code: j.countryCode ?? null,
+        city: j.city ?? null,
+        workplace_type: j.workplaceType ?? "unknown",
+        employment_types: j.employmentTypes ?? [],
+        language_requirements: j.languageRequirements ?? [],
+        language_evidence: j.languageEvidence ?? null,
         source_name: row.name,
         ats_type: row.ats,
         created_at: fetchedAt,

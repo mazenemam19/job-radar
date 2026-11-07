@@ -13,7 +13,7 @@ export async function GET() {
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const db = createServerClient();
+  const db = await createServerClient();
   const { data, error } = await db
     .from("tracker_entries")
     .select("*")
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     ? (body.status as TrackerStatus)
     : "saved";
 
-  const db = createServerClient();
+  const db = await createServerClient();
   const now = new Date().toISOString();
 
   const { data, error } = await db

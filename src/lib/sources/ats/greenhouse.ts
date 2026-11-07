@@ -28,11 +28,12 @@ export async function fetchGreenhouse(c: ATSConfig, mode: JobMode): Promise<Fetc
   const rawCount = jobs.length;
   const processed = processJobs(
     jobs.map((r) => {
+      const hasRemoteOffice = (r.offices || []).some((office) => /^remote$/i.test(office.name));
       const officeNames = (r.offices || [])
         .map((o) => o.name)
-        .filter((n) => n && n !== "Remote")
+        .filter((n) => n && !/^remote$/i.test(n))
         .join(", ");
-      const location = officeNames || r.location?.name || c.city || c.country;
+      const location = officeNames || r.location?.name || (hasRemoteOffice ? "Remote" : "");
 
       return {
         id: `${mode}_gh_${c.slug}_${r.id}`,
@@ -41,6 +42,8 @@ export async function fetchGreenhouse(c: ATSConfig, mode: JobMode): Promise<Fetc
         url: r.absolute_url,
         postedAt: r.updated_at,
         description: stripHtml(r.content || ""),
+        employmentType: r.employment_type ?? undefined,
+        workplaceType: hasRemoteOffice ? "remote" : undefined,
       };
     }),
     c,

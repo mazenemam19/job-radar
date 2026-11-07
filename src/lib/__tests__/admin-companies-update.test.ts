@@ -44,7 +44,7 @@ function makeRequest(body: unknown): NextRequest {
 
 async function callPut(body: unknown) {
   const { PUT } = await import("../../app/api/admin/companies/[id]/route");
-  return PUT(makeRequest(body), { params: { id: "abc-123" } });
+  return PUT(makeRequest(body), { params: Promise.resolve({ id: "abc-123" }) });
 }
 
 describe("PUT /api/admin/companies/[id]", () => {

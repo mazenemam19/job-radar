@@ -6,9 +6,12 @@ import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
 import { buildTrackerPatch, type TrackerPatchBody } from "@/lib/tracker-route";
 
+type RouteContext = { params: Promise<{ id: string }> };
+
 // ── PATCH /api/tracker/[id] ───────────────────────────────
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
@@ -20,12 +23,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const patch = buildTrackerPatch(body, new Date().toISOString());
-  const db = createServerClient();
+  const db = await createServerClient();
 
   const { data, error } = await db
     .from("tracker_entries")
     .update(patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id) // RLS-equivalent guard at app layer
     .select()
     .single();
@@ -38,16 +41,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 // ── DELETE /api/tracker/[id] ──────────────────────────────
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const db = createServerClient();
-  const { error } = await db
-    .from("tracker_entries")
-    .delete()
-    .eq("id", params.id)
-    .eq("user_id", user.id);
+  const db = await createServerClient();
+  const { error } = await db.from("tracker_entries").delete().eq("id", id).eq("user_id", user.id);
 
   if (error) return dbErrorResponse("tracker/[id]:DELETE", error);
 

@@ -3,6 +3,7 @@
 // is a plain transform so it can be unit tested without mounting a component.
 
 import type { ResolvedSettings, SettingsFormFields } from "@/lib/types";
+import { EMPTY_SEARCH_PROFILE } from "./search-profile";
 
 export const DEFAULT_FORM_FIELDS: SettingsFormFields = {
   geminiKey: "",
@@ -27,6 +28,7 @@ export const DEFAULT_FORM_FIELDS: SettingsFormFields = {
   requiredKeywords: "",
   globalBlockedRegions: "",
   globalAllowedLocations: "",
+  searchProfile: structuredClone(EMPTY_SEARCH_PROFILE),
 };
 
 /** "react, node,  next.js" -> ["react", "node", "next.js"] */
@@ -40,6 +42,10 @@ export function parseCsvList(value: string): string[] {
 /** ["react", "node"] -> "react, node" */
 export function csvListToString(values: string[] | null | undefined): string {
   return (values ?? []).join(", ");
+}
+
+function cloneSearchProfile(resolved: ResolvedSettings) {
+  return structuredClone(resolved.search_profile ?? EMPTY_SEARCH_PROFILE);
 }
 
 /** Maps a fetched ResolvedSettings into the form's editable field shape. */
@@ -70,6 +76,7 @@ export function hydrateFormFields(resolved: ResolvedSettings): SettingsFormField
     requiredKeywords: csvListToString(resolved.required_keywords),
     globalBlockedRegions: csvListToString(resolved.global_mode_blocked_regions),
     globalAllowedLocations: csvListToString(resolved.global_mode_allowed_locations),
+    searchProfile: cloneSearchProfile(resolved),
   };
 }
 
@@ -114,6 +121,7 @@ export function buildSettingsPayload(fields: SettingsFormFields): SettingsSaveRe
     required_keywords: parseCsvList(fields.requiredKeywords),
     global_mode_blocked_regions: parseCsvList(fields.globalBlockedRegions),
     global_mode_allowed_locations: parseCsvList(fields.globalAllowedLocations),
+    search_profile: structuredClone(fields.searchProfile),
   };
 
   if (fields.clearGeminiKey) {

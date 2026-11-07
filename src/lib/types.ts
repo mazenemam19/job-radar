@@ -40,6 +40,13 @@ export interface ATSCompanyRow {
 /** Normalised job as stored in public.raw_jobs */
 export interface RawJob {
   id: string;
+  /**
+   * Provider-issued identity used only while a fetched job is being written.
+   * It is deliberately not persisted: the canonical `id` is the durable
+   * database identity. Keeping this value lets the writer update a legacy
+   * local/global row instead of creating a duplicate during the ID migration.
+   */
+  source_id?: string;
   title: string;
   company: string;
   location: string;
@@ -58,6 +65,48 @@ export interface RawJob {
   source_name: string | null;
   ats_type: string | null;
   created_at: string;
+  country_code?: string | null;
+  city?: string | null;
+  workplace_type?: "on_site" | "hybrid" | "remote" | "unknown";
+  employment_types?: JobEmploymentType[];
+  work_authorization_status?:
+    | "sponsorship_available"
+    | "sponsorship_unavailable"
+    | "authorization_required"
+    | "unclear";
+  work_authorization_evidence?: string | null;
+  language_requirements?: string[];
+  language_evidence?: string | null;
+  source_location?: string | null;
+}
+
+export type JobEmploymentType =
+  | "full_time"
+  | "part_time"
+  | "working_student"
+  | "internship"
+  | "contract"
+  | "temporary"
+  | "mini_job"
+  | "apprenticeship"
+  | "freelance"
+  | "other";
+
+export type WorkplaceType = "on_site" | "hybrid" | "remote";
+
+export interface SearchLocationPreference {
+  country_code: string;
+  country_name: string;
+  cities: string[];
+  country_wide: boolean;
+  remote_countrywide: boolean;
+}
+
+/** Personal target market and job categories. Empty arrays mean no restriction. */
+export interface JobSearchProfile {
+  locations: SearchLocationPreference[];
+  workplace_types: WorkplaceType[];
+  employment_types: JobEmploymentType[];
 }
 
 // ── Scoring ─────────────────────────────────────────────────
@@ -88,6 +137,8 @@ export interface ScoredJob extends RawJob {
    *  "not AI-reviewed" one. */
   gemini_quota_exhausted?: boolean;
   scoring_weights?: ScoringWeights;
+  /** Why this posting passed the user's location and category preferences. */
+  search_profile_match?: { reasons: string[]; uncertainties: string[] } | null;
 }
 
 /** Snapshot stored in tracker_entries.job_snapshot */
@@ -155,6 +206,7 @@ export interface UserSettingsRow {
   global_mode_allowed_locations: string[] | null;
   email_alerts_enabled: boolean | null;
   salary_reminder_enabled: boolean | null;
+  search_profile: JobSearchProfile | null;
   updated_at: string;
 }
 
@@ -181,6 +233,7 @@ export interface ResolvedSettings {
   global_mode_allowed_locations: string[];
   email_alerts_enabled: boolean;
   salary_reminder_enabled: boolean;
+  search_profile?: JobSearchProfile;
 }
 
 /** Editable state backing the settings form. Comma-separated list fields are
@@ -209,6 +262,7 @@ export interface SettingsFormFields {
   requiredKeywords: string;
   globalBlockedRegions: string;
   globalAllowedLocations: string;
+  searchProfile: JobSearchProfile;
 }
 
 export interface SettingsData {

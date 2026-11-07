@@ -8,13 +8,12 @@
 //             Junior is just another selectable level.
 
 import type { RawJob, ResolvedSettings, ScoredJob, ScoringWeights, SeniorityLevel } from "./types";
+import { detectWorkAuthorizationSignal, hasRelocationSupportEvidence } from "./job-signals";
 
 // ── Seniority: term-array classification ─────────────────────
 
 /** Ordinal rank for display badge purposes only (highest-wins). */
 const SENIORITY_RANK: SeniorityLevel[] = ["junior", "mid", "senior", "staff"];
-
-const VISA_SPONSORSHIP_PATTERN = /visa\s+sponsorship|relocation|work\s+permit/i;
 
 /**
  * Build a word-boundary regex from a term array. Each term is escaped;
@@ -193,11 +192,11 @@ export function computeSkillMatchScore(
 // ── Relocation bonus ─────────────────────────────────────────
 
 export function hasRelocationSupport(job: RawJob): boolean {
-  return (
-    job.visa_sponsorship ||
-    VISA_SPONSORSHIP_PATTERN.test(job.description) ||
-    VISA_SPONSORSHIP_PATTERN.test(job.title)
-  );
+  const text = `${job.title}\n${job.description}`;
+  const signal = detectWorkAuthorizationSignal(text);
+  if (signal.status === "sponsorship_unavailable") return false;
+  if (signal.status === "sponsorship_available") return true;
+  return job.visa_sponsorship || hasRelocationSupportEvidence(text);
 }
 
 // ── Settings gate & Pre-filters ──────────────────────────────
@@ -241,8 +240,11 @@ export function passesBlacklistedLocationsGate(job: RawJob, settings: ResolvedSe
   }
   const textCombined = `${job.title} ${job.description} ${job.location}`.toLowerCase();
   const hasBlacklisted = settings.blacklisted_locations.some(
+    // Work authorization belongs in the evidence panel. Older per-user
+    // blacklist values are ignored so they cannot silently hide postings.
     (word) =>
-      matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase()),
+      !/visa|sponsor|work permit|relocation/i.test(word) &&
+      (matchesAnyWholeWord(textCombined, [word]) || textCombined.includes(word.toLowerCase())),
   );
   return !hasBlacklisted;
 }
@@ -355,6 +357,7 @@ export function scoreJob(
     gemini_reason: geminiReason,
     gemini_reviewed: geminiReviewed,
     gemini_quota_exhausted: geminiQuotaExhausted,
+    scoring_weights: { ...settings.scoring_weights },
   };
 }
 
@@ -362,17 +365,42 @@ export function scoreJob(
 
 /**
  * Merges new scored jobs into an existing array.
- * Deduplication by job.id (URL hash).
+ * Deduplicates canonical postings by ID. Legacy local/global rows fall back
+ * to a normalized URL, dropping only known tracking parameters so provider
+ * identifiers such as `gh_jid` remain distinct.
  */
 export function mergeJobs(existing: ScoredJob[], incoming: ScoredJob[]): ScoredJob[] {
-  const map = new Map(existing.map((j) => [j.id, j]));
+  function identity(job: ScoredJob): string {
+    try {
+      const url = new URL(job.url.trim());
+      url.hash = "";
+      for (const key of Array.from(url.searchParams.keys())) {
+        if (/^(?:utm_.+|ref|source|campaign|mc_[a-z]+)$/i.test(key)) {
+          url.searchParams.delete(key);
+        }
+      }
+      url.searchParams.sort();
+      url.hostname = url.hostname.toLowerCase();
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+      return "url:" + url.toString();
+    } catch {
+      return "id:" + job.id;
+    }
+  }
+
+  const map = new Map<string, ScoredJob>();
+
+  function keepFresher(job: ScoredJob): void {
+    const key = identity(job);
+    const previous = map.get(key);
+    if (!previous || job.fetched_at > previous.fetched_at) map.set(key, job);
+  }
+
+  existing.forEach(keepFresher);
 
   for (const job of incoming) {
     if (job.total_score <= 0) continue;
-    const prev = map.get(job.id);
-    if (!prev || job.fetched_at > prev.fetched_at) {
-      map.set(job.id, job);
-    }
+    keepFresher(job);
   }
 
   return Array.from(map.values()).sort((a, b) => b.total_score - a.total_score);

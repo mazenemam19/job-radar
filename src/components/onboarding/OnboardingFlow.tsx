@@ -8,13 +8,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { GERMANY_PILOT_SEARCH_PROFILE } from "@/lib/search-profile";
 
 export default function OnboardingFlow() {
   const [apiKey, setApiKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function complete(useDefaults: boolean) {
+  async function complete(choice: "defaults" | "customize" | "germany") {
     const trimmedKey = apiKey.trim();
 
     if (trimmedKey && !trimmedKey.startsWith("AIza")) {
@@ -31,6 +32,10 @@ export default function OnboardingFlow() {
         onboarding_complete: true,
       };
       if (trimmedKey) body.gemini_api_key = trimmedKey;
+      if (choice === "germany") {
+        body.search_profile = GERMANY_PILOT_SEARCH_PROFILE;
+        body.seniority_levels = ["junior", "mid", "senior", "staff"];
+      }
 
       const res = await fetch("/api/settings", {
         method: "PATCH",
@@ -52,7 +57,7 @@ export default function OnboardingFlow() {
       // guaranteed ordering). A full browser navigation always asks the
       // server for a brand new page load, so the layout re-runs
       // getUserProfile() and gets the freshly-saved value every time.
-      window.location.href = useDefaults ? "/dashboard" : "/settings";
+      window.location.href = choice === "customize" ? "/settings" : "/dashboard";
     } catch {
       setKeyError("Network error. Please try again.");
       setLoading(false);
@@ -123,7 +128,7 @@ export default function OnboardingFlow() {
 
         <div className="flex flex-col gap-3.5">
           <button
-            onClick={() => complete(true)}
+            onClick={() => complete("defaults")}
             disabled={loading}
             className="cursor-pointer rounded-[10px] border border-[#1e1e30] bg-[#0a0a18] px-6 py-5 text-left text-[#e2e8f0] disabled:cursor-not-allowed"
             style={{ opacity: loading ? 0.6 : 1 }}
@@ -136,7 +141,7 @@ export default function OnboardingFlow() {
           </button>
 
           <button
-            onClick={() => complete(false)}
+            onClick={() => complete("customize")}
             disabled={loading}
             className="cursor-pointer rounded-[10px] border border-[#6366f1] bg-[#0f0f20] px-6 py-5 text-left text-[#e2e8f0] disabled:cursor-not-allowed"
             style={{ opacity: loading ? 0.6 : 1 }}
@@ -145,7 +150,21 @@ export default function OnboardingFlow() {
               🎛️ Customise my profile
             </div>
             <div className="text-[13px] text-[#64748b]">
-              Set your own skills, pipelines, seniority preferences, and Gemini filter prompt.
+              Open Settings to choose countries, cities, job types, seniority, and your skills.
+            </div>
+          </button>
+
+          <button
+            onClick={() => complete("germany")}
+            disabled={loading}
+            className="cursor-pointer rounded-[10px] border border-[#1e1e30] bg-[#0a0a18] px-6 py-5 text-left text-[#e2e8f0] disabled:cursor-not-allowed"
+            style={{ opacity: loading ? 0.6 : 1 }}
+          >
+            <div className="mb-1 text-[15px] font-semibold">🇩🇪 Start with the Germany pilot</div>
+            <div className="text-[13px] text-[#64748b]">
+              Search near Buckenhof, Erlangen, and Nürnberg, plus Germany-wide remote roles. Include
+              working-student, part-time, full-time, and other job types, across all seniority
+              levels. You can change every preference in Settings.
             </div>
           </button>
         </div>

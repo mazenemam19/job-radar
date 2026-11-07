@@ -7,24 +7,31 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
+import { dbErrorResponse } from "@/lib/api-errors";
 import type { ScoredJob } from "@/lib/types";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = createServerClient();
+  const db = await createServerClient();
 
-  const { data: cache } = await db
+  const { data: cache, error } = await db
     .from("user_jobs_cache")
     .select("jobs")
     .eq("user_id", user.id)
     .single();
+  if (error && error.code !== "PGRST116") {
+    return dbErrorResponse("jobs/[id]:GET:user_jobs_cache", error);
+  }
 
   const jobs = (cache?.jobs as unknown as ScoredJob[]) ?? [];
-  const job = jobs.find((j) => j.id === params.id);
+  const job = jobs.find((j) => j.id === id);
 
   if (!job) {
     return NextResponse.json({ ok: false, error: "Job not found" }, { status: 404 });

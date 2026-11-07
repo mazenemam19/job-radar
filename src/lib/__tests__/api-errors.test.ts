@@ -28,14 +28,32 @@ describe("dbErrorResponse", () => {
     expect(res.status).toBe(500);
   });
 
-  it("returns a generic message to the client (not the real error)", async () => {
+  it("returns an actionable development diagnostic to the client", async () => {
     const res = dbErrorResponse("tracker:GET", { message: "raw supabase detail" });
     const body = await res.json();
     expect(body).toEqual({
       ok: false,
-      error: "Something went wrong. Please try again.",
+      code: "tracker:GET",
+      error: "Request failed in tracker:GET: raw supabase detail",
+      detail: "raw supabase detail",
     });
-    expect(body.error).not.toContain("raw supabase");
+  });
+
+  it("keeps raw diagnostics out of production responses", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    try {
+      const res = dbErrorResponse("tracker:GET", { message: "raw supabase detail" });
+      const body = await res.json();
+
+      expect(body).toEqual({
+        ok: false,
+        code: "tracker:GET",
+        error: "Request failed in tracker:GET. Please try again.",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("logs the real error message with the context tag", () => {
@@ -59,12 +77,14 @@ describe("catchErrorResponse", () => {
     expect(res.status).toBe(500);
   });
 
-  it("returns a generic message to the client", async () => {
+  it("returns the caught error with operation context in development", async () => {
     const res = catchErrorResponse("settings:PATCH", new Error("invalid SSL cert"));
     const body = await res.json();
     expect(body).toEqual({
       ok: false,
-      error: "Something went wrong. Please try again.",
+      code: "settings:PATCH",
+      error: "Request failed in settings:PATCH: invalid SSL cert",
+      detail: "invalid SSL cert",
     });
   });
 

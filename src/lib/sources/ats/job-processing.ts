@@ -1,9 +1,13 @@
-// src/lib/sources/ats/job-processing.ts
-// Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change
-// except the New Cairo fix noted below.
+// Converts raw ATS postings into the shared job shape used by the scraper.
 import type { Job, BaseCompany, ATSRawInput } from "@/types";
 import type { JobMode } from "@/lib/types";
-import { COUNTRY_MAP } from "../../constants";
+import { detectWorkAuthorizationSignal } from "../../job-signals";
+import {
+  extractLanguageClues,
+  inferEmploymentTypes,
+  inferWorkplaceType,
+  normalizePostingLocation,
+} from "../../job-normalization";
 
 /** Parses strings like '1 day ago', '2 hours ago', 'yesterday' into ISO strings. */
 export function parseRelativeDate(text: string): string {
@@ -38,18 +42,6 @@ export function parseRelativeDate(text: string): string {
   return isNaN(parsed) ? now.toISOString() : new Date(parsed).toISOString();
 }
 
-function detectCountry(
-  location: string,
-  fallback: { name: string; flag: string },
-): { name: string; flag: string } {
-  const loc = (location || "").toLowerCase();
-  for (const [key, val] of Object.entries(COUNTRY_MAP)) {
-    const re = new RegExp(`\\b${key}\\b`, "i");
-    if (re.test(loc)) return val;
-  }
-  return fallback;
-}
-
 export function stripHtml(html: string): string {
   if (!html) return "";
   return html
@@ -66,34 +58,6 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
-/**
- * Ordered match table for extractEgyptCity. "New Cairo" is checked before the
- * plain "cairo" pattern so it's actually reachable — see AUDIT_STATUS.md row
- * #2. (Previously "cairo" was checked first, which meant any location
- * containing "new cairo" was caught by the "cairo" branch and displayed as
- * "Cairo" instead of "New Cairo". That was a real behavior change when fixed,
- * not just a refactor, so it shipped as its own noted fix.)
- */
-const EGYPT_CITY_PATTERNS: ReadonlyArray<{ matches: readonly string[]; result: string }> = [
-  { matches: ["remote"], result: "Remote 🌐" },
-  { matches: ["new cairo", "new-cairo"], result: "New Cairo" },
-  { matches: ["cairo"], result: "Cairo" },
-  { matches: ["giza"], result: "Giza" },
-  { matches: ["alexandria"], result: "Alexandria" },
-  { matches: ["maadi"], result: "Maadi, Cairo" },
-  { matches: ["nasr city", "nasr-city"], result: "Nasr City, Cairo" },
-  { matches: ["heliopolis"], result: "Heliopolis, Cairo" },
-  { matches: ["6th", "sheikh zayed"], result: "6th of October" },
-  { matches: ["smart village"], result: "Smart Village, Giza" },
-];
-
-/** For local jobs: extract a specific Egyptian city from the raw location string. */
-function extractEgyptCity(rawLocation: string, companyCity?: string): string {
-  const loc = (rawLocation || "").toLowerCase();
-  const hit = EGYPT_CITY_PATTERNS.find((p) => p.matches.some((m) => loc.includes(m)));
-  return hit?.result ?? companyCity ?? "Cairo";
-}
-
 export function processJobs(raw: ATSRawInput[], company: BaseCompany, mode: JobMode): Job[] {
   const now = new Date().toISOString();
   const out: Job[] = [];
@@ -105,35 +69,39 @@ export function processJobs(raw: ATSRawInput[], company: BaseCompany, mode: JobM
     // applied downstream in the per-user pipeline (scoring.ts + dashboard route).
     // processJobs() only normalizes raw ATS data into the Job shape.
 
-    const actualSponsorship = /visa\s+sponsorship|relocation|work\s+permit/i.test(
-      title + " " + r.description,
-    );
-    const isRemote = /remote|work\s+from\s+home/i.test(title + r.location + r.description);
-    const countryInfo = detectCountry(r.location, {
-      name: company.country,
-      flag: company.countryFlag,
-    });
-
-    const displayLocation =
-      mode === "local" ? extractEgyptCity(r.location, company.city) : r.location;
+    const workAuthorization = detectWorkAuthorizationSignal(`${title}\n${r.description}`);
+    const actualSponsorship = workAuthorization.status === "sponsorship_available";
+    const normalizedLocation = normalizePostingLocation(r.location || "");
+    const workplaceType = inferWorkplaceType(r.location, title, r.description, r.workplaceType);
+    const employmentTypes = inferEmploymentTypes(r.employmentType, title, r.description);
+    const languageClues = extractLanguageClues(r.description);
 
     out.push({
       id: r.id,
       source: "company",
-      mode,
+      mode: workplaceType === "remote" ? "global" : mode,
       sourceName: company.name,
       title,
       company: r.company || company.name,
-      location: displayLocation,
-      country: countryInfo.name,
-      countryFlag: countryInfo.flag,
+      location: normalizedLocation.sourceLocation || "Unknown location",
+      sourceLocation: normalizedLocation.sourceLocation,
+      city: normalizedLocation.city,
+      country: normalizedLocation.country,
+      countryCode: normalizedLocation.countryCode,
+      countryFlag: normalizedLocation.countryFlag,
+      workplaceType,
+      employmentTypes,
+      languageRequirements: languageClues.requirements,
+      languageEvidence: languageClues.evidence,
       url: r.url,
       // Full description stored — no ceiling.
       description: r.description,
-      isRemote,
+      isRemote: workplaceType === "remote",
       postedAt: r.postedAt || now,
       dateUnknown: !r.postedAt,
       visaSponsorship: actualSponsorship,
+      workAuthorizationStatus: workAuthorization.status,
+      workAuthorizationEvidence: workAuthorization.evidence,
       // These fields are vestigial on the legacy `Job` type — nothing downstream
       // reads them (the dashboard pipeline computes its own scores in JobCard.tsx via
       // computeRecencyScore/passesSettingsGate against the user's real settings).

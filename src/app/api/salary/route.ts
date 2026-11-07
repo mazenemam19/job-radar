@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const roleFilter = url.searchParams.get("role");
   const pipelineFilter = url.searchParams.get("pipeline");
 
-  const db = createServerClient();
+  const db = await createServerClient();
 
   let query = db
     .from("salary_reports")
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   // All required fields are guaranteed non-empty and valid after validateSalaryPost.
   const currency = body.currency!;
 
-  const db = createServerClient();
+  const db = await createServerClient();
   const now = new Date().toISOString();
 
   const { data, error } = await db

@@ -7,7 +7,10 @@ import { dbErrorResponse } from "@/lib/api-errors";
 import { buildCompanyPatch } from "@/lib/admin/build-company-patch";
 import { missingPipeline } from "@/lib/companies-table";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function PUT(request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
@@ -34,7 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const { data: current } = await db
     .from("ats_companies")
     .select("pipeline_local, pipeline_global, is_active")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (current) {
@@ -56,7 +59,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const { data, error } = await db
     .from("ats_companies")
     .update(result.patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -66,7 +69,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ ok: true, data });
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
@@ -78,7 +82,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   const { data: company } = await db
     .from("ats_companies")
     .select("name, ats")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   // Delete raw_jobs that belong to this company (matched by name + ats)
@@ -87,7 +91,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   }
 
   // Delete the company itself
-  const { error } = await db.from("ats_companies").delete().eq("id", params.id);
+  const { error } = await db.from("ats_companies").delete().eq("id", id);
 
   if (error) return dbErrorResponse("admin/companies/[id]:DELETE", error);
   return NextResponse.json({ ok: true });

@@ -12,7 +12,16 @@
 
 import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
-import type { DefaultSettings, UserSettingsRow, ResolvedSettings, ScoringWeights } from "./types";
+import { EMPTY_SEARCH_PROFILE, normalizeSearchProfile } from "./search-profile";
+import type { Json } from "./database.types";
+import { filterWorkAuthorizationBlacklistTerms } from "./job-signals";
+import type {
+  DefaultSettings,
+  JobSearchProfile,
+  UserSettingsRow,
+  ResolvedSettings,
+  ScoringWeights,
+} from "./types";
 
 // Pure evaluation criteria only — no response-format instructions here.
 // The JSON contract is owned by code (see RESPONSE_FORMAT_INSTRUCTIONS in
@@ -146,11 +155,6 @@ const FALLBACK_DEFAULTS: ResolvedSettings = {
     "security clearance required",
     "must be a us citizen",
     "us citizenship required",
-    "cannot provide visa sponsorship",
-    "unable to provide visa sponsorship",
-    "we are unable to offer visa",
-    "no visa sponsorship",
-    "unable to sponsor",
   ],
   required_keywords: ["react", "next.js", "react native", "react.js", "reactjs"],
   global_mode_blocked_regions: [
@@ -195,7 +199,7 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
 
 /** Fetch user_settings row. Returns null if the row doesn't exist. */
 async function getUserSettingsRow(userId: string): Promise<UserSettingsRow | null> {
-  const db = createServerClient();
+  const db = await createServerClient();
   const { data, error } = await db.from("user_settings").select("*").eq("user_id", userId).single();
 
   if (error) return null;
@@ -243,6 +247,10 @@ const SIMPLE_MERGE_FIELDS = [
 
 type SimpleMergeField = (typeof SIMPLE_MERGE_FIELDS)[number];
 
+function resolveSearchProfile(user: UserSettingsRow | null): JobSearchProfile {
+  return normalizeSearchProfile(user?.search_profile) ?? structuredClone(EMPTY_SEARCH_PROFILE);
+}
+
 function mergeWithDefaults(
   defaults: DefaultSettings,
   user: UserSettingsRow | null,
@@ -255,9 +263,13 @@ function mergeWithDefaults(
 
   return {
     ...(merged as Pick<ResolvedSettings, SimpleMergeField>),
+    blacklisted_locations: filterWorkAuthorizationBlacklistTerms(
+      merged.blacklisted_locations as string[],
+    ),
     gemini_filter_prompt:
       user?.gemini_filter_prompt ?? defaults.gemini_filter_prompt ?? FALLBACK_PROMPT,
     scoring_weights: normaliseWeights(user?.scoring_weights ?? defaults.scoring_weights),
+    search_profile: resolveSearchProfile(user),
   };
 }
 
@@ -289,7 +301,7 @@ export async function saveUserSettings(
   userId: string,
   patch: Partial<Omit<UserSettingsRow, "user_id" | "updated_at">>,
 ): Promise<void> {
-  const db = createServerClient();
+  const db = await createServerClient();
 
   // Strip anything that isn't a settings field
   const safe: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -315,10 +327,19 @@ export async function saveUserSettings(
     "global_mode_allowed_locations",
     "email_alerts_enabled",
     "salary_reminder_enabled",
+    "search_profile",
   ];
 
   for (const key of allowed) {
-    if (key in patch) safe[key] = (patch as Record<string, unknown>)[key];
+    if (key in patch) {
+      if (key === "search_profile") {
+        const normalized = normalizeSearchProfile((patch as Record<string, unknown>)[key]);
+        if (!normalized) throw new Error("Invalid job search profile");
+        safe[key] = normalized as unknown as Json;
+      } else {
+        safe[key] = (patch as Record<string, unknown>)[key];
+      }
+    }
   }
 
   const { error } = await db
@@ -341,7 +362,7 @@ export async function saveUserSettings(
  * rather than overwritten.
  */
 export async function initializeUserSettingsForSignup(userId: string): Promise<void> {
-  const db = createServerClient();
+  const db = await createServerClient();
 
   const { data: existing } = await db
     .from("user_settings")
@@ -370,12 +391,13 @@ export async function initializeUserSettingsForSignup(userId: string): Promise<v
     scoring_weights: { ...defaults.scoring_weights },
     score_denominator: defaults.score_denominator,
     excluded_keywords: defaults.excluded_keywords,
-    blacklisted_locations: defaults.blacklisted_locations,
+    blacklisted_locations: filterWorkAuthorizationBlacklistTerms(defaults.blacklisted_locations),
     required_keywords: defaults.required_keywords,
     global_mode_blocked_regions: defaults.global_mode_blocked_regions,
     global_mode_allowed_locations: defaults.global_mode_allowed_locations,
     email_alerts_enabled: defaults.email_alerts_enabled,
     salary_reminder_enabled: defaults.salary_reminder_enabled,
+    search_profile: structuredClone(EMPTY_SEARCH_PROFILE) as unknown as Json,
     updated_at: new Date().toISOString(),
   });
 

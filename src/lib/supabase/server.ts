@@ -1,6 +1,6 @@
 // src/lib/supabase/server.ts
 // Cookie-based Supabase client for use in Server Components, Route Handlers,
-// and Server Actions (Next.js 14 App Router).
+// and Server Actions (Next.js App Router).
 // Requires: @supabase/ssr
 import { createServerClient as createSSRClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -15,8 +15,8 @@ import type { UserProfile } from "../types";
  * NOTE: This uses the anon key + RLS. For admin operations that bypass RLS,
  * use createAdminClient() from ./admin.ts instead.
  */
-export function createServerClient() {
-  const cookieStore = cookies();
+export async function createServerClient() {
+  const cookieStore = await cookies();
 
   return createSSRClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +35,7 @@ export function createServerClient() {
             );
           } catch {
             // setAll can throw in Server Components (read-only context).
-            // The middleware will refresh the session cookie instead.
+            // The proxy will refresh the session cookie instead.
           }
         },
       },
@@ -49,7 +49,7 @@ export function createServerClient() {
  * (not from cache) — safe to use for auth checks.
  */
 export async function getUser() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -61,7 +61,7 @@ export async function getUser() {
  * Returns null if the user is not authenticated or has no profile yet.
  */
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("user_profiles")
     .select(

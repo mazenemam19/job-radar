@@ -4,11 +4,12 @@
 // Kept separate so it's unit-testable without mocking the route layer.
 
 import { filterJobsWithGemini } from "@/lib/gemini";
+import { explainSearchProfileMatch } from "@/lib/search-profile-match";
 import {
   scoreJob,
   mergeJobs,
-  passesRequiredKeywordsGate,
-  passesSkillMatchGate,
+  passesSettingsGate,
+  passesGlobalModeGate,
 } from "@/lib/scoring";
 import type { RawJob, ScoredJob, PipelineLog, ResolvedSettings } from "@/lib/types";
 import type { RawJobsFunnel } from "@/lib/raw-jobs-query";
@@ -20,15 +21,40 @@ export type FeedResult = {
   pipelineLog: PipelineLog;
 };
 
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ");
+}
+
 /**
- * Applies the remaining pipeline stages (precision recheck → Gemini → score →
- * merge) to a raw job pool that has ALREADY passed date, seniority, excluded-
- * keywords, blacklisted-locations, and global-mode filtering at the DB level
- * (see fetchFilteredRawJobs() in raw-jobs-query.ts). `rawJobs` here also
- * carries a COARSE superset for required-keywords/skill-match -- the precision
- * recheck below is what actually enforces hasMeaningfulKeywordMatch()'s
- * boilerplate-window logic, which the SQL deliberately does not replicate
- * (see docs/plans/2026-07-11-db-level-job-filtering.md §2.3).
+ * A fast, deliberately broad candidate check before the regex-heavy exact
+ * gates. Any exact word-boundary match remains a substring after whitespace
+ * normalization, so this cannot discard a job that the exact gates would pass.
+ */
+function hasQuickCandidate(text: string, terms: string[]): boolean {
+  return terms.some((term) => {
+    const normalizedTerm = normalizeText(term).trim();
+    return normalizedTerm.length > 0 && text.includes(normalizedTerm);
+  });
+}
+
+function passesQuickTextCandidate(
+  job: RawJob,
+  requiredTerms: string[],
+  skillTerms: string[],
+): boolean {
+  const combinedText = normalizeText(`${job.title} ${job.description} ${job.location}`);
+  const description = normalizeText(job.description);
+  const hasRequiredTerm = requiredTerms.length === 0 || hasQuickCandidate(combinedText, requiredTerms);
+
+  return hasRequiredTerm && hasQuickCandidate(description, skillTerms);
+}
+
+/**
+ * Applies the in-memory settings gates → Gemini → score → merge to a raw job
+ * pool that has already passed inexpensive DB-side date/location/type filters.
+ * Text matching stays here: the candidate pool is limited only after the
+ * user's location and job type are applied, so a wider age window cannot make
+ * Postgres time out while existing keyword semantics are preserved.
  *
  * `dbFunnelCounts` carries total_fetched/after_date_filter through from the
  * RPC's funnel object -- this function no longer has enough information to
@@ -42,15 +68,27 @@ export async function buildFeed(
   userId: string,
   db: SupabaseClient<Database>,
 ): Promise<FeedResult> {
-  // Stage: exact precision recheck for required-keywords/skill-match.
-  const afterPrecisionFilter = rawJobs.filter(
-    (j) => passesRequiredKeywordsGate(j, settings) && passesSkillMatchGate(j, settings),
+  const requiredTerms =
+    settings.required_keywords.length > 0 ? settings.required_keywords : settings.expert_skills;
+  const skillTerms = [...settings.expert_skills, ...settings.secondary_skills];
+
+  // Cheap substring checks shrink the profile-scoped pool before the richer
+  // regex gates scan long ATS descriptions. Exact gates below remain the
+  // authority for a final match.
+  const quickTextCandidates = rawJobs.filter((job) =>
+    passesQuickTextCandidate(job, requiredTerms, skillTerms),
+  );
+
+  // Stage: settings gates. The database bounds this by date/location/type;
+  // text matching here uses the full, well-tested application semantics.
+  const afterSettingsFilter = quickTextCandidates.filter(
+    (job) => passesSettingsGate(job, settings) && passesGlobalModeGate(job, settings),
   );
 
   // Stage: Gemini filter — skipped when no key, fails open on error
   const geminiFiltered = geminiApiKey
-    ? await filterJobsWithGemini(geminiApiKey, afterPrecisionFilter, settings, userId, db)
-    : afterPrecisionFilter.map((j) => ({
+    ? await filterJobsWithGemini(geminiApiKey, afterSettingsFilter, settings, userId, db)
+    : afterSettingsFilter.map((j) => ({
         ...j,
         gemini_pass: true,
         gemini_reason: null,
@@ -77,15 +115,17 @@ export async function buildFeed(
   // Stage: Merge — deduplicates and sorts by total_score descending.
   // Empty first arg is intentional: this is a full rebuild path, not an
   // incremental merge — there are no pre-existing cached jobs to preserve.
-  const finalJobs = mergeJobs([], scoredJobs);
+  const finalJobs = mergeJobs([], scoredJobs).map((job) => ({
+    ...job,
+    search_profile_match: settings.search_profile
+      ? explainSearchProfileMatch(job, settings.search_profile)
+      : null,
+  }));
 
   const pipelineLog: PipelineLog = {
     total_fetched: dbFunnelCounts.total_fetched,
     after_date_filter: dbFunnelCounts.after_date_filter,
-    // NOTE: this now includes global-mode attrition, which used to be
-    // invisibly bundled into "after your Gemini filter" -- a deliberate,
-    // disclosed redefinition, not an accident. See plan §4.2.
-    after_settings_filter: afterPrecisionFilter.length,
+    after_settings_filter: afterSettingsFilter.length,
     after_gemini_filter: geminiFiltered.length,
     after_scoring: finalJobs.length,
     cached_at: new Date().toISOString(),

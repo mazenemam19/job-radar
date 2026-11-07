@@ -428,7 +428,11 @@ describe("scoreJob", () => {
 describe("mergeJobs", () => {
   function makeScoredJob(id: string, score: number, fetchedAt = NOW) {
     return {
-      ...makeJob({ id, fetched_at: new Date(fetchedAt).toISOString() }),
+      ...makeJob({
+        id,
+        url: "https://jobs.example.com/" + id,
+        fetched_at: new Date(fetchedAt).toISOString(),
+      }),
       skill_match_score: score,
       recency_score: 80,
       relocation_bonus: 0,
@@ -462,6 +466,31 @@ describe("mergeJobs", () => {
     const result = mergeJobs([older], [newer]);
     expect(result).toHaveLength(1);
     expect(result[0].fetched_at).toBe(newer.fetched_at);
+  });
+
+  it("deduplicates legacy local/global IDs by normalized posting URL", () => {
+    const older = makeScoredJob("local_gh_1", 70, NOW - 86_400_000);
+    older.url = "https://jobs.example.com/1?source=local#details";
+    const newer = makeScoredJob("global_gh_1", 65, NOW);
+    newer.url = "https://jobs.example.com/1?source=global";
+
+    const result = mergeJobs([older], [newer]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("global_gh_1");
+    expect(result[0].fetched_at).toBe(newer.fetched_at);
+  });
+
+  it("keeps postings distinct when their provider job IDs are query parameters", () => {
+    const first = makeScoredJob("local_gh_123", 70);
+    first.url = "https://jobs.example.com/openings?gh_jid=123&utm_source=feed";
+    const second = makeScoredJob("local_gh_124", 65);
+    second.url = "https://jobs.example.com/openings?gh_jid=124&utm_source=feed";
+
+    const result = mergeJobs([], [first, second]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((job) => job.id)).toEqual(["local_gh_123", "local_gh_124"]);
   });
 });
 
@@ -509,12 +538,29 @@ describe("passesSettingsGate", () => {
     expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(false);
   });
 
-  it("filters out roles with citizenship/clearance requirements", () => {
+  it("does not treat no-visa-sponsorship text as a blacklist match", () => {
     const job = makeJob({
-      title: "React Developer",
-      description: "Requires security clearance. No visa sponsorship.",
+      title: "Senior React Developer",
+      description: "React TypeScript. No visa sponsorship.",
+    });
+    expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(true);
+  });
+
+  it("still filters explicit location and clearance blacklist entries", () => {
+    const job = makeJob({
+      title: "Senior React Developer",
+      description: "React TypeScript. US only.",
     });
     expect(passesSettingsGate(job, DEFAULT_SETTINGS)).toBe(false);
+  });
+
+  it("does not award a relocation bonus for unavailable sponsorship", () => {
+    const job = makeJob({
+      title: "Senior React Developer",
+      description: "React TypeScript. No visa sponsorship.",
+      visa_sponsorship: true,
+    });
+    expect(scoreJob(job, DEFAULT_SETTINGS)?.relocation_bonus).toBe(0);
   });
 
   it("filters out roles with 0 matched skills", () => {

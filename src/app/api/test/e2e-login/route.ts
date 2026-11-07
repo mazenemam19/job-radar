@@ -22,7 +22,7 @@
 //
 // This route bypasses /auth/callback entirely, so it also mirrors that
 // route's user_profiles upsert — otherwise the test user would have no
-// profile row and middleware would bounce it to /onboarding.
+// profile row and the proxy would bounce it to /onboarding.
 //
 // SECURITY NOTE: the account to log into is read from TEST_USER_EMAIL on
 // the server, never from the request body. This means a leaked
@@ -58,8 +58,43 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const onboardingComplete = body?.onboardingComplete ?? true;
   const isActive = body?.isActive ?? true;
+  const updateOnly = body?.updateOnly === true;
 
   const admin = createAdminClient();
+
+  // The blocked-user E2E test must change the profile beneath an existing
+  // browser session. Minting a magic-link session just to do that can revoke
+  // the session under test, turning a blocked-user assertion into an
+  // unauthenticated redirect race. This narrow test-only path updates the
+  // configured test user's existing profile without issuing any auth token.
+  if (updateOnly) {
+    const { data: profile, error: profileLookupError } = await admin
+      .from("user_profiles")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (profileLookupError || !profile) {
+      console.error("[test/e2e-login] could not find test profile:", profileLookupError?.message);
+      return NextResponse.json({ error: "could not find test profile" }, { status: 500 });
+    }
+
+    const { error: profileUpdateError } = await admin
+      .from("user_profiles")
+      .update({
+        onboarding_complete: onboardingComplete,
+        is_active: isActive,
+        last_active_at: new Date().toISOString(),
+      })
+      .eq("id", profile.id);
+
+    if (profileUpdateError) {
+      console.error("[test/e2e-login] could not update test profile:", profileUpdateError.message);
+      return NextResponse.json({ error: "could not update test profile" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, userId: profile.id });
+  }
 
   // type: "magiclink" auto-creates the user if they don't already exist —
   // no separate createUser step needed.
@@ -85,7 +120,7 @@ export async function POST(request: NextRequest) {
   // generateLink({ type: "magiclink" }) above, so it must be verified with
   // type: "magiclink" too — type: "email" is for numeric OTP codes and
   // fails with "Email link is invalid or has expired" on a magic-link token.
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
     type: "magiclink",
     token_hash: tokenHash,

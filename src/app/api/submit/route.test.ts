@@ -147,7 +147,11 @@ describe("POST /api/submit", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.ok).toBe(false);
-    expect(body.error).toBe("Something went wrong. Please try again.");
+    expect(body).toMatchObject({
+      code: "submit:POST",
+      error: "Request failed in submit:POST: duplicate key",
+      detail: "duplicate key",
+    });
   });
 
   it("returns 429 when rate limit exceeded (>5 submissions per 10min from same IP)", async () => {
