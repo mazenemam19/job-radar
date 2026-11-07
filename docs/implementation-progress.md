@@ -32,7 +32,7 @@
 - [x] Manually verify Settings save/readback, dashboard rebuild, job detail, and tracker in the browser. On 2026-11-07, an unchanged save at the real 11-day setting returned the success toast and rebuilt the dashboard to 12 matches; the corrected Doctolib card displayed 🇩🇪 Berlin.
 - [ ] Verify profile isolation with a second user.
 - [x] Update GitHub issues and Project #3: #47 is closed, #43 is the active Germany ATS intake issue, and #48 is closed as consolidated work.
-- [ ] Apply and verify `20261107400000_rekey_and_deduplicate_legacy_raw_jobs.sql`. Read-only analysis identified 2,891 pipeline-specific duplicate source records; the migration preserves the newest snapshot, moves any Gemini review before removal, makes review IDs update-cascading, and invalidates result caches for a normal rebuild.
+- [ ] Apply and verify the manual rekey script in `supabase/manual-migrations/20261107400000_rekey_and_deduplicate_legacy_raw_jobs.sql`. Read-only analysis identified 2,891 pipeline-specific duplicate source records; it preserves the newest tracker state and Gemini review before removal, makes review IDs update-cascading, and invalidates result caches for a normal rebuild.
 - [ ] Run the 2–4 week pilot and record whether it yields at least three actionable matches per week.
 - [x] Push the reviewed branch and open draft PR #61; add it to Project #3 as In Progress and link the active ATS intake issue (#43).
 
