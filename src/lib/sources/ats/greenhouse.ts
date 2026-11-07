@@ -33,7 +33,10 @@ export async function fetchGreenhouse(c: ATSConfig, mode: JobMode): Promise<Fetc
         .map((o) => o.name)
         .filter((n) => n && !/^remote$/i.test(n))
         .join(", ");
-      const location = officeNames || r.location?.name || (hasRemoteOffice ? "Remote" : "");
+      // A job posting's own location is more specific than a board-level
+      // office label (for example, "Constructor TECH"). A Remote office stays
+      // workplace metadata instead of replacing the geographic location.
+      const location = r.location?.name || officeNames || (hasRemoteOffice ? "Remote" : "");
 
       return {
         id: `${mode}_gh_${c.slug}_${r.id}`,

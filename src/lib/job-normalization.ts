@@ -92,6 +92,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
   berlin: { country: "Germany", code: "DE" },
+  bremen: { country: "Germany", code: "DE" },
   hamburg: { country: "Germany", code: "DE" },
   munich: { country: "Germany", code: "DE" },
   münchen: { country: "Germany", code: "DE" },
