@@ -103,4 +103,22 @@ describe("GET /api/jobs/[id]", () => {
 
     expect(res.status).toBe(404);
   });
+
+  it("returns an operation code when loading the cache fails", async () => {
+    mockServerDb.from.mockReturnValue(mockQuery(null, { message: "statement timeout", code: "57014" }));
+
+    const { GET } = await import("./route");
+    const req = new Request("http://localhost/api/jobs/job_abc");
+    const res = await GET(req as unknown as NextRequest, {
+      params: Promise.resolve({ id: "job_abc" }),
+    });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      ok: false,
+      code: "jobs/[id]:GET:user_jobs_cache",
+      detail: "statement timeout",
+    });
+  });
 });

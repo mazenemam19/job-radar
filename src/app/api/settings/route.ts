@@ -18,17 +18,21 @@ export async function GET() {
   const [resolved, db] = await Promise.all([resolveUserSettings(user.id), createServerClient()]);
 
   // Also return the raw user settings row (for the form's initial state)
-  const { data: rawSettings } = await db
+  const { data: rawSettings, error: rawSettingsError } = await db
     .from("user_settings")
     .select("*")
     .eq("user_id", user.id)
     .single();
+  if (rawSettingsError && rawSettingsError.code !== "PGRST116") {
+    return dbErrorResponse("settings:GET:user_settings", rawSettingsError);
+  }
 
-  const { data: profile } = await db
+  const { data: profile, error: profileError } = await db
     .from("user_profiles")
     .select("email, gemini_api_key, onboarding_complete")
     .eq("id", user.id)
     .single();
+  if (profileError) return dbErrorResponse("settings:GET:user_profile", profileError);
 
   return NextResponse.json({
     ok: true,
@@ -80,11 +84,21 @@ export async function PATCH(request: NextRequest) {
 
   // Handle onboarding_complete separately
   if (body.onboarding_complete === true) {
-    await db.from("user_profiles").update({ onboarding_complete: true }).eq("id", user.id);
+    const { error: onboardingError } = await db
+      .from("user_profiles")
+      .update({ onboarding_complete: true })
+      .eq("id", user.id);
+    if (onboardingError) {
+      return dbErrorResponse("settings:PATCH:onboarding_complete", onboardingError);
+    }
 
     // One-time snapshot: copy today's defaults into this user's row so
     // later admin changes to default_settings never affect them.
-    await initializeUserSettingsForSignup(user.id);
+    try {
+      await initializeUserSettingsForSignup(user.id);
+    } catch (err) {
+      return catchErrorResponse("settings:PATCH:initialize_defaults", err);
+    }
 
     delete body.onboarding_complete;
   }
@@ -99,10 +113,11 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Invalidate the user's cache so they get fresh results with new settings
-  await db
+  const { error: cacheError } = await db
     .from("user_jobs_cache")
     .update({ cached_at: "2000-01-01T00:00:00Z" }) // epoch forces rebuild
     .eq("user_id", user.id);
+  if (cacheError) return dbErrorResponse("settings:PATCH:invalidate_cache", cacheError);
 
   return NextResponse.json({ ok: true });
 }

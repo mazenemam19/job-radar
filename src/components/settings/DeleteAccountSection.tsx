@@ -36,7 +36,7 @@ export default function DeleteAccountSection() {
       const json = await res.json();
 
       if (!json.ok) {
-        setError(json.error || "Something went wrong. Please try again.");
+        setError(json.error || "Account deletion failed without a diagnostic message.");
         setDeleting(false);
         return;
       }
