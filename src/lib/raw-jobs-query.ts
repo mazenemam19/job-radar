@@ -42,9 +42,10 @@ export interface FilteredRawJobsResult {
 
 /**
  * Fetches raw_jobs pre-filtered at the DB level for the given modes and
- * settings. Returns a coarse superset for required-keywords/skill-match --
- * callers MUST still run the exact hasMeaningfulKeywordMatch() check on the
- * result before treating it as final (see plan §2.3 and §3.2).
+ * settings. The user's location and job-type profile is applied before the
+ * row limit; unknown location or type values remain visible for review.
+ * Returns a coarse superset for required-keywords/skill-match -- callers MUST
+ * still run the exact hasMeaningfulKeywordMatch() check (see plan §2.3 and §3.2).
  */
 export async function fetchFilteredRawJobs(
   modes: string[],
@@ -60,18 +61,10 @@ export async function fetchFilteredRawJobs(
     (level) => settings[LEVEL_KEYWORD_FIELDS[level]] as string[],
   );
 
-  // @ts-expect-error -- jr_get_filtered_raw_jobs isn't in the generated Functions
-  // union in database.types.ts yet: that file is generated from a deployed
-  // project's schema, and this function won't exist in any deployed project
-  // until Task 1 (supabase/migrations/20260711000000_jr_filtered_raw_jobs.sql)
-  // is actually applied and `supabase gen types typescript` is re-run against
-  // it. IMPORTANT: keep this as ONE inline call (name + args object together) --
-  // extracting the args into a separate `const params = {...}` first was tried
-  // and makes TS silently fall back to an unchecked path instead of raising this
-  // error, which loses real argument-shape checking once the types ARE
-  // regenerated. Remove this directive once that regeneration happens -- if the
-  // error is gone, @ts-expect-error will itself fail the build as a reminder.
-  const { data, error } = await db.rpc("jr_get_filtered_raw_jobs", {
+  // @ts-expect-error -- the tracked SQL migration adds this RPC; generated DB
+  // types do not yet include it. Keep the RPC name and arguments inline so a
+  // later type regeneration validates the argument shape.
+  const { data, error } = await db.rpc("jr_get_filtered_raw_jobs_for_profile", {
     p_modes: modes,
     p_job_age_days: settings.job_age_days,
     p_all_level_terms: [
@@ -87,6 +80,7 @@ export async function fetchFilteredRawJobs(
     p_blacklist_terms: filterWorkAuthorizationBlacklistTerms(settings.blacklisted_locations),
     p_global_allowed_terms: settings.global_mode_allowed_locations,
     p_global_blocked_terms: settings.global_mode_blocked_regions,
+    p_search_profile: settings.search_profile,
     p_limit: limit,
   });
 
