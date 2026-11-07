@@ -12,6 +12,7 @@
 // returns a coarse superset for those two gates (see plan §2.3).
 
 import { createAdminClient } from "./supabase/admin";
+import { filterWorkAuthorizationBlacklistTerms } from "./job-signals";
 import type { RawJob, ResolvedSettings, SeniorityLevel } from "./types";
 
 const LEVEL_KEYWORD_FIELDS = {
@@ -83,7 +84,7 @@ export async function fetchFilteredRawJobs(
     p_excluded_terms: settings.excluded_keywords,
     p_required_terms: requiredTerms,
     p_skill_terms: [...settings.expert_skills, ...settings.secondary_skills],
-    p_blacklist_terms: settings.blacklisted_locations,
+    p_blacklist_terms: filterWorkAuthorizationBlacklistTerms(settings.blacklisted_locations),
     p_global_allowed_terms: settings.global_mode_allowed_locations,
     p_global_blocked_terms: settings.global_mode_blocked_regions,
     p_limit: limit,

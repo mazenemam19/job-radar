@@ -42,6 +42,11 @@ export function detectWorkAuthorizationSignal(text: string): WorkAuthorizationSi
   return { status: "unclear", evidence: null };
 }
 
+/** Sponsorship clues are evidence to display, not location blacklist terms. */
+export function filterWorkAuthorizationBlacklistTerms(terms: string[]): string[] {
+  return terms.filter((term) => !/visa|sponsor(?:ship)?/i.test(term));
+}
+
 const RELOCATION_AVAILABLE =
   /\brelocation (?:support|assistance|package|allowance)\b|\bwe (?:will|can) assist with relocation\b/i;
 const RELOCATION_UNAVAILABLE =

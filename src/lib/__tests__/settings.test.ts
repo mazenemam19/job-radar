@@ -152,6 +152,29 @@ describe("resolveUserSettings", () => {
     expect(result.salary_reminder_enabled).toBe(false); // explicitly overridden
   });
 
+  it("does not turn negative sponsorship evidence into a hidden blacklist", async () => {
+    const defaultQuery = mockQuery({
+      ...DEFAULT_ROW,
+      blacklisted_locations: ["israel", "no visa sponsorship"],
+    });
+    const userQuery = mockQuery({
+      user_id: "u-sponsor",
+      blacklisted_locations: ["unable to sponsor", "security clearance required"],
+    });
+
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null),
+    );
+    mockServerDb.from.mockImplementation((table: string) =>
+      table === "user_settings" ? userQuery : mockQuery(null),
+    );
+
+    const { resolveUserSettings } = await import("../settings");
+    const result = await resolveUserSettings("u-sponsor");
+
+    expect(result.blacklisted_locations).toEqual(["security clearance required"]);
+  });
+
   it("normalises scoring weights when they don't sum to 1", async () => {
     const userWithBadWeights = {
       user_id: "u3",

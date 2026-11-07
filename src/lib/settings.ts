@@ -14,6 +14,7 @@ import { createAdminClient } from "./supabase/admin";
 import { createServerClient } from "./supabase/server";
 import { EMPTY_SEARCH_PROFILE, normalizeSearchProfile } from "./search-profile";
 import type { Json } from "./database.types";
+import { filterWorkAuthorizationBlacklistTerms } from "./job-signals";
 import type {
   DefaultSettings,
   JobSearchProfile,
@@ -154,11 +155,6 @@ const FALLBACK_DEFAULTS: ResolvedSettings = {
     "security clearance required",
     "must be a us citizen",
     "us citizenship required",
-    "cannot provide visa sponsorship",
-    "unable to provide visa sponsorship",
-    "we are unable to offer visa",
-    "no visa sponsorship",
-    "unable to sponsor",
   ],
   required_keywords: ["react", "next.js", "react native", "react.js", "reactjs"],
   global_mode_blocked_regions: [
@@ -267,6 +263,9 @@ function mergeWithDefaults(
 
   return {
     ...(merged as Pick<ResolvedSettings, SimpleMergeField>),
+    blacklisted_locations: filterWorkAuthorizationBlacklistTerms(
+      merged.blacklisted_locations as string[],
+    ),
     gemini_filter_prompt:
       user?.gemini_filter_prompt ?? defaults.gemini_filter_prompt ?? FALLBACK_PROMPT,
     scoring_weights: normaliseWeights(user?.scoring_weights ?? defaults.scoring_weights),
@@ -392,7 +391,7 @@ export async function initializeUserSettingsForSignup(userId: string): Promise<v
     scoring_weights: { ...defaults.scoring_weights },
     score_denominator: defaults.score_denominator,
     excluded_keywords: defaults.excluded_keywords,
-    blacklisted_locations: defaults.blacklisted_locations,
+    blacklisted_locations: filterWorkAuthorizationBlacklistTerms(defaults.blacklisted_locations),
     required_keywords: defaults.required_keywords,
     global_mode_blocked_regions: defaults.global_mode_blocked_regions,
     global_mode_allowed_locations: defaults.global_mode_allowed_locations,

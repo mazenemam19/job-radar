@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { detectWorkAuthorizationSignal, hasRelocationSupportEvidence } from "../job-signals";
+import {
+  detectWorkAuthorizationSignal,
+  filterWorkAuthorizationBlacklistTerms,
+  hasRelocationSupportEvidence,
+} from "../job-signals";
 
 describe("work authorization evidence", () => {
   it("recognizes explicit available sponsorship and keeps its sentence", () => {
@@ -33,5 +37,16 @@ describe("work authorization evidence", () => {
   it("does not count negated relocation language as support", () => {
     expect(hasRelocationSupportEvidence("No relocation support is available.")).toBe(false);
     expect(hasRelocationSupportEvidence("Relocation assistance is provided.")).toBe(true);
+  });
+
+  it("keeps sponsorship wording out of location blacklist filters", () => {
+    expect(
+      filterWorkAuthorizationBlacklistTerms([
+        "Israel",
+        "No visa sponsorship",
+        "unable to sponsor",
+        "Security clearance required",
+      ]),
+    ).toEqual(["Israel", "Security clearance required"]);
   });
 });
