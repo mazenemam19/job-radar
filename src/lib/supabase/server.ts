@@ -35,7 +35,7 @@ export async function createServerClient() {
             );
           } catch {
             // setAll can throw in Server Components (read-only context).
-            // The middleware will refresh the session cookie instead.
+            // The proxy will refresh the session cookie instead.
           }
         },
       },

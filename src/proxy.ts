@@ -1,15 +1,15 @@
-// src/middleware.ts
+// src/proxy.ts
 // Redirects unauthenticated users to /login, and signs out + redirects
 // blocked users, for all protected routes.
 //
 // Onboarding and the admin-role gate live in the (protected) layout and
 // admin/layout.tsx instead, where there's already a server-side Supabase
 // client and profile data. The blocked-user check does NOT live there —
-// it lives here, in middleware, on purpose. The (protected) layout is a
+// it lives here, in the proxy, on purpose. The (protected) layout is a
 // cached dynamic segment: Next's Router Cache can serve a soft client-side
 // navigation from a previously-rendered layout without re-running the
 // server component at all, which means a check placed only in that layout
-// can be skipped entirely for a user who's already mid-session. Middleware
+// can be skipped entirely for a user who's already mid-session. The proxy
 // runs on every request before that cache negotiation happens, so it's the
 // only place a security-relevant check is guaranteed to fire immediately,
 // even on an in-app link click. (See onboarding.spec.ts and the bug it
@@ -26,7 +26,7 @@ import { NextResponse, type NextRequest } from "next/server";
 //  paths that don't require any authentication
 const PUBLIC_PATHS = new Set(["/", "/login", "/submit"]);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   let response = NextResponse.next({

@@ -22,7 +22,7 @@
 //
 // This route bypasses /auth/callback entirely, so it also mirrors that
 // route's user_profiles upsert — otherwise the test user would have no
-// profile row and middleware would bounce it to /onboarding.
+// profile row and the proxy would bounce it to /onboarding.
 //
 // SECURITY NOTE: the account to log into is read from TEST_USER_EMAIL on
 // the server, never from the request body. This means a leaked

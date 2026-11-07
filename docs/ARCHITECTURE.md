@@ -12,7 +12,7 @@ preference, keyword rules, and Gemini prompt.
 
 | Layer           | Choice                                                             |
 | --------------- | ------------------------------------------------------------------ |
-| Framework       | Next.js 14 (App Router), TypeScript, React 18                      |
+| Framework       | Next.js 16 (App Router), TypeScript, React 19                      |
 | Styling         | Tailwind CSS + inline-style dark theme, GSAP for motion            |
 | Database / Auth | Supabase (Postgres + Supabase Auth, Google OAuth)                  |
 | AI              | Google Gemini (`@google/genai`), **per-user API key**              |
@@ -34,7 +34,7 @@ flowchart TB
     end
 
     subgraph Vercel["Next.js App (Vercel)"]
-        MW["middleware.ts — auth/onboarding/admin gate"]
+        MW["proxy.ts — auth/onboarding/admin gate"]
         CronRoute["/api/cron"]
         Dashboard["/api/dashboard — Lazy C rebuild"]
         Settings["/api/settings"]
@@ -253,7 +253,7 @@ Auth is Supabase Auth via Google OAuth:
 
 Two layers enforce access control:
 
-1. **`middleware.ts`** — runs on every matched path (`/dashboard`, `/admin`, `/pipeline`,
+1. **`proxy.ts`** — runs on every matched path (`/dashboard`, `/admin`, `/pipeline`,
    `/salary`, `/settings`, `/tracker`). Validates the session via `supabase.auth.getUser()`
    (never trusts a cached JWT), then redirects: unauthenticated → `/login`; blocked user
    (`is_active = false`) → signs out and redirects to `/login?error=blocked`; non-admin on
@@ -437,7 +437,7 @@ seconds of `fetchedAt`, it's treated as a fallback/unknown date rather than a re
   the admin page (`/admin`) only _displays_ `cron_logs_v2` history; the scrape is only
   ever invoked by GitHub Actions or a manual `curl`/`pnpm run cron`. The secret never
   appears in any client-rendered code, since nothing in the UI references it.
-- **Blocked users**: `user_profiles.is_active = false` is checked in middleware on every
+- **Blocked users**: `user_profiles.is_active = false` is checked in the proxy on every
   request to a protected path; a blocked user is actively signed out and redirected, not
   just hidden from UI.
 - **Per-user secrets stay per-user**: each user's Gemini key lives in `user_profiles` and
@@ -469,7 +469,7 @@ Two email types, both sent via Nodemailer/SMTP (`src/lib/email.ts`):
 
 ```
 src/
-├── middleware.ts                 # Route-level auth/onboarding/admin gate
+├── proxy.ts                      # Route-level auth/onboarding/admin gate
 ├── app/
 │   ├── page.tsx                  # Public landing page
 │   ├── login/                    # OAuth login
@@ -527,7 +527,7 @@ Vitest specs live in `src/lib/__tests__/`, covering the scoring/gating logic, se
 
 ## 12. Migration model
 
-The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were extended with new features (per-user seniority config, atomic domain counts, Teamtailor/Breezy tracking, Supabase-backed rate limiting) rather than replaced. The multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `middleware.ts`) that import and adapt the fetchers. `ats-bridge.ts` reshapes data between the fetcher signatures and the new DB-backed types.
+The system was rebuilt from a single-user tool into a multi-tenant platform. The original single-user ingestion fetchers (`sources/ats-utils.ts`) were extended with new features (per-user seniority config, atomic domain counts, Teamtailor/Breezy tracking, Supabase-backed rate limiting) rather than replaced. The multi-tenant layer was built as new files (`runner.ts`, `ats-bridge.ts`, `/api/cron`, `/api/dashboard`, `proxy.ts`) that import and adapt the fetchers. `ats-bridge.ts` reshapes data between the fetcher signatures and the new DB-backed types.
 
 ---
 

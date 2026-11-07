@@ -98,9 +98,9 @@ Per-user opt-in (`/settings` → Email Alerts), two templates:
 
 ## 🛠️ Architecture & Setup
 
-- **Frontend**: Next.js 14 (App Router), inline-style dark theme.
+- **Frontend**: Next.js 16 (App Router), inline-style dark theme.
 - **Auth**: Supabase Auth (Google OAuth), enforced for all protected routes
-  via `middleware.ts`. Role (`user`/`admin`) is only ever set via direct
+  via `proxy.ts`. Role (`user`/`admin`) is only ever set via direct
   database access — no API surface can grant it.
 - **Backend**: Supabase Postgres. Key tables: `user_profiles`, `ats_companies`,
   `raw_jobs`, `user_jobs_cache`, `user_settings`, `default_settings`,
