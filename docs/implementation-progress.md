@@ -2,9 +2,9 @@
 
 **Goal:** Make Job Radar a useful, location-agnostic job-search tool, starting with a Germany pilot for an international candidate who does not speak German.
 
-**Branch:** `codex/germany-search-portability`
+**Branch:** `codex/raw-job-retention`
 
-**Current state:** The Germany pilot migrations have been applied to the live Supabase project. Settings now saves and reloads the per-user profile correctly, including an 11-day search window that previously exposed a dashboard query timeout. The branch has small, reviewed commits and is published as draft PR [#61](https://github.com/mazenemam19/job-radar/pull/61); Project #3 and issue #43 are updated. A follow-up CI test-race repair is also on that PR.
+**Current state:** PR [#61](https://github.com/mazenemam19/job-radar/pull/61) is merged. The Germany pilot migrations are live, and Settings saves/reloads the per-user profile correctly, including the 11-day search window that previously exposed a dashboard query timeout. A new storage-retention branch is ready to bound `raw_jobs` growth safely.
 
 ## Done locally
 
@@ -36,6 +36,14 @@
 - [ ] Run the 2–4 week pilot and record whether it yields at least three actionable matches per week.
 - [x] Push the reviewed branch and open draft PR #61; add it to Project #3 as In Progress and link the active ATS intake issue (#43).
 
+## Storage retention follow-up
+
+- [x] Measure production `raw_jobs`: 27,717 rows and 280 MB. 15,173 rows were unseen for 30 days, 11,440 for 60 days, and 8,154 for 90 days; every 90-day candidate is untracked. No rows were unseen for 180 days.
+- [x] Add a 90-day tracked-job-safe retention function and invoke it after each cron scrape. The database operation is atomic: it excludes `tracker_entries` within the same delete statement.
+- [ ] Apply and verify additive migration `20261107700000_prune_stale_raw_jobs.sql` in production.
+- [ ] Execute the one-time production cleanup of the verified 8,154 untracked 90-day rows, invalidate cached dashboards, and record before/after counts. This is destructive and requires confirmation at execution time.
+- [ ] Check the database-size trend after the next cron runs. A normal vacuum makes deleted space reusable; it does not necessarily reduce the allocated-disk chart immediately.
+
 ## Deferred
 
 - [ ] #53 full diagnostic pipeline.
@@ -61,3 +69,4 @@
 - [x] CI reliability: the blocked-user browser test now changes only the configured test profile (not its browser session) before asserting the proxy redirect. The focused auth suite passed after this repair.
 - [x] Database report inspection: `raw_jobs` occupies 278 MB for 27,609 rows and drives the 0.31 GB database size. The report shows severe memory commitment (1.43 GB) while physical memory use was about 401 MB; this needs operational follow-up before increasing cron load. A live snapshot showed 1 active and 9 idle client connections, so it does not indicate a connection surge.
 - [x] Legacy-ID cleanup preview: 2,891 logical postings are duplicated across historical `local`, `global`, and `visa` pipeline IDs. All 216 Gemini reviews already point at retained rows, so no live review needs moving for the current database. The retained source identity is provider-specific; this avoids treating query-string posting IDs as tracking noise.
+- [x] Retention preview: live production counts confirm that a 90-day `fetched_at` cutoff removes 8,154 untracked rows without touching a tracker entry. The full suite passed with 53 test files / 503 tests after adding the cron retention call and its failure path.

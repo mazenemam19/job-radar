@@ -191,6 +191,30 @@ describe("runCronJob", () => {
     expect(result.errors).toContain("Test Corp (global): ATS timeout");
     expect(result.total_fetched).toBe(0);
   });
+
+  it("records a retention failure without failing the completed scrape", async () => {
+    const company = makeCompanyRow({ pipeline_global: true });
+    mockDb.from.mockImplementation((table: string) => {
+      if (table === "ats_companies") return makeChain([company]);
+      return makeChain(null);
+    });
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Test Corp",
+      mode: "global",
+      jobs: [],
+      error: null,
+    });
+    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({
+      ok: false,
+      error: "function is missing",
+      cutoff: "2026-08-09T12:00:00.000Z",
+    });
+
+    const { runCronJob } = await import("../runner");
+    const result = await runCronJob("manual");
+
+    expect(result.errors).toContain("Failed to prune stale raw jobs: function is missing");
+  });
 });
 
 describe("runCronJob — email notifications", () => {
