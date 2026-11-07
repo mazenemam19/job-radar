@@ -200,6 +200,12 @@ export function inferWorkplaceType(
   if (/^(hybrid|flexible)$/.test(metadata)) return "hybrid";
   if (/^(on_site|onsite|office)$/.test(metadata)) return "on_site";
 
+  // Most ATS adapters expose the source location even when they do not
+  // provide structured workplace metadata. A standalone `Remote` location is
+  // an explicit arrangement, unlike a generic description mentioning remote
+  // work, so it is safe to classify it here.
+  if (/\bremote\b/i.test(rawLocation)) return "remote";
+
   const locationAndTitle = `${rawLocation} ${title}`;
   if (
     /\b(fully remote|remote-first|remote position|remote role|work from home|home-based)\b/i.test(

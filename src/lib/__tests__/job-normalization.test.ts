@@ -82,6 +82,7 @@ describe("posting attributes", () => {
     expect(inferWorkplaceType("Erlangen, Germany", "Engineer", "Some responsibilities.")).toBe(
       "unknown",
     );
+    expect(inferWorkplaceType("Remote, Germany", "Engineer", "")).toBe("remote");
     expect(inferWorkplaceType("Remote, Germany", "Engineer", "", "remote")).toBe("remote");
     expect(inferWorkplaceType("Berlin, Germany", "Engineer", "Hybrid work model.")).toBe("hybrid");
   });
