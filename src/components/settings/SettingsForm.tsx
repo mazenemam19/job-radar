@@ -4,6 +4,7 @@
 import type { SeniorityLevel } from "@/lib/types";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 import DeleteAccountSection from "@/components/settings/DeleteAccountSection";
+import SearchProfileSection from "@/components/settings/SearchProfileSection";
 import {
   Section,
   KeywordField,
@@ -136,20 +137,10 @@ export default function SettingsForm() {
         helperText="Describe what makes a job a good fit. Response formatting is handled automatically — no need to specify JSON shape here."
       />
 
-      <Section title="Pipelines">
-        <Toggle
-          checked={fields.pipelineLocal}
-          onChange={(v) => update("pipelineLocal", v)}
-          label="🇪🇬 Local pipeline"
-          description="Egypt-based companies"
-        />
-        <Toggle
-          checked={fields.pipelineGlobal}
-          onChange={(v) => update("pipelineGlobal", v)}
-          label="🌐 Global pipeline"
-          description="Worldwide remote companies"
-        />
-      </Section>
+      <SearchProfileSection
+        profile={fields.searchProfile}
+        onChange={(profile) => update("searchProfile", profile)}
+      />
 
       <SeniorityLevelsSection
         levels={SENIORITY_LEVELS}
