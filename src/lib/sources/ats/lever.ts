@@ -25,15 +25,29 @@ export async function fetchLever(c: ATSConfig, mode: JobMode): Promise<FetcherRe
   const jobs = result.data;
   const rawCount = jobs.length;
   const processed = processJobs(
-    jobs.map((r) => ({
-      id: `${mode}_lever_${c.slug}_${r.id}`,
-      title: r.text,
-      location: r.categories?.location ?? "",
-      url: r.hostedUrl,
-      postedAt: new Date(r.createdAt).toISOString(),
-      description: stripHtml(r.description || ""),
-      employmentType: r.categories?.commitment ?? undefined,
-    })),
+    jobs.map((r) => {
+      // Lever keeps many postings' actual requirements in named `lists`
+      // sections instead of the introductory `description` field.
+      const description = [
+        r.description,
+        r.descriptionBody,
+        r.opening,
+        ...(r.lists || []).flatMap((section) => [section.text, section.content]),
+        r.additional,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join("\n");
+
+      return {
+        id: `${mode}_lever_${c.slug}_${r.id}`,
+        title: r.text,
+        location: r.categories?.location ?? "",
+        url: r.hostedUrl,
+        postedAt: new Date(r.createdAt).toISOString(),
+        description: stripHtml(description),
+        employmentType: r.categories?.commitment ?? undefined,
+      };
+    }),
     c,
     mode,
   );

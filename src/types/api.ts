@@ -68,6 +68,10 @@ export interface LeverJob {
   hostedUrl: string;
   createdAt: number;
   description: string;
+  descriptionBody?: string | null;
+  opening?: string | null;
+  additional?: string | null;
+  lists?: Array<{ text?: string | null; content?: string | null }>;
 }
 
 export interface AshbyJob {
