@@ -38,12 +38,16 @@ const FETCHERS: Record<ATSConfig["ats"], Fetcher> = {
   bamboohr: fetchBambooHR,
 };
 
-function canonicalPostingId(ats: string, url: string): string {
-  let identity = url.trim();
+function canonicalPostingId(ats: string, sourceId: string, url: string): string {
+  // Fetchers historically prefixed their provider job IDs with the pipeline
+  // name (for example `local_gh_acme_42` and `global_gh_acme_42`). The
+  // provider ID is the durable identity; URLs are only a fallback. In
+  // particular, some boards put that ID in a query parameter, so stripping
+  // every query parameter would incorrectly collapse different postings.
+  let identity = sourceId.trim().replace(/^(?:local|global|visa)_/, "") || url.trim();
   try {
     const parsed = new URL(identity);
     parsed.hash = "";
-    parsed.search = "";
     parsed.hostname = parsed.hostname.toLowerCase();
     parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
     identity = parsed.toString();
@@ -111,7 +115,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
       const dateUnknown = Number.isNaN(postedMs) || Math.abs(postedMs - fetchedMs) < 30_000;
 
       return {
-        id: canonicalPostingId(row.ats, j.url || j.id),
+        id: canonicalPostingId(row.ats, j.id, j.url),
         title: j.title,
         company: j.company ?? row.name,
         location: j.location ?? "",

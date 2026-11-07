@@ -186,6 +186,38 @@ describe("fetchCompany", () => {
     expect(local.jobs[0].id).toMatch(/^greenhouse_[a-f0-9]{40}$/);
   });
 
+  it("uses the provider job ID so query-string job IDs stay distinct", async () => {
+    mockFetchResponse([
+      {
+        id: "local_gh_testco_123",
+        title: "Engineer one",
+        url: "https://careers.example.com/jobs?gh_jid=123",
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+      },
+      {
+        id: "local_gh_testco_124",
+        title: "Engineer two",
+        url: "https://careers.example.com/jobs?gh_jid=124",
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+      },
+    ]);
+
+    const local = await fetchCompany(makeRow(), "local");
+
+    mockFetchResponse([
+      {
+        id: "global_gh_testco_123",
+        title: "Engineer one",
+        url: "https://careers.example.com/jobs?gh_jid=123",
+        postedAt: new Date(NOW - 86_400_000).toISOString(),
+      },
+    ]);
+    const global = await fetchCompany(makeRow(), "global");
+
+    expect(local.jobs[0].id).toBe(global.jobs[0].id);
+    expect(local.jobs[0].id).not.toBe(local.jobs[1].id);
+  });
+
   it.each([
     ["lever", atsUtils.fetchLever],
     ["ashby", atsUtils.fetchAshby],
