@@ -52,6 +52,36 @@ describe("upsertRawJobs", () => {
     expect(upserted.map((r) => r.id).sort()).toEqual(["dup", "unique"]);
   });
 
+  it("persists normalized posting attributes and evidence", async () => {
+    const db = makeDb(() => ({ error: null }));
+    const job = makeRawJob("normalized");
+    job.source_location = "Erlangen, Germany";
+    job.country_code = "DE";
+    job.city = "Erlangen";
+    job.workplace_type = "hybrid";
+    job.employment_types = ["working_student"];
+    job.work_authorization_status = "sponsorship_unavailable";
+    job.work_authorization_evidence = "No visa sponsorship is available.";
+    job.language_requirements = ["English"];
+    job.language_evidence = "English is our working language.";
+
+    await upsertRawJobs(db as never, [job]);
+
+    expect(db.upsert.mock.calls[0][0]).toMatchObject([
+      {
+        source_location: "Erlangen, Germany",
+        country_code: "DE",
+        city: "Erlangen",
+        workplace_type: "hybrid",
+        employment_types: ["working_student"],
+        work_authorization_status: "sponsorship_unavailable",
+        work_authorization_evidence: "No visa sponsorship is available.",
+        language_requirements: ["English"],
+        language_evidence: "English is our working language.",
+      },
+    ]);
+  });
+
   it("splits more than 500 jobs into multiple chunks", async () => {
     const db = makeDb(() => ({ error: null }));
     const jobs = Array.from({ length: 750 }, (_, i) => makeRawJob(`job-${i}`));

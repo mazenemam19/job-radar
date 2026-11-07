@@ -31,6 +31,16 @@ function toRawJobRow(j: RawJob) {
     source_name: j.source_name,
     ats_type: j.ats_type,
     created_at: j.created_at,
+    source_location: j.source_location ?? j.location,
+    country_code: j.country_code ?? null,
+    city: j.city ?? null,
+    workplace_type: j.workplace_type ?? "unknown",
+    employment_types: j.employment_types ?? [],
+    work_authorization_status:
+      j.work_authorization_status ?? (j.visa_sponsorship ? "sponsorship_available" : "unclear"),
+    work_authorization_evidence: j.work_authorization_evidence ?? null,
+    language_requirements: j.language_requirements ?? [],
+    language_evidence: j.language_evidence ?? null,
   };
 }
 
