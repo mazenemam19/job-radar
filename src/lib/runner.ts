@@ -5,6 +5,7 @@
 import { createAdminClient } from "./supabase/admin";
 import { fetchAllCompanyJobs } from "./cron/fetch-jobs";
 import { upsertRawJobs } from "./cron/upsert-raw-jobs";
+import { pruneStaleUntrackedRawJobs } from "./cron/prune-raw-jobs";
 import { sendScanNotifications } from "./cron/send-scan-notifications";
 import {
   loadWorkableStateFromDB,
@@ -50,8 +51,9 @@ function pushError(errors: string[], message: string | null): void {
  *  2. Calls ATS fetchers in parallel (concurrency-limited)
  *  3. Upserts all fetched jobs into public.raw_jobs
  *     (INSERT ... ON CONFLICT (id) DO UPDATE SET fetched_at = NOW())
- *  4. Bumps app_config.last_cron_at → invalidates all user caches
- *  5. Logs the run in public.cron_logs_v2
+ *  4. Prunes untracked jobs unseen for 90 days
+ *  5. Bumps app_config.last_cron_at → invalidates all user caches
+ *  6. Logs the run in public.cron_logs_v2
  *
  * User-specific Gemini filtering happens lazily on dashboard load ("Lazy C").
  */
@@ -120,6 +122,16 @@ export async function runCronJob(
   // 5. Upsert into raw_jobs (chunked, deduplicated within each chunk)
   errors.push(...(await upsertRawJobs(db, allJobs)));
   console.log(`[cron] upsert done (+${Date.now() - startMs}ms)`);
+
+  const prune = await pruneStaleUntrackedRawJobs(db);
+  if (!prune.ok) {
+    errors.push(`Failed to prune stale raw jobs: ${prune.error}`);
+    console.error(`[cron] raw-job prune failed: ${prune.error} (+${Date.now() - startMs}ms)`);
+  } else {
+    console.log(
+      `[cron] pruned ${prune.deletedCount} stale untracked raw jobs (+${Date.now() - startMs}ms)`,
+    );
+  }
 
   // 6. Bump app_config.last_cron_at → invalidates all user_jobs_cache entries
   const { error: configError } = await db

@@ -14,8 +14,13 @@ vi.mock("../email", () => ({
   sendNewScanNotificationEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../cron/prune-raw-jobs", () => ({
+  pruneStaleUntrackedRawJobs: vi.fn().mockResolvedValue({ ok: true, deletedCount: 0 }),
+}));
+
 import { fetchCompany } from "../ats-bridge";
 import { sendNewScanNotificationEmail } from "../email";
+import { pruneStaleUntrackedRawJobs } from "../cron/prune-raw-jobs";
 import type { ATSCompanyRow, RawJob } from "../types";
 
 // ── Mock database ─────────────────────────────────────────────
@@ -118,6 +123,7 @@ function makeRawJob(id: string, overrides: Partial<RawJob> = {}): RawJob {
 describe("runCronJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({ ok: true, deletedCount: 0 });
   });
 
   it("returns error when no active companies", async () => {
@@ -161,6 +167,7 @@ describe("runCronJob", () => {
     // Should be called once (local pipeline only)
     expect(fetchCompany).toHaveBeenCalledTimes(1);
     expect(fetchCompany).toHaveBeenCalledWith(company, "local");
+    expect(pruneStaleUntrackedRawJobs).toHaveBeenCalledWith(mockDb);
   });
 
   it("records fetch errors in source_health without crashing", async () => {
