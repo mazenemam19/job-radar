@@ -25,7 +25,9 @@ export async function fetchAshby(c: ATSConfig, mode: JobMode): Promise<FetcherRe
     jobs.map((r) => ({
       id: `${mode}_ashby_${c.slug}_${r.id}`,
       title: r.title,
-      location: r.locationName ?? "",
+      // Ashby's live public API calls this field `location`; use the legacy
+      // spelling only as a compatibility fallback.
+      location: r.location ?? r.locationName ?? "",
       url: r.jobUrl,
       postedAt: r.publishedAt,
       description: stripHtml(r.descriptionHtml || ""),
