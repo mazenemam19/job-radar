@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const db = createServerClient();
+  const db = await createServerClient();
   const { data: profile } = await db
     .from("user_profiles")
     .select("gemini_api_key")

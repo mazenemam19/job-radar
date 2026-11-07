@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = createServerClient();
+  const db = await createServerClient();
 
   const { data: cache } = await db
     .from("user_jobs_cache")

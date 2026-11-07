@@ -30,13 +30,14 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   // was exposed to. Kept here too in case a route ever reaches this layout
   // without passing through middleware.
   if (profile && !profile.is_active) {
+    const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookies().getAll();
+            return cookieStore.getAll();
           },
           setAll() {
             // no-op: we're about to redirect anyway

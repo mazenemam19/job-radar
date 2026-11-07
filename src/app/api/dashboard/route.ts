@@ -27,7 +27,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = createServerClient();
+  const db = await createServerClient();
   // raw_jobs and app_config are global, not user-owned — RLS wasn't
   // checked/granted for them, so they stay on the service-role client.
   const adminDb = createAdminClient();

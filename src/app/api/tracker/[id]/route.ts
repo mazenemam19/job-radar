@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const patch = buildTrackerPatch(body, new Date().toISOString());
-  const db = createServerClient();
+  const db = await createServerClient();
 
   const { data, error } = await db
     .from("tracker_entries")
@@ -46,7 +46,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const user = await getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const db = createServerClient();
+  const db = await createServerClient();
   const { error } = await db.from("tracker_entries").delete().eq("id", id).eq("user_id", user.id);
 
   if (error) return dbErrorResponse("tracker/[id]:DELETE", error);

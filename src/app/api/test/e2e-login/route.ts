@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   // generateLink({ type: "magiclink" }) above, so it must be verified with
   // type: "magiclink" too — type: "email" is for numeric OTP codes and
   // fails with "Email link is invalid or has expired" on a magic-link token.
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
     type: "magiclink",
     token_hash: tokenHash,

@@ -195,7 +195,7 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
 
 /** Fetch user_settings row. Returns null if the row doesn't exist. */
 async function getUserSettingsRow(userId: string): Promise<UserSettingsRow | null> {
-  const db = createServerClient();
+  const db = await createServerClient();
   const { data, error } = await db.from("user_settings").select("*").eq("user_id", userId).single();
 
   if (error) return null;
@@ -289,7 +289,7 @@ export async function saveUserSettings(
   userId: string,
   patch: Partial<Omit<UserSettingsRow, "user_id" | "updated_at">>,
 ): Promise<void> {
-  const db = createServerClient();
+  const db = await createServerClient();
 
   // Strip anything that isn't a settings field
   const safe: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -341,7 +341,7 @@ export async function saveUserSettings(
  * rather than overwritten.
  */
 export async function initializeUserSettingsForSignup(userId: string): Promise<void> {
-  const db = createServerClient();
+  const db = await createServerClient();
 
   const { data: existing } = await db
     .from("user_settings")
