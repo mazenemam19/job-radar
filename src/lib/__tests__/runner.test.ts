@@ -15,7 +15,11 @@ vi.mock("../email", () => ({
 }));
 
 vi.mock("../cron/prune-raw-jobs", () => ({
-  pruneStaleUntrackedRawJobs: vi.fn().mockResolvedValue({ ok: true, deletedCount: 0 }),
+  pruneStaleUntrackedRawJobs: vi.fn().mockResolvedValue({
+    ok: true,
+    deletedCount: 0,
+    cutoff: "2026-08-09T12:00:00.000Z",
+  }),
 }));
 
 import { fetchCompany } from "../ats-bridge";
@@ -123,7 +127,11 @@ function makeRawJob(id: string, overrides: Partial<RawJob> = {}): RawJob {
 describe("runCronJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({ ok: true, deletedCount: 0 });
+    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({
+      ok: true,
+      deletedCount: 0,
+      cutoff: "2026-08-09T12:00:00.000Z",
+    });
   });
 
   it("returns error when no active companies", async () => {
