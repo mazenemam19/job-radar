@@ -124,6 +124,7 @@ export interface TeamtailorFeedItem {
   content_html?: string;
   date_published?: string;
   _jobposting?: {
+    employmentType?: string | null;
     jobLocation?:
       | string
       | {
@@ -142,6 +143,9 @@ export interface BreezyJob {
   url: string;
   updated_at: string;
   description: string;
+  type?: string | null;
+  employment_type?: string | null;
+  workplace_type?: string | null;
 }
 
 export interface SRJob {
@@ -150,6 +154,9 @@ export interface SRJob {
   ref: string;
   location: { fullLocation: string };
   releasedDate: string;
+  typeOfEmployment?: string | null;
+  employmentType?: string | null;
+  workplaceType?: string | null;
 }
 
 export interface SRDetail {
@@ -168,6 +175,8 @@ export interface BambooJob {
   city: string;
   country: string;
   datePosted: string;
+  employmentType?: string | null;
+  employmentStatus?: string | null;
 }
 
 /** Shape of GET https://{slug}.bamboohr.com/careers/{id}/detail.

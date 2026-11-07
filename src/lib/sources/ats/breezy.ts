@@ -25,10 +25,12 @@ export async function fetchBreezy(c: ATSConfig, mode: JobMode): Promise<FetcherR
     jobs.map((r) => ({
       id: `${mode}_breezy_${c.slug}_${r.id}`,
       title: r.name,
-      location: r.location?.name ?? c.city ?? c.country,
+      location: r.location?.name ?? "",
       url: r.url,
       postedAt: r.updated_at,
       description: stripHtml(r.description || ""),
+      employmentType: r.employment_type ?? r.type ?? undefined,
+      workplaceType: r.workplace_type ?? undefined,
     })),
     c,
     mode,

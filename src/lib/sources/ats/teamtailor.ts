@@ -1,20 +1,17 @@
-// src/lib/sources/ats/teamtailor.ts
-// Split out of ats-utils.ts (see AUDIT_STATUS.md row #2) — no behavior change.
+// Reads Teamtailor's supported public job-feed formats.
 import type { ATSConfig, FetcherResult, Job, TeamtailorFeedItem, TeamtailorJob } from "@/types";
 import type { JobMode } from "@/lib/types";
 import { safeFetchJson } from "./http";
 import { processJobs, stripHtml } from "./job-processing";
 
 /** `_jobposting.jobLocation` on a JSON Feed item is either a plain string
- * or a schema.org PostalAddress-shaped object — pull a display string out
- * of either, falling back to the company's configured city/country same as
- * the legacy `data[]` shape does for a missing `location-name`. */
-function feedLocation(item: TeamtailorFeedItem, c: ATSConfig): string {
+ * or a schema.org PostalAddress-shaped object. */
+function feedLocation(item: TeamtailorFeedItem): string {
   const loc = item._jobposting?.jobLocation;
   if (typeof loc === "string") return loc;
   const locality = loc?.address?.addressLocality;
   const country = loc?.address?.addressCountry;
-  return [locality, country].filter(Boolean).join(", ") || c.city || c.country;
+  return [locality, country].filter(Boolean).join(", ");
 }
 
 function okResult(jobs: Job[], rawCount: number, t0: number): FetcherResult {
@@ -52,7 +49,7 @@ export async function fetchTeamtailor(c: ATSConfig, mode: JobMode): Promise<Fetc
       jobs.map((r) => ({
         id: `${mode}_tt_${c.slug}_${r.id}`,
         title: r.attributes.title,
-        location: r.attributes["location-name"] ?? c.city ?? c.country,
+        location: r.attributes["location-name"] ?? "",
         url: r.attributes["external-url"] || `https://${c.slug}.teamtailor.com/jobs/${r.id}`,
         postedAt: r.attributes["published-at"],
         description: stripHtml(r.attributes["body-html"] || ""),
@@ -69,10 +66,11 @@ export async function fetchTeamtailor(c: ATSConfig, mode: JobMode): Promise<Fetc
       jobs.map((r) => ({
         id: `${mode}_tt_${c.slug}_${r.id}`,
         title: r.title ?? "Untitled",
-        location: feedLocation(r, c),
+        location: feedLocation(r),
         url: r.url || `https://${c.slug}.teamtailor.com/jobs/${r.id}`,
         postedAt: r.date_published ?? "",
         description: stripHtml(r.content_html || ""),
+        employmentType: r._jobposting?.employmentType ?? undefined,
       })),
       c,
       mode,

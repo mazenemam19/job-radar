@@ -80,7 +80,7 @@ describe("fetchTeamtailor — response-shape guard", () => {
     expect(result.jobs[0].location).toBe("London, UK");
   });
 
-  it("falls back to the company's configured city/country when a feed item has no jobLocation", async () => {
+  it("keeps a missing posting location unknown instead of using the company headquarters", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -105,7 +105,8 @@ describe("fetchTeamtailor — response-shape guard", () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(result.jobs[0].location).toBe("Remote");
+    expect(result.jobs[0].location).toBe("Unknown location");
+    expect(result.jobs[0].country).toBe("Unknown");
   });
 
   it("still processes jobs normally when `data` is a proper array", async () => {
