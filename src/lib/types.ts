@@ -58,7 +58,32 @@ export interface RawJob {
   source_name: string | null;
   ats_type: string | null;
   created_at: string;
+  country_code?: string | null;
+  city?: string | null;
+  workplace_type?: "on_site" | "hybrid" | "remote" | "unknown";
+  employment_types?: JobEmploymentType[];
+  work_authorization_status?:
+    | "sponsorship_available"
+    | "sponsorship_unavailable"
+    | "authorization_required"
+    | "unclear";
+  work_authorization_evidence?: string | null;
+  language_requirements?: string[];
+  language_evidence?: string | null;
+  source_location?: string | null;
 }
+
+export type JobEmploymentType =
+  | "full_time"
+  | "part_time"
+  | "working_student"
+  | "internship"
+  | "contract"
+  | "temporary"
+  | "mini_job"
+  | "apprenticeship"
+  | "freelance"
+  | "other";
 
 // ── Scoring ─────────────────────────────────────────────────
 

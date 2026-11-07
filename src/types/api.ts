@@ -29,6 +29,8 @@ export interface ATSRawInput {
   description: string;
   company?: string;
   locationRestrictions?: string[];
+  employmentType?: string;
+  workplaceType?: string;
 }
 
 export interface FetcherResult {
@@ -56,12 +58,13 @@ export interface GreenhouseJob {
   absolute_url: string;
   updated_at: string;
   content: string;
+  employment_type?: string | null;
 }
 
 export interface LeverJob {
   id: string;
   text: string;
-  categories: { location: string } | null;
+  categories: { location: string; commitment?: string } | null;
   hostedUrl: string;
   createdAt: number;
   description: string;
@@ -74,6 +77,8 @@ export interface AshbyJob {
   jobUrl: string;
   publishedAt: string;
   descriptionHtml: string;
+  employmentType?: string | null;
+  workplaceType?: string | null;
 }
 
 export interface WorkableJob {
@@ -83,6 +88,8 @@ export interface WorkableJob {
   url: string;
   published_on: string;
   description: string;
+  employment_type?: string | null;
+  workplace?: string | null;
 }
 
 export interface WorkableDetail {
@@ -98,6 +105,8 @@ export interface TeamtailorJob {
     "external-url": string | null;
     "published-at": string;
     "body-html": string;
+    "employment-type"?: string | null;
+    "workplace-type"?: string | null;
   };
 }
 

@@ -1,4 +1,5 @@
 import type { JobMode } from "@/lib/types";
+import type { WorkAuthorizationStatus } from "@/lib/job-signals";
 
 export type JobSource = "company" | "local";
 
@@ -30,4 +31,13 @@ export interface Job {
   fetchedAt: string;
   geminiPassed?: boolean;
   geminiReason?: string;
+  workAuthorizationStatus?: WorkAuthorizationStatus;
+  workAuthorizationEvidence?: string | null;
+  sourceLocation?: string;
+  city?: string | null;
+  countryCode?: string | null;
+  workplaceType?: "on_site" | "hybrid" | "remote" | "unknown";
+  employmentTypes?: import("@/lib/types").JobEmploymentType[];
+  languageRequirements?: string[];
+  languageEvidence?: string | null;
 }
