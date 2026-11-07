@@ -9,7 +9,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import type { ScoredJob } from "@/lib/types";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -24,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .single();
 
   const jobs = (cache?.jobs as unknown as ScoredJob[]) ?? [];
-  const job = jobs.find((j) => j.id === params.id);
+  const job = jobs.find((j) => j.id === id);
 
   if (!job) {
     return NextResponse.json({ ok: false, error: "Job not found" }, { status: 404 });

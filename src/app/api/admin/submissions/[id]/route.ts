@@ -7,9 +7,12 @@ import { dbErrorResponse } from "@/lib/api-errors";
 import { buildSubmissionPatch } from "@/lib/admin/build-submission-patch";
 import { approveSubmission } from "@/lib/admin/approve-submission";
 
+type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+
 // ── PATCH — approve / reject / edit a submission ─────────────
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
@@ -25,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   // If approving, also write to ats_companies
   if (body.status === "approved") {
-    const result = await approveSubmission(db, params.id, body, now);
+    const result = await approveSubmission(db, id, body, now);
     if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 404 });
   }
 
@@ -33,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const { data, error } = await db
     .from("ats_submissions")
     .update(patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -43,12 +46,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 // ── DELETE — remove a submission ─────────────────────────────
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
   const db = createAdminClient();
-  const { error } = await db.from("ats_submissions").delete().eq("id", params.id);
+  const { error } = await db.from("ats_submissions").delete().eq("id", id);
   if (error) return dbErrorResponse("admin/submissions/[id]:DELETE", error);
   return NextResponse.json({ ok: true });
 }

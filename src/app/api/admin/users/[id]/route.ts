@@ -8,7 +8,10 @@ import { requireAdmin } from "@/lib/auth";
 import { dbErrorResponse } from "@/lib/api-errors";
 import type { Database } from "@/lib/database.types";
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+type RouteContext = { params: { id: string } | Promise<{ id: string }> };
+
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
 
@@ -34,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   // Prevent admin from deactivating themselves
-  if (params.id === admin.id && patch.is_active === false) {
+  if (id === admin.id && patch.is_active === false) {
     return NextResponse.json(
       { ok: false, error: "Cannot deactivate your own account" },
       { status: 400 },
@@ -45,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const { data, error } = await db
     .from("user_profiles")
     .update(patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
