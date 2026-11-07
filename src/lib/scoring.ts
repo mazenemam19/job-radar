@@ -365,15 +365,21 @@ export function scoreJob(
 
 /**
  * Merges new scored jobs into an existing array.
- * Deduplicates by normalized posting URL so legacy local/global IDs for the
- * same posting collapse together. Falls back to job.id when the URL is invalid.
+ * Deduplicates canonical postings by ID. Legacy local/global rows fall back
+ * to a normalized URL, dropping only known tracking parameters so provider
+ * identifiers such as `gh_jid` remain distinct.
  */
 export function mergeJobs(existing: ScoredJob[], incoming: ScoredJob[]): ScoredJob[] {
   function identity(job: ScoredJob): string {
     try {
       const url = new URL(job.url.trim());
       url.hash = "";
-      url.search = "";
+      for (const key of Array.from(url.searchParams.keys())) {
+        if (/^(?:utm_.+|ref|source|campaign|mc_[a-z]+)$/i.test(key)) {
+          url.searchParams.delete(key);
+        }
+      }
+      url.searchParams.sort();
       url.hostname = url.hostname.toLowerCase();
       url.pathname = url.pathname.replace(/\/+$/, "") || "/";
       return "url:" + url.toString();

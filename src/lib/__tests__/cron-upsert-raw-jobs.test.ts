@@ -26,10 +26,16 @@ function makeRawJob(id: string): RawJob {
   };
 }
 
-// Minimal admin-client stub: only `.from("raw_jobs").upsert(...)` is exercised.
-function makeDb(upsertImpl: (rows: unknown[]) => { error: { message: string } | null }) {
+// Minimal admin-client stub for the compatibility lookup and raw-job upsert.
+function makeDb(
+  upsertImpl: (rows: unknown[]) => { error: { message: string } | null },
+  existingIds: string[] = [],
+) {
   const upsert = vi.fn().mockImplementation(async (rows: unknown[]) => upsertImpl(rows));
-  return { from: vi.fn().mockReturnValue({ upsert }), upsert };
+  const select = vi.fn().mockReturnValue({
+    in: vi.fn().mockResolvedValue({ data: existingIds.map((id) => ({ id })), error: null }),
+  });
+  return { from: vi.fn().mockReturnValue({ select, upsert }), upsert, select };
 }
 
 describe("upsertRawJobs", () => {
@@ -80,6 +86,17 @@ describe("upsertRawJobs", () => {
         language_evidence: "English is our working language.",
       },
     ]);
+  });
+
+  it("updates a legacy row instead of creating a canonical duplicate during the transition", async () => {
+    const job = makeRawJob("greenhouse_canonical");
+    job.source_id = "global_gh_testcorp_123";
+    const db = makeDb(() => ({ error: null }), ["local_gh_testcorp_123"]);
+
+    await upsertRawJobs(db as never, [job]);
+
+    expect(db.upsert.mock.calls[0][0]).toMatchObject([{ id: "local_gh_testcorp_123" }]);
+    expect(db.upsert.mock.calls[0][0][0]).not.toHaveProperty("source_id");
   });
 
   it("splits more than 500 jobs into multiple chunks", async () => {

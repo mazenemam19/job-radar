@@ -116,6 +116,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
 
       return {
         id: canonicalPostingId(row.ats, j.id, j.url),
+        source_id: j.id,
         title: j.title,
         company: j.company ?? row.name,
         location: j.location ?? "",

@@ -40,6 +40,13 @@ export interface ATSCompanyRow {
 /** Normalised job as stored in public.raw_jobs */
 export interface RawJob {
   id: string;
+  /**
+   * Provider-issued identity used only while a fetched job is being written.
+   * It is deliberately not persisted: the canonical `id` is the durable
+   * database identity. Keeping this value lets the writer update a legacy
+   * local/global row instead of creating a duplicate during the ID migration.
+   */
+  source_id?: string;
   title: string;
   company: string;
   location: string;

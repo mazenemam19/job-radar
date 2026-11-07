@@ -480,6 +480,18 @@ describe("mergeJobs", () => {
     expect(result[0].id).toBe("global_gh_1");
     expect(result[0].fetched_at).toBe(newer.fetched_at);
   });
+
+  it("keeps postings distinct when their provider job IDs are query parameters", () => {
+    const first = makeScoredJob("local_gh_123", 70);
+    first.url = "https://jobs.example.com/openings?gh_jid=123&utm_source=feed";
+    const second = makeScoredJob("local_gh_124", 65);
+    second.url = "https://jobs.example.com/openings?gh_jid=124&utm_source=feed";
+
+    const result = mergeJobs([], [first, second]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((job) => job.id)).toEqual(["local_gh_123", "local_gh_124"]);
+  });
 });
 
 // ── passesSettingsGate ───────────────────────────────────────
