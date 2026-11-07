@@ -14,8 +14,17 @@ vi.mock("../email", () => ({
   sendNewScanNotificationEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../cron/prune-raw-jobs", () => ({
+  pruneStaleUntrackedRawJobs: vi.fn().mockResolvedValue({
+    ok: true,
+    deletedCount: 0,
+    cutoff: "2026-08-09T12:00:00.000Z",
+  }),
+}));
+
 import { fetchCompany } from "../ats-bridge";
 import { sendNewScanNotificationEmail } from "../email";
+import { pruneStaleUntrackedRawJobs } from "../cron/prune-raw-jobs";
 import type { ATSCompanyRow, RawJob } from "../types";
 
 // ── Mock database ─────────────────────────────────────────────
@@ -118,6 +127,11 @@ function makeRawJob(id: string, overrides: Partial<RawJob> = {}): RawJob {
 describe("runCronJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({
+      ok: true,
+      deletedCount: 0,
+      cutoff: "2026-08-09T12:00:00.000Z",
+    });
   });
 
   it("returns error when no active companies", async () => {
@@ -161,6 +175,7 @@ describe("runCronJob", () => {
     // Should be called once (local pipeline only)
     expect(fetchCompany).toHaveBeenCalledTimes(1);
     expect(fetchCompany).toHaveBeenCalledWith(company, "local");
+    expect(pruneStaleUntrackedRawJobs).toHaveBeenCalledWith(mockDb);
   });
 
   it("records fetch errors in source_health without crashing", async () => {
@@ -183,6 +198,30 @@ describe("runCronJob", () => {
 
     expect(result.errors).toContain("Test Corp (global): ATS timeout");
     expect(result.total_fetched).toBe(0);
+  });
+
+  it("records a retention failure without failing the completed scrape", async () => {
+    const company = makeCompanyRow({ pipeline_global: true });
+    mockDb.from.mockImplementation((table: string) => {
+      if (table === "ats_companies") return makeChain([company]);
+      return makeChain(null);
+    });
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Test Corp",
+      mode: "global",
+      jobs: [],
+      error: null,
+    });
+    vi.mocked(pruneStaleUntrackedRawJobs).mockResolvedValue({
+      ok: false,
+      error: "function is missing",
+      cutoff: "2026-08-09T12:00:00.000Z",
+    });
+
+    const { runCronJob } = await import("../runner");
+    const result = await runCronJob("manual");
+
+    expect(result.errors).toContain("Failed to prune stale raw jobs: function is missing");
   });
 });
 
