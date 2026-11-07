@@ -4,7 +4,7 @@
 
 **Branch:** `codex/germany-search-portability`
 
-**Current state:** The Germany pilot migrations have been applied to the live Supabase project. Settings now saves and reloads the per-user profile correctly, including an 11-day search window that previously exposed a dashboard query timeout. The branch contains small, reviewed local commits, including the match explanation, eligibility evidence, and the complete Next 16 dynamic-route compatibility repair. It is ready to push for a draft PR.
+**Current state:** The Germany pilot migrations have been applied to the live Supabase project. Settings now saves and reloads the per-user profile correctly, including an 11-day search window that previously exposed a dashboard query timeout. The branch has small, reviewed commits and is published as draft PR [#61](https://github.com/mazenemam19/job-radar/pull/61); Project #3 and issue #43 are updated. A follow-up CI test-race repair is also on that PR.
 
 ## Done locally
 
@@ -34,7 +34,7 @@
 - [x] Update GitHub issues and Project #3: #47 is closed, #43 is the active Germany ATS intake issue, and #48 is closed as consolidated work.
 - [ ] Apply and verify `20261107400000_rekey_and_deduplicate_legacy_raw_jobs.sql`. Read-only analysis identified 2,891 pipeline-specific duplicate source records; the migration preserves the newest snapshot, moves any Gemini review before removal, makes review IDs update-cascading, and invalidates result caches for a normal rebuild.
 - [ ] Run the 2–4 week pilot and record whether it yields at least three actionable matches per week.
-- [ ] Push the reviewed branch and open the draft PR now authorized by the user.
+- [x] Push the reviewed branch and open draft PR #61; add it to Project #3 as In Progress and link the active ATS intake issue (#43).
 
 ## Deferred
 
@@ -57,5 +57,6 @@
 - [x] Dashboard timeout diagnosis: the previous profile RPC took 15.8 seconds for the 11-day search. The constrained query and in-process precision gates now rebuild the real dashboard successfully instead of returning a generic error.
 - [x] Review follow-up: an independent code review identified the legacy country-label mismatch and missing standalone-remote classification. Both were fixed, regression-tested, and manually verified against the live Doctolib posting.
 - [x] E2E reliability: onboarding tests now restore the shared test session after each case, preventing an incomplete-onboarding session from leaking into Settings tests.
+- [x] CI reliability: the blocked-user browser test now changes only the configured test profile (not its browser session) before asserting the proxy redirect. The focused auth suite passed after this repair.
 - [x] Database report inspection: `raw_jobs` occupies 278 MB for 27,609 rows and drives the 0.31 GB database size. The report shows severe memory commitment (1.43 GB) while physical memory use was about 401 MB; this needs operational follow-up before increasing cron load. A live snapshot showed 1 active and 9 idle client connections, so it does not indicate a connection surge.
 - [x] Legacy-ID cleanup preview: 2,891 logical postings are duplicated across historical `local`, `global`, and `visa` pipeline IDs. All 216 Gemini reviews already point at retained rows, so no live review needs moving for the current database. The retained source identity is provider-specific; this avoids treating query-string posting IDs as tracking noise.
