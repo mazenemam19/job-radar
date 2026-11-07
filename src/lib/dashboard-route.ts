@@ -4,6 +4,7 @@
 // Kept separate so it's unit-testable without mocking the route layer.
 
 import { filterJobsWithGemini } from "@/lib/gemini";
+import { explainSearchProfileMatch } from "@/lib/search-profile-match";
 import {
   scoreJob,
   mergeJobs,
@@ -77,7 +78,12 @@ export async function buildFeed(
   // Stage: Merge — deduplicates and sorts by total_score descending.
   // Empty first arg is intentional: this is a full rebuild path, not an
   // incremental merge — there are no pre-existing cached jobs to preserve.
-  const finalJobs = mergeJobs([], scoredJobs);
+  const finalJobs = mergeJobs([], scoredJobs).map((job) => ({
+    ...job,
+    search_profile_match: settings.search_profile
+      ? explainSearchProfileMatch(job, settings.search_profile)
+      : null,
+  }));
 
   const pipelineLog: PipelineLog = {
     total_fetched: dbFunnelCounts.total_fetched,

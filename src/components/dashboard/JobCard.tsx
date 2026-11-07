@@ -10,6 +10,8 @@ import { MODE_COLORS } from "@/lib/constants";
 import JobBadges from "./JobBadges";
 import JobScoreBreakdown from "./JobScoreBreakdown";
 import JobCardActions from "./JobCardActions";
+import SearchProfileMatch from "./SearchProfileMatch";
+import JobEligibilityEvidence from "./JobEligibilityEvidence";
 import type { ScoredJob, ResolvedSettings } from "@/lib/types";
 
 interface Props {
@@ -65,6 +67,8 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
       </div>
 
       <JobBadges job={job} modeColor={modeColor} settings={settings} />
+      <SearchProfileMatch job={job} />
+      <JobEligibilityEvidence job={job} />
 
       {expanded && <JobScoreBreakdown job={job} liveRecencyScore={liveRecencyScore} />}
 

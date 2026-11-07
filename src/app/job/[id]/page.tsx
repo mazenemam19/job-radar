@@ -14,6 +14,8 @@ import { formatPostedLabel } from "@/lib/job-display";
 import { MODE_COLORS } from "@/lib/constants";
 import JobDetailBadges from "@/components/dashboard/JobDetailBadges";
 import JobScoreBreakdown from "@/components/dashboard/JobScoreBreakdown";
+import SearchProfileMatch from "@/components/dashboard/SearchProfileMatch";
+import JobEligibilityEvidence from "@/components/dashboard/JobEligibilityEvidence";
 import type { ScoredJob } from "@/lib/types";
 
 const PAGE_SHELL_CLASS = "mx-auto min-h-screen max-w-[760px] bg-[#08080f] px-6 py-8 font-sans";
@@ -138,6 +140,8 @@ export default function JobDetailPage() {
 
         {/* Tags row */}
         <JobDetailBadges job={job} modeColor={modeColor} />
+        <SearchProfileMatch job={job} />
+        <JobEligibilityEvidence job={job} />
 
         {/* Score breakdown */}
         <JobScoreBreakdown job={job} liveRecencyScore={liveRecencyScore} />

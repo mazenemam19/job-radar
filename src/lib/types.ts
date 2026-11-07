@@ -130,6 +130,8 @@ export interface ScoredJob extends RawJob {
    *  "not AI-reviewed" one. */
   gemini_quota_exhausted?: boolean;
   scoring_weights?: ScoringWeights;
+  /** Why this posting passed the user's location and category preferences. */
+  search_profile_match?: { reasons: string[]; uncertainties: string[] } | null;
 }
 
 /** Snapshot stored in tracker_entries.job_snapshot */
