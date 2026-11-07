@@ -4,7 +4,7 @@
 
 **Branch:** `codex/raw-job-retention`
 
-**Current state:** PR [#61](https://github.com/mazenemam19/job-radar/pull/61) is merged. The Germany pilot migrations are live, and Settings saves/reloads the per-user profile correctly, including the 11-day search window that previously exposed a dashboard query timeout. A new storage-retention branch is ready to bound `raw_jobs` growth safely.
+**Current state:** PR [#61](https://github.com/mazenemam19/job-radar/pull/61) is merged. The Germany pilot migrations are live, and Settings saves/reloads the per-user profile correctly, including the 11-day search window that previously exposed a dashboard query timeout. Storage-retention draft PR [#62](https://github.com/mazenemam19/job-radar/pull/62) is in progress on Project #3; its additive migration is live, and its one-time cleanup awaits destructive-action confirmation.
 
 ## Done locally
 
