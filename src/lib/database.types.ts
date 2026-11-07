@@ -499,6 +499,7 @@ export type Database = {
           global_mode_allowed_locations: string[] | null;
           email_alerts_enabled: boolean | null;
           salary_reminder_enabled: boolean | null;
+          search_profile: Json;
           updated_at: string;
         };
         Insert: {
@@ -524,6 +525,7 @@ export type Database = {
           global_mode_allowed_locations?: string[] | null;
           email_alerts_enabled?: boolean | null;
           salary_reminder_enabled?: boolean | null;
+          search_profile?: Json;
           updated_at?: string;
         };
         Update: {
@@ -549,6 +551,7 @@ export type Database = {
           global_mode_allowed_locations?: string[] | null;
           email_alerts_enabled?: boolean | null;
           salary_reminder_enabled?: boolean | null;
+          search_profile?: Json;
           updated_at?: string;
         };
         Relationships: [];

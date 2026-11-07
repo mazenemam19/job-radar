@@ -85,6 +85,23 @@ export type JobEmploymentType =
   | "freelance"
   | "other";
 
+export type WorkplaceType = "on_site" | "hybrid" | "remote";
+
+export interface SearchLocationPreference {
+  country_code: string;
+  country_name: string;
+  cities: string[];
+  country_wide: boolean;
+  remote_countrywide: boolean;
+}
+
+/** Personal target market and job categories. Empty arrays mean no restriction. */
+export interface JobSearchProfile {
+  locations: SearchLocationPreference[];
+  workplace_types: WorkplaceType[];
+  employment_types: JobEmploymentType[];
+}
+
 // ── Scoring ─────────────────────────────────────────────────
 
 export interface ScoringWeights {
@@ -180,6 +197,7 @@ export interface UserSettingsRow {
   global_mode_allowed_locations: string[] | null;
   email_alerts_enabled: boolean | null;
   salary_reminder_enabled: boolean | null;
+  search_profile: JobSearchProfile | null;
   updated_at: string;
 }
 
@@ -206,6 +224,7 @@ export interface ResolvedSettings {
   global_mode_allowed_locations: string[];
   email_alerts_enabled: boolean;
   salary_reminder_enabled: boolean;
+  search_profile?: JobSearchProfile;
 }
 
 /** Editable state backing the settings form. Comma-separated list fields are
@@ -234,6 +253,7 @@ export interface SettingsFormFields {
   requiredKeywords: string;
   globalBlockedRegions: string;
   globalAllowedLocations: string;
+  searchProfile: JobSearchProfile;
 }
 
 export interface SettingsData {

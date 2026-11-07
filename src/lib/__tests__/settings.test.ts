@@ -3,6 +3,7 @@
 // defaults; null fields fall back to the signup snapshot (not live).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EMPTY_SEARCH_PROFILE, GERMANY_PILOT_SEARCH_PROFILE } from "../search-profile";
 
 // ── Mock Supabase clients ──────────────────────────────────────
 // getDefaultSettings() reads default_settings via the service-role client
@@ -187,6 +188,30 @@ describe("resolveUserSettings", () => {
     expect(Math.abs(total - 1)).toBeLessThan(0.001);
   });
 
+  it("resolves the search profile from each user's own row", async () => {
+    const defaultQuery = mockQuery(DEFAULT_ROW);
+    const firstUserQuery = mockQuery({
+      user_id: "u-de",
+      search_profile: GERMANY_PILOT_SEARCH_PROFILE,
+    });
+    const secondUserQuery = mockQuery({
+      user_id: "u-other",
+      search_profile: EMPTY_SEARCH_PROFILE,
+    });
+
+    mockAdminDb.from.mockImplementation((table: string) =>
+      table === "default_settings" ? defaultQuery : mockQuery(null),
+    );
+    mockServerDb.from.mockReturnValueOnce(firstUserQuery).mockReturnValueOnce(secondUserQuery);
+
+    const { resolveUserSettings } = await import("../settings");
+    const first = await resolveUserSettings("u-de");
+    const second = await resolveUserSettings("u-other");
+
+    expect(first.search_profile).toEqual(GERMANY_PILOT_SEARCH_PROFILE);
+    expect(second.search_profile).toEqual(EMPTY_SEARCH_PROFILE);
+  });
+
   it("falls back to hardcoded defaults when DB returns no row", async () => {
     const defaultQuery = mockQuery(null, { message: "no row" });
     const userQuery = mockQuery(null, { message: "no row" });
@@ -220,6 +245,7 @@ describe("resolveUserSettings", () => {
     const { saveUserSettings } = await import("../settings");
     await saveUserSettings("u5", {
       job_age_days: 14,
+      search_profile: GERMANY_PILOT_SEARCH_PROFILE,
       // @ts-expect-error intentional test of security strip
       role: "admin",
     });
@@ -227,6 +253,7 @@ describe("resolveUserSettings", () => {
     const call = upsertMock.mock.calls[0][0];
     expect(call).not.toHaveProperty("role");
     expect(call).toHaveProperty("job_age_days", 14);
+    expect(call).toHaveProperty("search_profile", GERMANY_PILOT_SEARCH_PROFILE);
   });
 
   describe("initializeUserSettingsForSignup", () => {
@@ -261,6 +288,7 @@ describe("resolveUserSettings", () => {
       expect(inserted.expert_skills).toEqual(DEFAULT_ROW.expert_skills);
       expect(inserted.job_age_days).toBe(DEFAULT_ROW.job_age_days);
       expect(inserted.gemini_filter_prompt).toBe(DEFAULT_ROW.gemini_filter_prompt);
+      expect(inserted.search_profile).toEqual(EMPTY_SEARCH_PROFILE);
     });
 
     it("does nothing if the user already has a row — never clobbers existing data", async () => {

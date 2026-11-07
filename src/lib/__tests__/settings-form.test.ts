@@ -13,6 +13,7 @@ import {
   DEFAULT_FORM_FIELDS,
 } from "../settings-form";
 import type { ResolvedSettings, SettingsFormFields } from "../types";
+import { GERMANY_PILOT_SEARCH_PROFILE } from "../search-profile";
 
 describe("parseCsvList", () => {
   it("splits, trims, and drops empties", () => {
@@ -76,6 +77,14 @@ describe("hydrateFormFields", () => {
     const fields = hydrateFormFields({ ...RESOLVED, seniority_levels: [] });
     expect(fields.seniorityLevels).toEqual(new Set(["senior", "staff"]));
   });
+
+  it("hydrates a personal search profile", () => {
+    const fields = hydrateFormFields({
+      ...RESOLVED,
+      search_profile: GERMANY_PILOT_SEARCH_PROFILE,
+    });
+    expect(fields.searchProfile).toEqual(GERMANY_PILOT_SEARCH_PROFILE);
+  });
 });
 
 describe("computeRelocationWeight", () => {
@@ -107,6 +116,7 @@ describe("buildSettingsPayload", () => {
     expect(result.payload.excluded_keywords).toEqual(["devops", "backend"]);
     expect(result.payload.junior_keywords).toEqual(["intern", "junior"]);
     expect(result.payload.scoring_weights).toEqual({ skill: 0.6, recency: 0.3, relocation: 0.1 });
+    expect(result.payload.search_profile).toEqual(baseFields.searchProfile);
   });
 
   it("omits gemini_api_key when no key was entered and clear wasn't requested", () => {
