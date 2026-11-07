@@ -1,4 +1,5 @@
 -- Adds normalized, posting-level attributes while retaining the legacy columns.
+-- Country codes are inferred only from the posting's location, never its company country.
 
 alter table public.raw_jobs
   add column if not exists source_location text,
@@ -47,6 +48,16 @@ set
       when job.location ~* '\m(hungary|budapest)\M' then 'HU'
       when job.location ~* '\m(czechia|czech republic|prague)\M' then 'CZ'
       when job.location ~* '\m(italy|rome)\M' then 'IT'
+      when job.location ~* '\m(japan|tokyo|osaka|kyoto)\M' then 'JP'
+      when job.location ~* '\m(south africa|johannesburg|cape town)\M' then 'ZA'
+      when job.location ~* '\mgibraltar\M' then 'GI'
+      when job.location ~* '\m(mexico|mexico city)\M' then 'MX'
+      when job.location ~* '\m(argentina|buenos aires)\M' then 'AR'
+      when job.location ~* '\m(brazil|são paulo|sao paulo|rio de janeiro)\M' then 'BR'
+      when job.location ~* '\m(india|mumbai|delhi|bengaluru|bangalore)\M' then 'IN'
+      when job.location ~* '\m(indonesia|jakarta)\M' then 'ID'
+      when job.location ~* '(^|[,[:space:]])(FR|NL|IE|ES|PT|SE|DK|FI|PL|AT|CH|BE|NO|CA|AU|SG|SA|AE|RO|HU|CZ|IT|JP|ZA|GI|MX|AR|BR|IN|ID)([,[:space:]]|$)'
+        then upper((regexp_match(job.location, '(^|[,[:space:]])(FR|NL|IE|ES|PT|SE|DK|FI|PL|AT|CH|BE|NO|CA|AU|SG|SA|AE|RO|HU|CZ|IT|JP|ZA|GI|MX|AR|BR|IN|ID)([,[:space:]]|$)', 'i'))[2])
       else null
     end
   ),
@@ -59,7 +70,8 @@ set
         'france', 'netherlands', 'ireland', 'spain', 'portugal', 'sweden', 'denmark',
         'finland', 'poland', 'austria', 'switzerland', 'belgium', 'norway', 'canada',
         'australia', 'singapore', 'saudi arabia', 'united arab emirates', 'romania',
-        'hungary', 'czechia', 'czech republic', 'italy'
+        'hungary', 'czechia', 'czech republic', 'italy', 'japan', 'south africa', 'gibraltar',
+        'mexico', 'argentina', 'brazil', 'india', 'indonesia'
       ]) then null
       else nullif(btrim(split_part(job.location, ',', 1)), '')
     end
@@ -96,63 +108,4 @@ set
   end;
 
 update public.raw_jobs as job
-set
-  country = case job.country_code
-    when 'DE' then 'Germany'
-    when 'EG' then 'Egypt'
-    when 'GB' then 'UK'
-    when 'US' then 'USA'
-    when 'FR' then 'France'
-    when 'NL' then 'Netherlands'
-    when 'IE' then 'Ireland'
-    when 'ES' then 'Spain'
-    when 'PT' then 'Portugal'
-    when 'SE' then 'Sweden'
-    when 'DK' then 'Denmark'
-    when 'FI' then 'Finland'
-    when 'PL' then 'Poland'
-    when 'AT' then 'Austria'
-    when 'CH' then 'Switzerland'
-    when 'BE' then 'Belgium'
-    when 'NO' then 'Norway'
-    when 'CA' then 'Canada'
-    when 'AU' then 'Australia'
-    when 'SG' then 'Singapore'
-    when 'SA' then 'Saudi Arabia'
-    when 'AE' then 'UAE'
-    when 'RO' then 'Romania'
-    when 'HU' then 'Hungary'
-    when 'CZ' then 'Czechia'
-    when 'IT' then 'Italy'
-    else 'Unknown'
-  end,
-  country_flag = case job.country_code
-    when 'DE' then '🇩🇪'
-    when 'EG' then '🇪🇬'
-    when 'GB' then '🇬🇧'
-    when 'US' then '🇺🇸'
-    when 'FR' then '🇫🇷'
-    when 'NL' then '🇳🇱'
-    when 'IE' then '🇮🇪'
-    when 'ES' then '🇪🇸'
-    when 'PT' then '🇵🇹'
-    when 'SE' then '🇸🇪'
-    when 'DK' then '🇩🇰'
-    when 'FI' then '🇫🇮'
-    when 'PL' then '🇵🇱'
-    when 'AT' then '🇦🇹'
-    when 'CH' then '🇨🇭'
-    when 'BE' then '🇧🇪'
-    when 'NO' then '🇳🇴'
-    when 'CA' then '🇨🇦'
-    when 'AU' then '🇦🇺'
-    when 'SG' then '🇸🇬'
-    when 'SA' then '🇸🇦'
-    when 'AE' then '🇦🇪'
-    when 'RO' then '🇷🇴'
-    when 'HU' then '🇭🇺'
-    when 'CZ' then '🇨🇿'
-    when 'IT' then '🇮🇹'
-    else '🌍'
-  end,
-  visa_sponsorship = (job.work_authorization_status = 'sponsorship_available');
+set visa_sponsorship = (job.work_authorization_status = 'sponsorship_available');

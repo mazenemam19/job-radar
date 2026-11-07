@@ -32,6 +32,16 @@ describe("posting location normalization", () => {
     ["Nürnberg, Deutschland", "DE", "Nürnberg"],
     ["Nuremberg, DE", "DE", "Nuremberg"],
     ["Cairo, Egypt", "EG", "Cairo"],
+    ["Tokyo, Japan", "JP", "Tokyo"],
+    ["Tokyo, JP", "JP", "Tokyo"],
+    ["Johannesburg, South Africa", "ZA", "Johannesburg"],
+    ["Gibraltar", "GI", null],
+    ["Mexico City, Mexico", "MX", "Mexico City"],
+    ["Buenos Aires, Argentina", "AR", "Buenos Aires"],
+    ["São Paulo, Brazil", "BR", "São Paulo"],
+    ["Mumbai, India", "IN", "Mumbai"],
+    ["Jakarta, Indonesia", "ID", "Jakarta"],
+    ["Paris, FR", "FR", "Paris"],
   ])("normalizes %s", (location, countryCode, city) => {
     const result = normalizePostingLocation(location);
     expect(result.countryCode).toBe(countryCode);

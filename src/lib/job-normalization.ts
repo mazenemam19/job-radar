@@ -43,6 +43,14 @@ const COUNTRY_CODES: Record<string, string> = {
   czechia: "CZ",
   "czech republic": "CZ",
   italy: "IT",
+  japan: "JP",
+  "south africa": "ZA",
+  gibraltar: "GI",
+  mexico: "MX",
+  argentina: "AR",
+  brazil: "BR",
+  india: "IN",
+  indonesia: "ID",
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -72,6 +80,14 @@ const COUNTRY_NAMES: Record<string, string> = {
   HU: "Hungary",
   CZ: "Czechia",
   IT: "Italy",
+  JP: "Japan",
+  ZA: "South Africa",
+  GI: "Gibraltar",
+  MX: "Mexico",
+  AR: "Argentina",
+  BR: "Brazil",
+  IN: "India",
+  ID: "Indonesia",
 };
 
 const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
@@ -104,6 +120,21 @@ const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
   warsaw: { country: "Poland", code: "PL" },
   prague: { country: "Czechia", code: "CZ" },
   rome: { country: "Italy", code: "IT" },
+  tokyo: { country: "Japan", code: "JP" },
+  osaka: { country: "Japan", code: "JP" },
+  kyoto: { country: "Japan", code: "JP" },
+  johannesburg: { country: "South Africa", code: "ZA" },
+  "cape town": { country: "South Africa", code: "ZA" },
+  "mexico city": { country: "Mexico", code: "MX" },
+  "buenos aires": { country: "Argentina", code: "AR" },
+  "são paulo": { country: "Brazil", code: "BR" },
+  "sao paulo": { country: "Brazil", code: "BR" },
+  "rio de janeiro": { country: "Brazil", code: "BR" },
+  mumbai: { country: "India", code: "IN" },
+  delhi: { country: "India", code: "IN" },
+  bengaluru: { country: "India", code: "IN" },
+  bangalore: { country: "India", code: "IN" },
+  jakarta: { country: "Indonesia", code: "ID" },
 };
 
 function escapeRegex(value: string): string {
