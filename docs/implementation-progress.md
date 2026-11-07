@@ -40,7 +40,7 @@
 
 - [x] Measure production `raw_jobs`: 27,717 rows and 280 MB. 15,173 rows were unseen for 30 days, 11,440 for 60 days, and 8,154 for 90 days; every 90-day candidate is untracked. No rows were unseen for 180 days.
 - [x] Add a 90-day tracked-job-safe retention function and invoke it after each cron scrape. The database operation is atomic: it excludes `tracker_entries` within the same delete statement.
-- [ ] Apply and verify additive migration `20261107700000_prune_stale_raw_jobs.sql` in production.
+- [x] Apply and verify additive migration `20261107700000_prune_stale_raw_jobs.sql` in production. The tracker-ID index and tracked-job-safe retention function were installed on 2026-11-07; no rows were deleted during this step.
 - [ ] Execute the one-time production cleanup of the verified 8,154 untracked 90-day rows, invalidate cached dashboards, and record before/after counts. This is destructive and requires confirmation at execution time.
 - [ ] Check the database-size trend after the next cron runs. A normal vacuum makes deleted space reusable; it does not necessarily reduce the allocated-disk chart immediately.
 
