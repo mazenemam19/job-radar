@@ -9,32 +9,42 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { catchErrorResponse } from "@/lib/api-errors";
+import { requireAdmin } from "@/lib/auth";
+import { acquireCronRunLock, releaseCronRunLock } from "@/lib/cron/run-lock";
 import { runCronJob } from "@/lib/runner";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Hobby + Fluid Compute already defaults to 300s — this can't buy more time,
 // it's here so the ceiling is explicit instead of an assumed default.
 export const maxDuration = 300;
 
-function isAuthorized(request: NextRequest): boolean {
+type CronTrigger = Parameters<typeof runCronJob>[0];
+
+/**
+ * Scheduled callers present CRON_SECRET. An authenticated admin may make a
+ * POST from the protected UI; GET remains secret-only so a page prefetch or
+ * link cannot trigger a live run.
+ */
+async function getAuthorization(request: NextRequest): Promise<{ trigger: CronTrigger } | null> {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-
-  // Check Authorization header (GitHub Actions / manual)
   const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${secret}`) return true;
-
-  // Check query param (Vercel Cron GET)
   const url = new URL(request.url);
-  if (url.searchParams.get("secret") === secret) return true;
+  const hasCronSecret =
+    Boolean(secret) &&
+    (authHeader === `Bearer ${secret}` || url.searchParams.get("secret") === secret);
 
-  return false;
+  if (hasCronSecret) return { trigger: getScheduledTrigger(request) };
+
+  if (request.method !== "POST") return null;
+
+  const admin = await requireAdmin();
+  return admin ? { trigger: "manual" } : null;
 }
 
-function getTrigger(request: NextRequest): "github_actions" | "vercel_cron" | "manual" {
+function getScheduledTrigger(request: NextRequest): CronTrigger {
   const ua = request.headers.get("user-agent") ?? "";
   if (ua.includes("vercel")) return "vercel_cron";
-  if (request.method === "POST") return "github_actions";
-  return "manual";
+  return request.method === "POST" ? "github_actions" : "vercel_cron";
 }
 
 export async function GET(request: NextRequest) {
@@ -46,12 +56,28 @@ export async function POST(request: NextRequest) {
 }
 
 async function handler(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  const authorization = await getAuthorization(request);
+  if (!authorization) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const db = createAdminClient();
+  let lock: Awaited<ReturnType<typeof acquireCronRunLock>> = null;
+
   try {
-    const result = await runCronJob(getTrigger(request));
+    lock = await acquireCronRunLock(db);
+    if (!lock) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "cron:busy",
+          error: "A cron run is already in progress. Wait for it to finish before starting another.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const result = await runCronJob(authorization.trigger);
 
     return NextResponse.json({
       ok: true,
@@ -60,6 +86,9 @@ async function handler(request: NextRequest) {
         duration_ms: result.duration_ms,
         error_count: result.errors.length,
         errors: result.errors.slice(0, 20), // truncate for response size
+        warning_count: result.warnings.length,
+        warnings: result.warnings.slice(0, 20),
+        source_health: result.source_health,
         email_sent_count: result.email_results?.filter((r) => r.sent).length ?? 0,
         email_failed_count: result.email_results?.filter((r) => !r.sent).length ?? 0,
         trigger: result.trigger,
@@ -67,5 +96,16 @@ async function handler(request: NextRequest) {
     });
   } catch (err) {
     return catchErrorResponse("cron", err);
+  } finally {
+    try {
+      await releaseCronRunLock(db, lock);
+    } catch (lockError) {
+      // A stale lock is recoverable. Preserve the successful cron response,
+      // but leave an actionable server-side diagnostic for follow-up.
+      console.error(
+        "[cron] lock release failed:",
+        lockError instanceof Error ? lockError.message : String(lockError),
+      );
+    }
   }
 }

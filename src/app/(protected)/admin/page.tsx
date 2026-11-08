@@ -1,5 +1,6 @@
 // src/app/admin/page.tsx
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CronRunPanel } from "@/components/admin/AdminComponents";
 import Link from "next/link";
 
 export default async function AdminIndexPage() {
@@ -19,7 +20,7 @@ export default async function AdminIndexPage() {
     db.from("ats_submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
     db
       .from("cron_logs_v2")
-      .select("run_at, total_fetched, duration_ms, trigger")
+      .select("id, run_at, total_fetched, duration_ms, trigger, errors, warnings, source_health")
       .order("run_at", { ascending: false })
       .limit(1)
       .single(),
@@ -66,18 +67,7 @@ export default async function AdminIndexPage() {
         ))}
       </div>
 
-      {/* Last cron run */}
-      {lastCron && (
-        <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
-          <h2 className="m-0 mb-3 text-sm text-slate-400">Last cron run</h2>
-          <div className="flex flex-wrap gap-6">
-            <Stat label="Ran at" value={new Date(lastCron.run_at).toLocaleString()} />
-            <Stat label="Trigger" value={lastCron.trigger ?? "—"} />
-            <Stat label="Jobs fetched" value={String(lastCron.total_fetched ?? 0)} />
-            <Stat label="Duration" value={`${((lastCron.duration_ms ?? 0) / 1000).toFixed(1)}s`} />
-          </div>
-        </div>
-      )}
+      <CronRunPanel lastRun={lastCron} />
 
       {/* Workable rate-limit status */}
       <div className="mb-7 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-5">
