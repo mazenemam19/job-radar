@@ -120,8 +120,13 @@ async function reviewUncachedJobs(
       break;
     }
     if (i > 0) await delay(BATCH_DELAY_MS);
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      reviewed.push(...deferReview(jobsNeedingReview.slice(i)));
+      break;
+    }
     const batch = jobsNeedingReview.slice(i, i + BATCH_SIZE);
-    const decisions = await filterBatch(apiKey, batch, prompt);
+    const decisions = await filterBatch(apiKey, batch, prompt, remainingMs);
     recordBatchDecisions(batch, decisions, reviewed, toPersist);
   }
   return { reviewed, toPersist };

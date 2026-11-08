@@ -71,9 +71,13 @@ async function callGemini(
   return value;
 }
 
-async function callGeminiWithinBudget(apiKey: string, prompt: string): Promise<string> {
+async function callGeminiWithinBudget(
+  apiKey: string,
+  prompt: string,
+  timeoutMs: number,
+): Promise<string> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), BATCH_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await callGemini(apiKey, prompt, controller.signal);
   } finally {
@@ -179,6 +183,7 @@ export async function filterBatch(
   apiKey: string,
   jobs: RawJob[],
   promptTemplate: string,
+  timeBudgetMs = BATCH_TIMEOUT_MS,
 ): Promise<Map<string, FilterResult>> {
   const jobSummaries = jobs.map((j, idx) => ({
     idx,
@@ -200,7 +205,11 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
 
   let resultMap: Map<string, FilterResult>;
   try {
-    const raw = await callGeminiWithinBudget(apiKey, prompt);
+    const raw = await callGeminiWithinBudget(
+      apiKey,
+      prompt,
+      Math.min(BATCH_TIMEOUT_MS, timeBudgetMs),
+    );
     resultMap = buildResultMap(jobs, parseDecisions(raw), raw);
   } catch (err) {
     resultMap = failOpenResultMap(jobs, err);
