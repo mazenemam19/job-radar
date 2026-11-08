@@ -142,7 +142,12 @@ describe("aggregateSalaries", () => {
 describe("validateSalaryPost", () => {
   it("returns ok for a complete valid body", () => {
     expect(
-      validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 30_000, currency: "EGP" }),
+      validateSalaryPost({
+        role_title: "Dev",
+        years_experience: 3,
+        amount: 30_000,
+        currency: "EGP",
+      }),
     ).toEqual({ ok: true });
   });
 
@@ -162,7 +167,9 @@ describe("validateSalaryPost", () => {
   });
 
   it("rejects when currency is missing or unrecognised", () => {
-    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1 }).ok).toBe(false);
+    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1 }).ok).toBe(
+      false,
+    );
 
     const result = validateSalaryPost({
       role_title: "Dev",
@@ -175,19 +182,28 @@ describe("validateSalaryPost", () => {
 
   it("accepts all supported original currencies", () => {
     for (const currency of VALID_CURRENCIES) {
-      expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1, currency })).toEqual({
+      expect(
+        validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1, currency }),
+      ).toEqual({
         ok: true,
       });
     }
   });
 
   it("rejects missing, non-positive, and non-finite amounts", () => {
-    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: "USD" }).ok).toBe(false);
+    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: "USD" }).ok).toBe(
+      false,
+    );
     expect(
       validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 0, currency: "USD" }).ok,
     ).toBe(false);
     expect(
-      validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: Number.NaN, currency: "USD" }).ok,
+      validateSalaryPost({
+        role_title: "Dev",
+        years_experience: 3,
+        amount: Number.NaN,
+        currency: "USD",
+      }).ok,
     ).toBe(false);
   });
 
