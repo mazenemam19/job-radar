@@ -35,13 +35,15 @@ describe("mapEgytechParticipants", () => {
       work_arrangement: "hybrid",
       reported_at: "2024-04-10T10:20:10.000Z",
     });
-    expect(rows[0].usd_conversion_rate).toBe(Number((1 / EGYTECH_EGP_PER_USD_JUNE_2024).toFixed(10)));
+    expect(rows[0].usd_conversion_rate).toBe(
+      Number((1 / EGYTECH_EGP_PER_USD_JUNE_2024).toFixed(10)),
+    );
   });
 
   it("derives a stable source key from the documented source fields", () => {
     const first = mapEgytechParticipants([egpParticipant]).rows[0].source_record_key;
-    const second = mapEgytechParticipants([{ ...egpParticipant, UnusedFutureField: "ignored" }]).rows[0]
-      .source_record_key;
+    const second = mapEgytechParticipants([{ ...egpParticipant, UnusedFutureField: "ignored" }])
+      .rows[0].source_record_key;
 
     expect(first).toBe(second);
   });

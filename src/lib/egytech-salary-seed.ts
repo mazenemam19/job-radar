@@ -51,7 +51,9 @@ function positiveNumber(value: unknown): number | null {
 }
 
 function experience(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 80 ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 80
+    ? value
+    : null;
 }
 
 /** Parses the source's date-without-time-zone format deterministically as UTC. */
@@ -64,7 +66,14 @@ function sourceTimestampToIso(value: unknown): string | null {
 
   const [, month, day, year, hour, minute, second] = match;
   const date = new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)),
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    ),
   );
 
   if (

@@ -12,6 +12,67 @@ import {
   type SalaryPostBody,
 } from "@/lib/salary-route";
 
+type ConversionResolution =
+  | { conversion: Awaited<ReturnType<typeof getUsdConversion>> }
+  | { response: NextResponse };
+
+async function resolveUsdConversion(
+  amount: number,
+  currency: NonNullable<SalaryPostBody["currency"]>,
+): Promise<ConversionResolution> {
+  try {
+    return { conversion: await getUsdConversion(amount, currency) };
+  } catch (error) {
+    if (error instanceof SalaryFxError) {
+      return {
+        response: NextResponse.json(
+          {
+            ok: false,
+            code: "salary:fx-unavailable",
+            error: "A current USD conversion rate is unavailable. Please try again shortly.",
+          },
+          { status: 503 },
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function buildSalaryInsert(
+  userId: string,
+  body: SalaryPostBody,
+  amount: number,
+  currency: NonNullable<SalaryPostBody["currency"]>,
+  conversion: Awaited<ReturnType<typeof getUsdConversion>>,
+  now: string,
+) {
+  return {
+    user_id: userId,
+    role_title: (body.role_title as string).trim(),
+    years_experience: body.years_experience as number,
+    years_experience_exact: body.years_experience as number,
+    // Keep the legacy columns populated for older readers while the original
+    // amount/currency pair becomes the canonical representation.
+    salary_egp: currency === "EGP" ? amount : null,
+    salary_usd: currency === "USD" ? amount : null,
+    currency,
+    source: "user",
+    source_record_key: null,
+    original_amount: amount,
+    original_currency: currency,
+    usd_amount: conversion.usdAmount,
+    usd_conversion_rate: conversion.usdConversionRate,
+    usd_rate_as_of: conversion.usdRateAsOf,
+    usd_rate_source: conversion.usdRateSource,
+    employment_type: body.employment_type ?? null,
+    work_arrangement: body.work_arrangement ?? null,
+    pipeline: body.pipeline ?? null,
+    reported_at: now,
+    last_updated_at: now,
+  };
+}
+
 // ── GET /api/salary — aggregated charts data ──────────────
 
 export async function GET(request: NextRequest) {
@@ -26,7 +87,9 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("salary_reports")
-    .select("role_title, years_experience, years_experience_exact, usd_amount, pipeline, reported_at")
+    .select(
+      "role_title, years_experience, years_experience_exact, usd_amount, pipeline, reported_at",
+    )
     .order("reported_at", { ascending: false })
     .limit(1000);
 
@@ -72,52 +135,16 @@ export async function POST(request: NextRequest) {
   const currency = body.currency!;
   const amount = getSubmittedAmount(body)!;
 
-  let conversion;
-  try {
-    conversion = await getUsdConversion(amount, currency);
-  } catch (error) {
-    if (error instanceof SalaryFxError) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: "salary:fx-unavailable",
-          error: "A current USD conversion rate is unavailable. Please try again shortly.",
-        },
-        { status: 503 },
-      );
-    }
-    throw error;
-  }
+  const conversionResult = await resolveUsdConversion(amount, currency);
+  if ("response" in conversionResult) return conversionResult.response;
+  const { conversion } = conversionResult;
 
   const db = await createServerClient();
   const now = new Date().toISOString();
 
   const { data, error } = await db
     .from("salary_reports")
-    .insert({
-      user_id: user.id,
-      role_title: (body.role_title as string).trim(),
-      years_experience: body.years_experience as number,
-      years_experience_exact: body.years_experience as number,
-      // Keep the legacy columns populated for older readers while the original
-      // amount/currency pair becomes the canonical representation.
-      salary_egp: currency === "EGP" ? amount : null,
-      salary_usd: currency === "USD" ? amount : null,
-      currency,
-      source: "user",
-      source_record_key: null,
-      original_amount: amount,
-      original_currency: currency,
-      usd_amount: conversion.usdAmount,
-      usd_conversion_rate: conversion.usdConversionRate,
-      usd_rate_as_of: conversion.usdRateAsOf,
-      usd_rate_source: conversion.usdRateSource,
-      employment_type: body.employment_type ?? null,
-      work_arrangement: body.work_arrangement ?? null,
-      pipeline: body.pipeline ?? null,
-      reported_at: now,
-      last_updated_at: now,
-    })
+    .insert(buildSalaryInsert(user.id, body, amount, currency, conversion, now))
     .select()
     .single();
 
