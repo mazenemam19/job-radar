@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { loadPublicFeaturedCompanies } from "@/lib/featured-companies";
+import { companyDirectoryRemovalMailto } from "@/lib/public-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,25 @@ export default async function CompaniesPage() {
             ))}
           </ul>
         )}
+
+        <section
+          aria-labelledby="company-removal-heading"
+          className="mt-12 rounded-xl border border-[#1e1e30] bg-[#0d0d1a] p-6"
+        >
+          <h2 id="company-removal-heading" className="m-0 text-lg font-semibold text-[#e2e8f0]">
+            Is this your company?
+          </h2>
+          <p className="mb-0 mt-3 max-w-2xl text-sm leading-6 text-[#94a3b8]">
+            If your company appears in this directory and you want it removed, contact us by email.
+            Job Radar does not store or track your request.
+          </p>
+          <a
+            href={companyDirectoryRemovalMailto()}
+            className="mt-4 inline-block text-sm font-semibold text-[#a5b4fc]"
+          >
+            Request company removal by email
+          </a>
+        </section>
       </div>
     </main>
   );

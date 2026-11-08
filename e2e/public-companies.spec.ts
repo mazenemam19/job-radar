@@ -8,5 +8,11 @@ test.describe("public featured companies directory", () => {
     await expect(
       page.getByRole("heading", { name: "Companies hiring through Job Radar" }),
     ).toBeVisible();
+
+    const removalLink = page.getByRole("link", { name: "Request company removal by email" });
+    await expect(removalLink).toHaveAttribute(
+      "href",
+      /^mailto:jobradarnoreply@gmail\.com\?subject=Job\+Radar\+company\+directory\+removal\+request/,
+    );
   });
 });
