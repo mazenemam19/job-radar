@@ -341,6 +341,7 @@ export interface SalaryReport {
   source_record_key: string | null;
   original_amount: number | null;
   original_currency: SalaryCurrency | null;
+  years_experience_exact: number | null;
   usd_amount: number | null;
   usd_conversion_rate: number | null;
   usd_rate_as_of: string | null;

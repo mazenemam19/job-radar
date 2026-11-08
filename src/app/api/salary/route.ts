@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("salary_reports")
-    .select("role_title, years_experience, usd_amount, pipeline, reported_at")
+    .select("role_title, years_experience, years_experience_exact, usd_amount, pipeline, reported_at")
     .order("reported_at", { ascending: false })
     .limit(1000);
 
@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       role_title: (body.role_title as string).trim(),
       years_experience: body.years_experience as number,
+      years_experience_exact: body.years_experience as number,
       // Keep the legacy columns populated for older readers while the original
       // amount/currency pair becomes the canonical representation.
       salary_egp: currency === "EGP" ? amount : null,

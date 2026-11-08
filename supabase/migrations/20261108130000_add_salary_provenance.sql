@@ -7,6 +7,7 @@ alter table public.salary_reports
   add column if not exists source_record_key text,
   add column if not exists original_amount numeric(14, 2),
   add column if not exists original_currency text,
+  add column if not exists years_experience_exact numeric(5, 2),
   add column if not exists usd_amount numeric(14, 2),
   add column if not exists usd_conversion_rate numeric(20, 10),
   add column if not exists usd_rate_as_of date,
@@ -18,6 +19,8 @@ comment on column public.salary_reports.source_record_key is
   'Stable source-specific identity used only for idempotent imports.';
 comment on column public.salary_reports.original_amount is
   'Submitted amount in original_currency; never overwritten by USD conversion.';
+comment on column public.salary_reports.years_experience_exact is
+  'Exact source experience where fractional years are available; integer column remains for compatibility.';
 comment on column public.salary_reports.usd_amount is
   'USD snapshot recorded at ingestion when the original currency and rate are known.';
 comment on column public.salary_reports.usd_conversion_rate is
@@ -42,6 +45,10 @@ where original_amount is null
     (currency = 'EGP' and salary_egp is not null)
     or (currency = 'USD' and salary_usd is not null)
   );
+
+update public.salary_reports
+set years_experience_exact = years_experience
+where years_experience_exact is null;
 
 -- A legacy USD amount is already a verifiable USD conversion with rate 1. Do
 -- not synthesize rates for legacy EGP/EUR/GBP data; those rows stay reviewable

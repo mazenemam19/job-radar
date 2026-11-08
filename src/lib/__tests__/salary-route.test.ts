@@ -278,6 +278,7 @@ describe("POST /api/salary", () => {
         years_experience: 4,
         amount: 35000,
         currency: "EGP",
+        reported_at: "2000-01-01T00:00:00.000Z",
       }),
     });
     const res = await POST(req as unknown as NextRequest);
@@ -336,6 +337,8 @@ describe("POST /api/salary", () => {
         salary_usd: null,
       }),
     );
+    const inserted = (queryMock.insert as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(inserted.reported_at).not.toBe("2000-01-01T00:00:00.000Z");
   });
 
   // role_title is trimmed before insert

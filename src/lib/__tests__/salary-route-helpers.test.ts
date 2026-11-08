@@ -49,6 +49,7 @@ function row(overrides: Partial<RawSalaryRow> = {}): RawSalaryRow {
   return {
     role_title: "Frontend Engineer",
     years_experience: 4,
+    years_experience_exact: 4,
     usd_amount: 750,
     pipeline: "local",
     reported_at: "2024-06-15T00:00:00.000Z",
@@ -91,6 +92,15 @@ describe("aggregateSalaries", () => {
     expect(result).toHaveLength(1);
     expect(result[0].years_experience).toBe(4);
     expect(result[0].count).toBe(2);
+  });
+
+  it("uses an exact source value for experience bands when present", () => {
+    const result = aggregateSalaries([
+      row({ years_experience: 3, years_experience_exact: 2.5, usd_amount: 600 }),
+      row({ years_experience: 3, years_experience_exact: 2.5, usd_amount: 800 }),
+    ]);
+
+    expect(result[0].years_experience).toBe(1);
   });
 
   it("combines converted source currencies into the same USD bucket", () => {

@@ -15,6 +15,7 @@ import type {
 export type RawSalaryRow = {
   role_title: string;
   years_experience: number;
+  years_experience_exact: number | null;
   usd_amount: number | null;
   pipeline: string | null;
   reported_at: string;
@@ -131,7 +132,7 @@ function buildGroups(rows: RawSalaryRow[]): {
     const amount = pickAmount(row.usd_amount);
     if (amount == null) continue;
 
-    const expBand = bucketExperience(row.years_experience);
+    const expBand = bucketExperience(row.years_experience_exact ?? row.years_experience);
     const key: AggKey = `${row.role_title}|${expBand}|${row.pipeline ?? "all"}`;
 
     if (!groups.has(key)) {
