@@ -2,9 +2,9 @@
 
 **Goal:** Make Job Radar a useful, location-agnostic job-search tool, starting with a Germany pilot for an international candidate who does not speak German.
 
-**Branch:** `main` (PRs #64–#67 merged; the tracked city-source migration is PR #63)
+**Branch:** `main` (PRs #61–#67 merged)
 
-**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61), [#62](https://github.com/mazenemam19/job-radar/pull/62), and [#64](https://github.com/mazenemam19/job-radar/pull/64)–[#67](https://github.com/mazenemam19/job-radar/pull/67) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup and legacy-ID rekey are complete. Source batches are live; their measured shortlist impact is recorded below rather than inferred from source counts. PR #63 tracks the already-applied, additive German city-source migration.
+**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61)–[#67](https://github.com/mazenemam19/job-radar/pull/67) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup and legacy-ID rekey are complete. Source batches are live; their measured shortlist impact is recorded below rather than inferred from source counts.
 
 ## Done locally
 
@@ -52,14 +52,17 @@
 - [x] Execute the one-time production cleanup after explicit confirmation: deleted 8,154 untracked 90-day rows, invalidated three dashboard caches, and refreshed the scheduler timestamp. `raw_jobs` fell from 27,717 to 19,563 rows; no stale untracked 90-day candidate remains.
 - [ ] Check the database-size trend after the next cron runs. A normal vacuum makes deleted space reusable; it does not necessarily reduce the allocated-disk chart immediately.
 
-## Deferred
+## Sequenced completion plan
 
-- [ ] #53 full diagnostic pipeline.
-- [ ] #42 cron rerun/log interface.
-- [ ] #44 featured-companies page.
-- [ ] #45 salary seeding/conversion; separately revisit the EUR/GBP data-loss risk.
-- [ ] #46 visual refresh.
-- [ ] Notion integration, broad job-board connectors, and translation.
+Each implementation item is handled in its own branch and pull request. Before marking an item Done, the branch receives a code review, the focused and full automated checks run, and the user-facing path is manually tested in the browser. Its GitHub issue, Project #3 item, and this document are then updated together.
+
+- [ ] **1. #53 — explain the job-filtering funnel.** Confirm the dashboard query is server-bounded, expose server-derived counts and the precise settings/reasons that narrowed the feed, and distinguish missing data from a hard mismatch. Test the API/funnel logic and manually verify the pipeline against the saved Germany profile.
+- [ ] **2. #42 — admin cron observability and controlled reruns.** Display the latest structured `cron_logs_v2` result first, then add an admin-only rerun that uses the same cron entry point, has duplicate-run protection and an explicit notification warning. Test authorization, concurrent-run handling, log rendering, and a safe manual run.
+- [ ] **3. #45 — safe salary provenance and currency work.** Audit existing EUR/GBP values before migration; add server-owned reported dates and source/currency provenance without rewriting original amounts; then add idempotent historical seeding and deterministic conversion records. Validate migration reversibility, duplicate prevention, submission behavior, and salary UI with seeded and user-entered examples.
+- [ ] **4. #44 — featured companies.** Add an additive feature flag, scoped admin toggle, public read-only listing, and a non-authenticated removal-request path. Verify anonymous access, admin authorization, and that a removal request does not expose private company-management data.
+- [ ] **5. #46 — professional visual system.** Replace static inline styles with tokens/classes, calibrate palette and typography without changing interaction contracts, and run visual/browser regression checks in both themes where supported.
+- [ ] **6. Integrations and portability.** [#69](https://github.com/mazenemam19/job-radar/issues/69) (Notion), [#70](https://github.com/mazenemam19/job-radar/issues/70) (job-board connectors), and [#71](https://github.com/mazenemam19/job-radar/issues/71) (English/German interface) now track the work with acceptance criteria. Do not silently add third-party data flows.
+- [ ] **7. Pilot and storage evidence.** Keep #43 In Progress until 2–4 weeks of real use show whether the shortlist reaches three actionable matches per week. After scheduled cron activity, capture the database-size report and log whether allocated storage changed or only reusable space changed.
 
 ## Verification log
 
