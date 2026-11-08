@@ -18,17 +18,59 @@ const LEVEL_KEYWORD_FIELDS = {
 export interface RawJobsFunnel {
   total_fetched: number;
   after_date_filter: number;
-  /**
-   * Rows passing the DB-side date/location/job-type filters. This is not the
-   * same as PipelineLog.after_settings_filter: buildFeed() applies every text
-   * settings and global-mode gate in memory.
-   */
-  after_settings_filter_coarse: number;
+  after_workplace_filter: number;
+  after_employment_filter: number;
+  after_location_filter: number;
 }
 
 export interface FilteredRawJobsResult {
   jobs: RawJob[];
   funnel: RawJobsFunnel;
+}
+
+function countOrFallback(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+/**
+ * A dashboard deploy can reach a cached or not-yet-migrated RPC response for
+ * a short period. Normalize that legacy shape so the funnel remains readable
+ * while the additive SQL migration is applied.
+ */
+export function normalizeFilteredResult(data: unknown): FilteredRawJobsResult {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Profile jobs RPC returned an invalid response");
+  }
+
+  const response = data as { jobs?: unknown; funnel?: unknown };
+  if (
+    !Array.isArray(response.jobs) ||
+    typeof response.funnel !== "object" ||
+    response.funnel === null
+  ) {
+    throw new Error("Profile jobs RPC returned an incomplete response");
+  }
+
+  const source = response.funnel as Record<string, unknown>;
+  const total = countOrFallback(source.total_fetched, 0);
+  const afterDate = countOrFallback(source.after_date_filter, total);
+  const afterWorkplace = countOrFallback(source.after_workplace_filter, afterDate);
+  const afterEmployment = countOrFallback(source.after_employment_filter, afterWorkplace);
+  const afterLocation = countOrFallback(
+    source.after_location_filter,
+    countOrFallback(source.after_settings_filter_coarse, afterEmployment),
+  );
+
+  return {
+    jobs: response.jobs as RawJob[],
+    funnel: {
+      total_fetched: total,
+      after_date_filter: afterDate,
+      after_workplace_filter: afterWorkplace,
+      after_employment_filter: afterEmployment,
+      after_location_filter: afterLocation,
+    },
+  };
 }
 
 /**
@@ -77,5 +119,5 @@ export async function fetchFilteredRawJobs(
     throw new Error(`fetchFilteredRawJobs failed: ${error.message}`);
   }
 
-  return data as unknown as FilteredRawJobsResult;
+  return normalizeFilteredResult(data);
 }

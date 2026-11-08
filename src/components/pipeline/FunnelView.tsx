@@ -8,8 +8,10 @@ interface Props {
   loading?: boolean;
 }
 
+type PipelineCounts = Omit<PipelineLog, "cached_at">;
+
 interface Stage {
-  key: keyof Omit<PipelineLog, "cached_at">;
+  key: keyof PipelineCounts;
   label: string;
   filterLabel: string;
   color: string;
@@ -19,8 +21,7 @@ const STAGES: Stage[] = [
   {
     key: "total_fetched",
     label: "Fetched",
-    filterLabel:
-      "Raw jobs from ATS sources this cron run, already scoped to your enabled pipelines",
+    filterLabel: "Raw jobs from your enabled source pipelines before profile filtering",
     color: "#6366f1",
   },
   {
@@ -30,25 +31,71 @@ const STAGES: Stage[] = [
     color: "#818cf8",
   },
   {
-    key: "after_settings_filter",
-    label: "Settings filter",
+    key: "after_workplace_filter",
+    label: "Workplace",
     filterLabel:
-      "Removed by seniority, excluded keywords, blacklisted locations, and global-mode gate (all run in the database), plus the exact required-keywords/skill-match recheck",
+      "Removed because the stated on-site, hybrid, or remote arrangement does not match your settings. Unknown arrangements stay visible for review.",
     color: "#a78bfa",
+  },
+  {
+    key: "after_employment_filter",
+    label: "Job type",
+    filterLabel:
+      "Removed because the stated full-time, part-time, Werkstudent, contract, or other job type does not match your settings. Missing types stay visible for review.",
+    color: "#b794f4",
+  },
+  {
+    key: "after_location_filter",
+    label: "Location",
+    filterLabel:
+      "Removed because the stated country or city does not match your profile. Unknown locations stay visible for review.",
+    color: "#d6bcfa",
+  },
+  {
+    key: "after_settings_filter",
+    label: "Skills & criteria",
+    filterLabel:
+      "Removed by the exact skills, required and excluded keywords, seniority, and global-mode checks.",
+    color: "#c4b5fd",
   },
   {
     key: "after_gemini_filter",
     label: "Your Gemini filter",
     filterLabel: "Jobs passing your personal AI filter prompt",
-    color: "#c4b5fd",
+    color: "#ddd6fe",
   },
   {
     key: "after_scoring",
     label: "Scoring",
     filterLabel: "Final matches after scoring (jobs scoring 0 are dropped)",
-    color: "#e9d5ff",
+    color: "#ede9fe",
   },
 ];
+
+function getCounts(log: PipelineLog): PipelineCounts {
+  const cachedLog = log as Partial<PipelineLog>;
+  const count = (key: keyof PipelineCounts, fallback: number): number => {
+    const value = cachedLog[key];
+    return typeof value === "number" && value >= 0 ? value : fallback;
+  };
+
+  const total = count("total_fetched", 0);
+  const afterDate = count("after_date_filter", total);
+  const afterWorkplace = count("after_workplace_filter", afterDate);
+  const afterEmployment = count("after_employment_filter", afterWorkplace);
+  const afterLocation = count("after_location_filter", afterEmployment);
+
+  return {
+    total_fetched: total,
+    after_date_filter: afterDate,
+    after_workplace_filter: afterWorkplace,
+    after_employment_filter: afterEmployment,
+    after_location_filter: afterLocation,
+    after_settings_filter: count("after_settings_filter", afterLocation),
+    after_gemini_filter: count("after_gemini_filter", afterLocation),
+    after_scoring: count("after_scoring", afterLocation),
+  };
+}
 
 export default function FunnelView({ log, loading }: Props) {
   if (loading) {
@@ -67,7 +114,8 @@ export default function FunnelView({ log, loading }: Props) {
     );
   }
 
-  const total = log.total_fetched || 1;
+  const counts = getCounts(log);
+  const total = counts.total_fetched || 1;
 
   return (
     <div className="p-8">
@@ -79,9 +127,9 @@ export default function FunnelView({ log, loading }: Props) {
       {/* Funnel nodes */}
       <div className="flex items-center gap-0 overflow-x-auto pb-4">
         {STAGES.map((stage, i) => {
-          const count = log[stage.key];
+          const count = counts[stage.key];
           const widthPct = Math.max(12, (count / total) * 100);
-          const dropped = i > 0 ? log[STAGES[i - 1].key] - count : 0;
+          const dropped = i > 0 ? counts[STAGES[i - 1].key] - count : 0;
           const circleSize = `${Math.min(100, Math.max(56, widthPct * 0.8))}px`;
 
           return (
@@ -138,8 +186,8 @@ export default function FunnelView({ log, loading }: Props) {
           What was filtered at each stage
         </div>
         {STAGES.slice(1).map((stage, i) => {
-          const before = log[STAGES[i].key];
-          const after = log[stage.key];
+          const before = counts[STAGES[i].key];
+          const after = counts[stage.key];
           const diff = before - after;
 
           return (
@@ -157,8 +205,9 @@ export default function FunnelView({ log, loading }: Props) {
       </div>
 
       <p className="mt-4 text-xs text-slate-600">
-        Hover any circle for a description of what was filtered. To see more jobs, try widening your
-        age limit, enabling more pipelines, or softening your Gemini prompt in Settings.
+        Unknown workplace arrangement, employment type, or location is retained for review rather
+        than counted as a hard mismatch. Hover any circle for a description, then adjust the setting
+        named by the stage if you want to widen your feed.
       </p>
     </div>
   );
