@@ -33,6 +33,7 @@ export interface ATSCompanyRow {
   pipeline_local: boolean;
   pipeline_global: boolean;
   is_active: boolean;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }

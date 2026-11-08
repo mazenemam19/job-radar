@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       pipeline_local: Boolean(body.pipeline_local),
       pipeline_global: Boolean(body.pipeline_global),
       is_active: body.is_active !== false,
+      is_featured: body.is_featured === true,
       created_at: now,
       updated_at: now,
     })

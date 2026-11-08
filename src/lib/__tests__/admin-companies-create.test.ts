@@ -135,4 +135,38 @@ describe("POST /api/admin/companies", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
   });
+
+  it("stores an explicit boolean featured flag", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+    const insertQuery = mockQuery({ id: "co-1", ...validBody, is_featured: true });
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" }))
+      .mockReturnValueOnce(insertQuery);
+
+    const { POST } = await import("../../app/api/admin/companies/route");
+    const response = await POST(makeRequest({ ...validBody, is_featured: true }));
+
+    expect(response.status).toBe(201);
+    expect(insertQuery.insert).toHaveBeenCalledWith(expect.objectContaining({ is_featured: true }));
+  });
+
+  it("does not coerce a non-boolean featured flag", async () => {
+    const { getUser } = await import("../supabase/server");
+    (getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "admin-user" });
+    const insertQuery = mockQuery({ id: "co-1", ...validBody, is_featured: false });
+    mockAdminDb.from = vi
+      .fn()
+      .mockReturnValueOnce(mockQuery({ role: "admin" }))
+      .mockReturnValueOnce(insertQuery);
+
+    const { POST } = await import("../../app/api/admin/companies/route");
+    const response = await POST(makeRequest({ ...validBody, is_featured: "true" }));
+
+    expect(response.status).toBe(201);
+    expect(insertQuery.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ is_featured: false }),
+    );
+  });
 });

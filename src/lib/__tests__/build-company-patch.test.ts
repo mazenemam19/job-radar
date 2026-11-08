@@ -13,11 +13,16 @@ describe("buildCompanyPatch", () => {
   });
 
   it("accepts boolean fields only when typeof boolean", () => {
-    const result = buildCompanyPatch({ pipeline_local: true, is_active: "yes" });
+    const result = buildCompanyPatch({
+      pipeline_local: true,
+      is_active: "yes",
+      is_featured: true,
+    });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.patch.pipeline_local).toBe(true);
       expect(result.patch.is_active).toBeUndefined();
+      expect(result.patch.is_featured).toBe(true);
     }
   });
 

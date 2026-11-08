@@ -61,14 +61,16 @@ export function CompaniesTable() {
         <div className="p-4 text-[#64748b]">Loading...</div>
       ) : (
         <div className="overflow-auto rounded-xl border border-[#1e1e30] bg-[#0d0d1a]">
-          <table className="w-full min-w-[700px] border-collapse">
+          <table className="w-full min-w-[800px] border-collapse">
             <thead>
               <tr>
-                {["Company", "ATS", "Country", "Pipelines", "Active", "Actions"].map((h) => (
-                  <th key={h} className={TH_CLASS}>
-                    {h}
-                  </th>
-                ))}
+                {["Company", "ATS", "Country", "Pipelines", "Active", "Featured", "Actions"].map(
+                  (h) => (
+                    <th key={h} className={TH_CLASS}>
+                      {h}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody>
@@ -93,6 +95,11 @@ export function CompaniesTable() {
                   <td className={TD_CLASS}>
                     <span style={{ color: c.is_active ? "#4ade80" : "#ef4444" }}>
                       {c.is_active ? "✓" : "✗"}
+                    </span>
+                  </td>
+                  <td className={TD_CLASS}>
+                    <span style={{ color: c.is_featured ? "#a5b4fc" : "#64748b" }}>
+                      {c.is_featured ? "✓" : "—"}
                     </span>
                   </td>
                   <td className={TD_CLASS}>
@@ -190,6 +197,17 @@ function CompanyFormPanel({
               </label>
             ))}
           </div>
+        </fieldset>
+        <fieldset className="border-0 p-0">
+          <legend className={LABEL_CLASS}>Public directory</legend>
+          <label className="mt-1 flex cursor-pointer items-center gap-1.5 text-[13px] text-[#94a3b8]">
+            <input
+              type="checkbox"
+              checked={form.is_featured}
+              onChange={(e) => set("is_featured", e.target.checked)}
+            />
+            Feature this company publicly
+          </label>
         </fieldset>
       </div>
       <div className="mt-4 flex gap-2.5">

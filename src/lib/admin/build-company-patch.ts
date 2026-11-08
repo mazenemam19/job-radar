@@ -21,6 +21,7 @@ const BOOLEAN_FIELDS = [
   "pipeline_local",
   "pipeline_global",
   "is_active",
+  "is_featured",
 ] as const satisfies readonly (keyof CompanyPatch)[];
 
 export type BuildPatchResult = { ok: true; patch: CompanyPatch } | { ok: false; error: string };

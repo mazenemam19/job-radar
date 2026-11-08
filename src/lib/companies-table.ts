@@ -20,6 +20,7 @@ export const EMPTY_FORM: CompanyForm = {
   pipeline_local: false,
   pipeline_global: false,
   is_active: true,
+  is_featured: false,
 };
 
 /**
@@ -62,5 +63,6 @@ export function formFromRow(c: ATSCompanyRow): CompanyForm {
     pipeline_local: c.pipeline_local,
     pipeline_global: c.pipeline_global,
     is_active: c.is_active,
+    is_featured: c.is_featured,
   };
 }
