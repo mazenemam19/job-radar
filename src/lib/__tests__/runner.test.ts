@@ -175,7 +175,7 @@ describe("runCronJob", () => {
 
     // Should be called once (local pipeline only)
     expect(fetchCompany).toHaveBeenCalledTimes(1);
-    expect(fetchCompany).toHaveBeenCalledWith(company, "local");
+    expect(fetchCompany).toHaveBeenCalledWith(company, "local", expect.any(AbortSignal));
     expect(pruneStaleUntrackedRawJobs).toHaveBeenCalledWith(mockDb);
   });
 

@@ -25,7 +25,7 @@ import type { Job } from "@/types";
 import type { ATSConfig, FetcherResult } from "@/types";
 
 // All fetchers share this signature; dispatch is a lookup, not a branch per ATS.
-type Fetcher = (config: ATSConfig, mode: JobMode) => Promise<FetcherResult>;
+type Fetcher = (config: ATSConfig, mode: JobMode, signal?: AbortSignal) => Promise<FetcherResult>;
 
 const FETCHERS: Record<ATSConfig["ats"], Fetcher> = {
   greenhouse: fetchGreenhouse,
@@ -92,7 +92,11 @@ interface FetchResult {
  * visa_sponsorship is computed by each fetcher from content (regex),
  * not from the pipeline flag.
  */
-export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<FetchResult> {
+export async function fetchCompany(
+  row: ATSCompanyRow,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetchResult> {
   const config = toATSConfig(row);
   const fetchedAt = new Date().toISOString();
   const fetchedMs = Date.parse(fetchedAt);
@@ -102,7 +106,7 @@ export async function fetchCompany(row: ATSCompanyRow, mode: JobMode): Promise<F
     const fetcher = FETCHERS[row.ats];
     if (!fetcher) throw new Error(`Unknown ATS type: ${row.ats}`);
 
-    const result = await fetcher(config, mode);
+    const result = await fetcher(config, mode, signal);
     const rawJobs: Job[] = result.jobs;
     const fetchError: string | null = result.error ?? null;
     const fetchWarnings = result.warnings;

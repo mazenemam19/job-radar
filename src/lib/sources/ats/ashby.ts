@@ -5,10 +5,19 @@ import type { JobMode } from "@/lib/types";
 import { safeFetchJson } from "./http";
 import { processJobs, stripHtml } from "./job-processing";
 
-export async function fetchAshby(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchAshby(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.ashbyhq.com/posting-api/job-board/${c.slug}`;
-  const result = await safeFetchJson<{ jobs?: AshbyJob[]; jobPostings?: AshbyJob[] }>(url);
+  const result = await safeFetchJson<{ jobs?: AshbyJob[]; jobPostings?: AshbyJob[] }>(
+    url,
+    undefined,
+    undefined,
+    signal,
+  );
 
   if (!result.ok)
     return {

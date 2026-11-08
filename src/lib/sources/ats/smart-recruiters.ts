@@ -5,10 +5,14 @@ import type { JobMode } from "@/lib/types";
 import { safeFetch, safeFetchJson } from "./http";
 import { processJobs, stripHtml, pLimit } from "./job-processing";
 
-export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchSmartRecruiters(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.smartrecruiters.com/v1/companies/${c.slug}/postings`;
-  const result = await safeFetchJson<{ content: SRJob[] }>(url);
+  const result = await safeFetchJson<{ content: SRJob[] }>(url, undefined, undefined, signal);
 
   if (!result.ok)
     return {
@@ -34,7 +38,7 @@ export async function fetchSmartRecruiters(c: ATSConfig, mode: JobMode): Promise
   // migration, which targets the list-call crash class only.
   const detailedJobs = await pLimit(
     content.map((r) => async () => {
-      const detailRes = await safeFetch(r.ref);
+      const detailRes = await safeFetch(r.ref, undefined, undefined, signal);
       if (!detailRes || !detailRes.ok) return null;
       try {
         const detail = (await detailRes.json()) as SRDetail;

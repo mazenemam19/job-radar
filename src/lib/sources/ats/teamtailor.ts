@@ -18,13 +18,18 @@ function okResult(jobs: Job[], rawCount: number, t0: number): FetcherResult {
   return { jobs, rawCount, durationMs: Date.now() - t0, ok: true };
 }
 
-export async function fetchTeamtailor(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchTeamtailor(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const publicUrl = `https://${c.slug}.teamtailor.com/jobs.json`;
   const result = await safeFetchJson<{ data?: TeamtailorJob[]; items?: TeamtailorFeedItem[] }>(
     publicUrl,
     30_000,
     { Accept: "application/json" },
+    signal,
   );
 
   if (!result.ok)

@@ -53,17 +53,42 @@ function queueWorkable<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
+function combinedSignal(timeout: number, signal?: AbortSignal): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeout);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
+
+function waitFor(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(false);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /** Queued, retried fetch for any apply.workable.com URL (list or detail). */
-async function fetchWorkableUrl(url: string, slug: string): Promise<Response | null> {
+async function fetchWorkableUrl(
+  url: string,
+  slug: string,
+  signal?: AbortSignal,
+): Promise<Response | null> {
   trackDomainRequest(url);
   const t0 = Date.now();
   const doFetch = () =>
     fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      signal: AbortSignal.timeout(30_000),
+      signal: combinedSignal(30_000, signal),
     }).catch(() => null);
 
   for (let attempt = 0; attempt <= WORKABLE_MAX_429_RETRIES; attempt++) {
+    if (signal?.aborted) return null;
     if (Date.now() - t0 >= WORKABLE_MAX_TOTAL_FETCH_MS) {
       console.error(
         `[workable] ${slug}: giving up before attempt ${attempt} — total-time ceiling (${WORKABLE_MAX_TOTAL_FETCH_MS}ms) reached`,
@@ -103,7 +128,7 @@ async function fetchWorkableUrl(url: string, slug: string): Promise<Response | n
       markWorkable429(slug);
       return res;
     }
-    await new Promise((r) => setTimeout(r, cappedBackoff));
+    if (!(await waitFor(cappedBackoff, signal))) return null;
   }
   return null; // unreachable — loop always returns
 }
@@ -160,7 +185,11 @@ function detailFailureWarning(failures: number, rateLimited: number, totalJobs: 
   return `${prefix} (${rateLimited} rate-limited, ${failures - rateLimited} dead/removed links) ${suffix}`;
 }
 
-export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchWorkable(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   if (isWorkableBlocked(c.slug))
     return {
@@ -185,7 +214,7 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
   incrementWorkableUsed(mode);
 
   const listUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}?details=true`;
-  const res = await fetchWorkableUrl(listUrl, c.slug);
+  const res = await fetchWorkableUrl(listUrl, c.slug, signal);
   const parsed = await parseJsonBody<{ jobs?: WorkableJob[] }>(res);
 
   if (!parsed.ok)
@@ -237,7 +266,9 @@ export async function fetchWorkable(c: ATSConfig, mode: JobMode): Promise<Fetche
         description = known;
       } else {
         const detailUrl = `https://apply.workable.com/api/v1/widget/accounts/${c.slug}/jobs/${r.shortcode}`;
-        const dr = isWorkableBlocked(c.slug) ? null : await fetchWorkableUrl(detailUrl, c.slug);
+        const dr = isWorkableBlocked(c.slug)
+          ? null
+          : await fetchWorkableUrl(detailUrl, c.slug, signal);
         const resolved = await resolveJobDescription(dr, stripHtml(r.description || ""));
         description = resolved.description;
         if (resolved.detailFailed) {

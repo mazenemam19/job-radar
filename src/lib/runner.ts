@@ -19,25 +19,13 @@ import type { ATSCompanyRow, CronRunResult } from "./types";
 // ── Main cron function ───────────────────────────────────────
 
 // Vercel Hobby + Fluid Compute caps this route at 300s (see maxDuration in
-// src/app/api/cron/route.ts) — there is no larger number to reach for on
-// this plan. FETCH_TIME_BUDGET_MS only ever stops *new* company fetches from
-// being queued (see makeFetchTask in cron/fetch-jobs.ts) — already-dispatched
-// fetches are left to run to completion, so on its own this number was never
-// a guarantee the fetch phase actually finished by 270s. HARD_FETCH_CUTOFF_MS
-// below is what makes that a real guarantee to the rest of runCronJob.
+// src/app/api/cron/route.ts). FETCH_TIME_BUDGET_MS stops new scheduled tasks;
+// HARD_FETCH_CUTOFF_MS aborts active ATS requests and preserves time for the
+// database, logging, and notification work that follows.
 const FETCH_TIME_BUDGET_MS = 270_000;
 
-// The actual ceiling on how long runCronJob waits for the fetch phase before
-// moving on with whatever's been fetched so far (see fetchAllCompanyJobs'
-// hardCutoffAt param). Deliberately set below FETCH_TIME_BUDGET_MS, not at
-// or above it: fetches still in flight when this hits keep running in the
-// background rather than being cancelled (Vercel Fluid Compute keeps the
-// invocation alive after the response is sent, up to maxDuration), so this
-// number governs what the *caller* waits for, while FETCH_TIME_BUDGET_MS
-// separately governs when that background continuation stops queueing more
-// work on its own. Landing this below 270s buys the upsert/app_config/log/
-// email steps below a full 50s of margin under the 300s ceiling instead of
-// the 30s they had when 270s was the only number in play.
+// The hard cutoff leaves a margin under the platform maximum for upsert,
+// app-config, logs, and notification delivery.
 const HARD_FETCH_CUTOFF_MS = 250_000;
 
 /** Pushes message onto errors if non-null. Keeps null-check branches out of runCronJob itself. */
@@ -47,7 +35,7 @@ function pushError(errors: string[], message: string | null): void {
 
 /**
  * Runs the global cron job:
- *  1. Fetches all active companies from public.ats_companies
+ *  1. Fetches one bounded, rotating batch of active companies
  *  2. Calls ATS fetchers in parallel (concurrency-limited)
  *  3. Upserts all fetched jobs into public.raw_jobs
  *     (INSERT ... ON CONFLICT (id) DO UPDATE SET fetched_at = NOW())
@@ -86,7 +74,7 @@ export async function runCronJob(
   await loadKnownWorkableJobsFromDB();
   console.log(`[cron] known workable jobs loaded (+${Date.now() - startMs}ms)`);
 
-  // Load the "other"-bucket dispatch rotation cursor — see dispatch-cursor.ts.
+  // Load the persisted position for the next scheduled company batch.
   await loadDispatchCursorFromDB();
   console.log(`[cron] dispatch cursor loaded (+${Date.now() - startMs}ms)`);
 
@@ -102,8 +90,8 @@ export async function runCronJob(
     };
   }
 
-  // 2-4. Fetch from every (company, pipeline) combination, concurrency-limited,
-  // degrading to partial results if the fetch phase runs past its time budget.
+  // 2-4. Fetch one bounded, rotating task batch. The stored task cursor
+  // resumes after the last completed local/global pipeline on the next run.
   const deadline = startMs + FETCH_TIME_BUDGET_MS;
   const hardCutoffAt = startMs + HARD_FETCH_CUTOFF_MS;
   console.log(
@@ -157,8 +145,7 @@ export async function runCronJob(
   await flushDomainCountsToDB();
   console.log(`[cron] domain counts flush done (+${Date.now() - startMs}ms)`);
 
-  // Persist where "other"-bucket dispatch stopped this run, so a skip from
-  // exceeding the time budget doesn't land on the same companies next run.
+  // Persist where this scheduled batch stopped so the next run starts after it.
   pushError(errors, await flushDispatchCursorToDB());
   console.log(`[cron] dispatch cursor flush done (+${Date.now() - startMs}ms)`);
 

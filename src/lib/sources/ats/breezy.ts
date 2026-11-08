@@ -5,10 +5,19 @@ import type { JobMode } from "@/lib/types";
 import { safeFetchJson } from "./http";
 import { processJobs, stripHtml } from "./job-processing";
 
-export async function fetchBreezy(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchBreezy(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.breezy.hr/json`;
-  const result = await safeFetchJson<BreezyJob[]>(url, 30_000, { Accept: "application/json" });
+  const result = await safeFetchJson<BreezyJob[]>(
+    url,
+    30_000,
+    { Accept: "application/json" },
+    signal,
+  );
 
   if (!result.ok)
     return {
