@@ -84,9 +84,22 @@ function makeSettings(overrides: Partial<ResolvedSettings> = {}): ResolvedSettin
 /** dbFunnelCounts fixture -- defaults to matching the input array length, but
  *  tests that need to prove the pass-through contract override it explicitly. */
 function makeDbFunnel(
-  overrides: Partial<{ total_fetched: number; after_date_filter: number }> = {},
+  overrides: Partial<{
+    total_fetched: number;
+    after_date_filter: number;
+    after_workplace_filter: number;
+    after_employment_filter: number;
+    after_location_filter: number;
+  }> = {},
 ) {
-  return { total_fetched: 0, after_date_filter: 0, ...overrides };
+  return {
+    total_fetched: 0,
+    after_date_filter: 0,
+    after_workplace_filter: 0,
+    after_employment_filter: 0,
+    after_location_filter: 0,
+    ...overrides,
+  };
 }
 
 // ── enabledModes ──────────────────────────────────────────────
@@ -142,7 +155,13 @@ describe("buildFeed", () => {
     const job = makeJob({ title: "Senior React Engineer" });
     const { finalJobs } = await buildFeed(
       [job],
-      makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
+      makeDbFunnel({
+        total_fetched: 1,
+        after_date_filter: 1,
+        after_workplace_filter: 1,
+        after_employment_filter: 1,
+        after_location_filter: 1,
+      }),
       settings,
       null,
       testUserId,
@@ -197,7 +216,13 @@ describe("buildFeed", () => {
 
     const { finalJobs, pipelineLog } = await buildFeed(
       [job],
-      makeDbFunnel({ total_fetched: 1, after_date_filter: 1 }),
+      makeDbFunnel({
+        total_fetched: 1,
+        after_date_filter: 1,
+        after_workplace_filter: 1,
+        after_employment_filter: 1,
+        after_location_filter: 1,
+      }),
       settings,
       "key",
       testUserId,
@@ -206,6 +231,9 @@ describe("buildFeed", () => {
 
     expect(pipelineLog.total_fetched).toBe(1);
     expect(pipelineLog.after_date_filter).toBe(1);
+    expect(pipelineLog.after_workplace_filter).toBe(1);
+    expect(pipelineLog.after_employment_filter).toBe(1);
+    expect(pipelineLog.after_location_filter).toBe(1);
     expect(pipelineLog.after_settings_filter).toBe(1);
     expect(pipelineLog.after_gemini_filter).toBe(1);
     expect(pipelineLog.after_scoring).toBe(finalJobs.length);
@@ -360,6 +388,33 @@ describe("buildFeed - DB-prefiltered input contract", () => {
 
     expect(pipelineLog.total_fetched).toBe(500);
     expect(pipelineLog.after_date_filter).toBe(42);
+  });
+
+  it("preserves the server-side profile stages separately from exact text checks", async () => {
+    const job = makeJob({ title: "Senior React Engineer" });
+    const { pipelineLog } = await buildFeed(
+      [job],
+      makeDbFunnel({
+        total_fetched: 500,
+        after_date_filter: 100,
+        after_workplace_filter: 80,
+        after_employment_filter: 60,
+        after_location_filter: 40,
+      }),
+      settings,
+      null,
+      testUserId,
+      testDb,
+    );
+
+    expect(pipelineLog).toMatchObject({
+      total_fetched: 500,
+      after_date_filter: 100,
+      after_workplace_filter: 80,
+      after_employment_filter: 60,
+      after_location_filter: 40,
+      after_settings_filter: 1,
+    });
   });
 
   it("rejects a job that arrives from the DB pool but fails exact keyword matching", async () => {

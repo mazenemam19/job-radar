@@ -5,12 +5,7 @@
 
 import { filterJobsWithGemini } from "@/lib/gemini";
 import { explainSearchProfileMatch } from "@/lib/search-profile-match";
-import {
-  scoreJob,
-  mergeJobs,
-  passesSettingsGate,
-  passesGlobalModeGate,
-} from "@/lib/scoring";
+import { scoreJob, mergeJobs, passesSettingsGate, passesGlobalModeGate } from "@/lib/scoring";
 import type { RawJob, ScoredJob, PipelineLog, ResolvedSettings } from "@/lib/types";
 import type { RawJobsFunnel } from "@/lib/raw-jobs-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -44,7 +39,8 @@ function passesQuickTextCandidate(
 ): boolean {
   const combinedText = normalizeText(`${job.title} ${job.description} ${job.location}`);
   const description = normalizeText(job.description);
-  const hasRequiredTerm = requiredTerms.length === 0 || hasQuickCandidate(combinedText, requiredTerms);
+  const hasRequiredTerm =
+    requiredTerms.length === 0 || hasQuickCandidate(combinedText, requiredTerms);
 
   return hasRequiredTerm && hasQuickCandidate(description, skillTerms);
 }
@@ -56,13 +52,20 @@ function passesQuickTextCandidate(
  * user's location and job type are applied, so a wider age window cannot make
  * Postgres time out while existing keyword semantics are preserved.
  *
- * `dbFunnelCounts` carries total_fetched/after_date_filter through from the
- * RPC's funnel object -- this function no longer has enough information to
- * compute them itself, since it never sees the unfiltered pool.
+ * `dbFunnelCounts` carries the server-side date, workplace, employment-type,
+ * and location stages through from the RPC's funnel object. This function
+ * never sees the unfiltered pool, so it must not infer those counts.
  */
 export async function buildFeed(
   rawJobs: RawJob[],
-  dbFunnelCounts: Pick<RawJobsFunnel, "total_fetched" | "after_date_filter">,
+  dbFunnelCounts: Pick<
+    RawJobsFunnel,
+    | "total_fetched"
+    | "after_date_filter"
+    | "after_workplace_filter"
+    | "after_employment_filter"
+    | "after_location_filter"
+  >,
   settings: ResolvedSettings,
   geminiApiKey: string | null | undefined,
   userId: string,
@@ -125,6 +128,9 @@ export async function buildFeed(
   const pipelineLog: PipelineLog = {
     total_fetched: dbFunnelCounts.total_fetched,
     after_date_filter: dbFunnelCounts.after_date_filter,
+    after_workplace_filter: dbFunnelCounts.after_workplace_filter,
+    after_employment_filter: dbFunnelCounts.after_employment_filter,
+    after_location_filter: dbFunnelCounts.after_location_filter,
     after_settings_filter: afterSettingsFilter.length,
     after_gemini_filter: geminiFiltered.length,
     after_scoring: finalJobs.length,

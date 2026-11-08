@@ -289,6 +289,13 @@ export interface UserProfile {
 export interface PipelineLog {
   total_fetched: number;
   after_date_filter: number;
+  /** Server-side workplace arrangement gate; unknown arrangements stay visible. */
+  after_workplace_filter: number;
+  /** Server-side employment-type gate; postings without a stated type stay visible. */
+  after_employment_filter: number;
+  /** Server-side country/city gate; uncertain locations stay visible for review. */
+  after_location_filter: number;
+  /** Exact in-process keyword, skill, seniority, exclusion, and global-mode gates. */
   after_settings_filter: number;
   /** Jobs that passed the Gemini gate, before scoring/merge. */
   after_gemini_filter: number;
