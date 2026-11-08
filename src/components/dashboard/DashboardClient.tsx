@@ -108,18 +108,20 @@ export default function DashboardClient() {
             {showLocationReview ? "▾" : "▸"} Location needs review ({locationReviewJobs.length})
           </button>
           <p className="mt-1 text-[12px] text-slate-500">
-            These passed your role criteria, but the source did not confirm an eligible country. They are not included in your match count or ranking.
+            These passed your role criteria, but the source did not confirm an eligible country.
+            They are not included in your match count or ranking.
           </p>
-          {showLocationReview && locationReviewJobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              isTracked={trackedIds.has(job.id)}
-              onStrategy={(j) => setStrategyJob(j)}
-              onTrack={(j) => setTrackerJob(j)}
-              settings={settings ?? undefined}
-            />
-          ))}
+          {showLocationReview &&
+            locationReviewJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isTracked={trackedIds.has(job.id)}
+                onStrategy={(j) => setStrategyJob(j)}
+                onTrack={(j) => setTrackerJob(j)}
+                settings={settings ?? undefined}
+              />
+            ))}
         </section>
       )}
 

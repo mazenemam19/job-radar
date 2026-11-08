@@ -56,7 +56,9 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
 
         {locationUncertain ? (
           <div className="max-w-28 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-center text-[11px] font-medium text-amber-300">
-            Location unverified<br />not ranked
+            Location unverified
+            <br />
+            not ranked
           </div>
         ) : (
           <div
