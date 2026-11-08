@@ -221,4 +221,7 @@ export type WorkableBudgetConfig = { global: number; local: number };
 export interface DispatchCursor {
   companyId: string;
   createdAt: string;
+  /** A company can have two enabled pipelines. Keeping the mode makes the
+   * persisted cursor resume after the exact task that completed. */
+  mode?: "global" | "local";
 }

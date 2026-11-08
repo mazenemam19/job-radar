@@ -1,11 +1,7 @@
 // src/lib/__tests__/cron-fetch-jobs-rotation.test.ts
-// Regression coverage for issue #52, act 7 ("the queue that never rotates"):
-// before this fix, ats_companies had no stable dispatch order and no memory
-// of where a time-budget skip left off, so whichever companies sat at the
-// tail of the fetch stayed skipped forever. These tests fail against that
-// pre-fix behavior (a second run restarts from the same top every time) and
-// pass once the "other" bucket is sorted and rotated per the persisted
-// cursor.
+// The scheduled-company batch has a stable rotating order so every active
+// source eventually receives a turn instead of repeatedly favoring the same
+// leading records.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../ats-bridge", () => ({
@@ -38,7 +34,7 @@ describe("fetchAllCompanyJobs — dispatch rotation cursor", () => {
     vi.resetModules();
   });
 
-  it("resumes the 'other' bucket right after the last company dispatched last run, instead of restarting from the top", async () => {
+  it("resumes the scheduled batch after the last company dispatched last run", async () => {
     const { fetchCompany } = await import("../ats-bridge");
     const dispatchedOrder: string[] = [];
     vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
@@ -87,7 +83,7 @@ describe("fetchAllCompanyJobs — dispatch rotation cursor", () => {
     expect(dispatchedOrder).toEqual(["c3", "c4", "c0", "c1", "c2"]);
   });
 
-  it("does not reorder the Workable bucket — its input order is untouched by the 'other' bucket's rotation (FR6)", async () => {
+  it("includes Workable companies in the same rotating batch as every other ATS", async () => {
     const { fetchCompany } = await import("../ats-bridge");
     const dispatchedWorkableOrder: string[] = [];
     vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
@@ -97,10 +93,8 @@ describe("fetchAllCompanyJobs — dispatch rotation cursor", () => {
 
     const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
 
-    // Workable rows deliberately given created_at values OUT of order
-    // relative to their position in `companies` — if the fix ever
-    // accidentally sorted the whole list instead of just the "other"
-    // bucket, this would catch it.
+    // Workable rows deliberately have created_at values out of input order.
+    // The batch scheduler must use the same stable order for every ATS.
     const companies = [
       makeCompanyRow({ id: "w-late", ats: "workable", created_at: "2025-03-01T00:00:00Z" }),
       makeCompanyRow({ id: "other-1", created_at: "2025-01-01T00:00:00Z" }),
@@ -108,11 +102,115 @@ describe("fetchAllCompanyJobs — dispatch rotation cursor", () => {
       makeCompanyRow({ id: "other-2", created_at: "2025-02-01T00:00:00Z" }),
     ];
 
-    await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000);
+    await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000, 2);
 
-    // Workable dispatch followed `companies`' own order (w-late before
-    // w-early), not created_at order — proving it was never touched by
-    // sortAndRotate.
-    expect(dispatchedWorkableOrder).toEqual(["w-late", "w-early"]);
+    expect(dispatchedWorkableOrder).toEqual(["w-early"]);
+  });
+
+  it("covers every company across consecutive bounded batches before repeating", async () => {
+    const { fetchCompany } = await import("../ats-bridge");
+    const dispatched: string[] = [];
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
+      dispatched.push(row.id);
+      return { company: row.name, mode, jobs: [], error: null };
+    });
+    const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
+    const companies = ["a", "b", "c", "d", "e"].map((id, index) =>
+      makeCompanyRow({
+        id,
+        created_at: `2025-01-0${index + 1}T00:00:00Z`,
+        pipeline_local: false,
+        pipeline_global: true,
+      }),
+    );
+    const deadline = Date.now() + 60_000;
+    const cutoff = Date.now() + 120_000;
+
+    await fetchAllCompanyJobs(companies, deadline, cutoff, 2);
+    expect(dispatched).toEqual(["a", "b"]);
+
+    dispatched.length = 0;
+    await fetchAllCompanyJobs(companies, deadline, cutoff, 2);
+    expect(dispatched).toEqual(["c", "d"]);
+
+    dispatched.length = 0;
+    await fetchAllCompanyJobs(companies, deadline, cutoff, 2);
+    expect(dispatched).toEqual(["e", "a"]);
+  });
+
+  it("resumes the second pipeline of a company before advancing to the next company", async () => {
+    const { fetchCompany } = await import("../ats-bridge");
+    const dispatched: string[] = [];
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
+      dispatched.push(`${row.id}:${mode}`);
+      return { company: row.name, mode, jobs: [], error: null };
+    });
+    const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
+    const companies = [
+      makeCompanyRow({ id: "dual", pipeline_local: true, pipeline_global: true }),
+      makeCompanyRow({ id: "next", created_at: "2025-01-02T00:00:00Z" }),
+    ];
+    const deadline = Date.now() + 60_000;
+    const cutoff = Date.now() + 120_000;
+
+    await fetchAllCompanyJobs(companies, deadline, cutoff, 1);
+    expect(dispatched).toEqual(["dual:local"]);
+
+    dispatched.length = 0;
+    await fetchAllCompanyJobs(companies, deadline, cutoff, 1);
+    expect(dispatched).toEqual(["dual:global"]);
+  });
+
+  it("ignores active rows without an enabled pipeline instead of stalling the cursor", async () => {
+    const { fetchCompany } = await import("../ats-bridge");
+    vi.mocked(fetchCompany).mockResolvedValue({
+      company: "Ready",
+      mode: "local",
+      jobs: [],
+      error: null,
+    });
+    const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
+    const companies = [
+      makeCompanyRow({ id: "invalid", pipeline_local: false, pipeline_global: false }),
+      makeCompanyRow({ id: "ready", name: "Ready", created_at: "2025-01-02T00:00:00Z" }),
+    ];
+
+    await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000, 1);
+    expect(fetchCompany).toHaveBeenCalledWith(companies[1], "local", expect.any(AbortSignal));
+  });
+
+  it("moves past an aborted early task when a later scheduled task started", async () => {
+    vi.useFakeTimers();
+    const { fetchCompany } = await import("../ats-bridge");
+    const dispatched: string[] = [];
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode, signal) => {
+      dispatched.push(row.id);
+      if (row.id !== "stuck") return { company: row.name, mode, jobs: [], error: null };
+      return new Promise((resolve) => {
+        signal?.addEventListener(
+          "abort",
+          () => resolve({ company: row.name, mode, jobs: [], error: "Aborted" }),
+          { once: true },
+        );
+      });
+    });
+    const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
+    const start = Date.now();
+    const companies = [
+      makeCompanyRow({ id: "stuck", ats: "workable", created_at: "2025-01-01T00:00:00Z" }),
+      makeCompanyRow({ id: "fast", created_at: "2025-01-02T00:00:00Z" }),
+      makeCompanyRow({ id: "tail", created_at: "2025-01-03T00:00:00Z" }),
+    ];
+
+    try {
+      const firstRun = fetchAllCompanyJobs(companies, start + 60_000, start + 1_000, 2);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await firstRun;
+      dispatched.length = 0;
+      await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000, 1);
+      expect(dispatched).toEqual(["tail"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

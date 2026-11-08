@@ -5,10 +5,14 @@ import type { JobMode } from "@/lib/types";
 import { safeFetchJson } from "./http";
 import { processJobs, stripHtml } from "./job-processing";
 
-export async function fetchGreenhouse(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchGreenhouse(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs?content=true`;
-  const result = await safeFetchJson<{ jobs: GreenhouseJob[] }>(url);
+  const result = await safeFetchJson<{ jobs: GreenhouseJob[] }>(url, undefined, undefined, signal);
 
   if (!result.ok)
     return {

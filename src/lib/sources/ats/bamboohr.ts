@@ -5,10 +5,14 @@ import type { JobMode } from "@/lib/types";
 import { safeFetch, safeFetchJson } from "./http";
 import { processJobs, stripHtml, pLimit } from "./job-processing";
 
-export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchBambooHR(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://${c.slug}.bamboohr.com/careers/list`;
-  const result = await safeFetchJson<{ result?: BambooJob[] }>(url);
+  const result = await safeFetchJson<{ result?: BambooJob[] }>(url, undefined, undefined, signal);
 
   if (!result.ok)
     return {
@@ -33,7 +37,7 @@ export async function fetchBambooHR(c: ATSConfig, mode: JobMode): Promise<Fetche
     jobs.map((r) => async () => {
       let description = "";
       const detailUrl = `https://${c.slug}.bamboohr.com/careers/${r.id}/detail`;
-      const dr = await safeFetch(detailUrl);
+      const dr = await safeFetch(detailUrl, undefined, undefined, signal);
       if (dr && dr.ok) {
         try {
           const detail = (await dr.json()) as BambooDetail;

@@ -5,10 +5,14 @@ import type { JobMode } from "@/lib/types";
 import { safeFetchJson } from "./http";
 import { processJobs, stripHtml } from "./job-processing";
 
-export async function fetchLever(c: ATSConfig, mode: JobMode): Promise<FetcherResult> {
+export async function fetchLever(
+  c: ATSConfig,
+  mode: JobMode,
+  signal?: AbortSignal,
+): Promise<FetcherResult> {
   const t0 = Date.now();
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
-  const result = await safeFetchJson<LeverJob[]>(url);
+  const result = await safeFetchJson<LeverJob[]>(url, undefined, undefined, signal);
 
   if (!result.ok)
     return {

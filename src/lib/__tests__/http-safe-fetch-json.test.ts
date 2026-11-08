@@ -95,6 +95,39 @@ describe("safeFetchJson", () => {
     expect(result).toEqual({ ok: false, error: "Network/Timeout" });
   });
 
+  it("passes the cron abort signal into the underlying request", async () => {
+    let receivedSignal: AbortSignal | undefined;
+    let fetchStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      fetchStarted = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        receivedSignal = init.signal as AbortSignal;
+        fetchStarted?.();
+        return new Promise((_resolve, reject) => {
+          receivedSignal?.addEventListener("abort", () => reject(new Error("aborted")), {
+            once: true,
+          });
+        });
+      }),
+    );
+    const controller = new AbortController();
+    const { safeFetchJson } = await import("../sources/ats/http");
+    const pending = safeFetchJson(
+      "https://example.com/jobs",
+      undefined,
+      undefined,
+      controller.signal,
+    );
+    await started;
+    controller.abort();
+
+    await expect(pending).resolves.toEqual({ ok: false, error: "Network/Timeout" });
+    expect(receivedSignal?.aborted).toBe(true);
+  });
+
   it("fails on a JSON content-type header with a malformed body", async () => {
     vi.stubGlobal(
       "fetch",

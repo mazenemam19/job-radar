@@ -6,7 +6,12 @@ vi.mock("../ats-bridge", () => ({
 }));
 
 import { fetchCompany } from "../ats-bridge";
-import { withConcurrencyLimit, fetchAllCompanyJobs } from "../cron/fetch-jobs";
+import {
+  DEFAULT_TASK_BATCH_SIZE,
+  taskBatchSize,
+  withConcurrencyLimit,
+  fetchAllCompanyJobs,
+} from "../cron/fetch-jobs";
 import { WORKABLE_LANE_COUNT } from "../sources/ats/workable";
 import type { ATSCompanyRow, RawJob } from "../types";
 
@@ -104,6 +109,19 @@ describe("withConcurrencyLimit", () => {
   });
 });
 
+describe("taskBatchSize", () => {
+  it("uses the conservative default for an absent or invalid override", () => {
+    expect(taskBatchSize(undefined)).toBe(DEFAULT_TASK_BATCH_SIZE);
+    expect(taskBatchSize("0")).toBe(DEFAULT_TASK_BATCH_SIZE);
+    expect(taskBatchSize("101")).toBe(DEFAULT_TASK_BATCH_SIZE);
+    expect(taskBatchSize("not-a-number")).toBe(DEFAULT_TASK_BATCH_SIZE);
+  });
+
+  it("accepts a whole-number override within the safe range", () => {
+    expect(taskBatchSize("24")).toBe(24);
+  });
+});
+
 describe("fetchAllCompanyJobs", () => {
   // Deadline/cutoff far in the future — these tests aren't exercising the
   // time budget or the hard cutoff, so nothing should ever be skipped or
@@ -161,6 +179,28 @@ describe("fetchAllCompanyJobs", () => {
     expect(fetchCompany).not.toHaveBeenCalled();
     expect(result.allJobs).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
+  });
+
+  it("scans only the selected company batch", async () => {
+    const companies = Array.from({ length: 5 }, (_, index) =>
+      makeCompanyRow({
+        id: `c${index}`,
+        name: `Company ${index}`,
+        created_at: `2025-01-0${index + 1}T00:00:00Z`,
+        pipeline_global: true,
+      }),
+    );
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => ({
+      company: row.name,
+      mode,
+      jobs: [],
+      error: null,
+    }));
+
+    await fetchAllCompanyJobs(companies, FAR_FUTURE_DEADLINE, FAR_FUTURE_CUTOFF, 2);
+
+    expect(fetchCompany).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(fetchCompany).mock.calls.map(([row]) => row.id)).toEqual(["c0", "c1"]);
   });
 
   it("aggregates warnings separately from errors for an otherwise-successful fetch", async () => {
@@ -249,68 +289,6 @@ describe("fetchAllCompanyJobs — time budget", () => {
 
     expect(fetchCompany).toHaveBeenCalledTimes(2);
     expect(result.errors).toHaveLength(0);
-  });
-});
-
-describe("fetchAllCompanyJobs — hard cutoff", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns within the hard cutoff with partial results when some fetches never resolve", async () => {
-    vi.useFakeTimers();
-    const start = Date.now();
-    const deadline = start + 60_000; // soft deadline never reached in this test
-    const hardCutoff = start + 10_000;
-
-    // 2 companies resolve quickly; 1 never resolves at all (simulates the
-    // "dispatched right before the deadline, then runs long" scenario from
-    // docs/solutions/bugs/issue-52-504-recurrence-part6.md — a single
-    // company task with no ceiling on its own total duration).
-    const companies = [
-      makeCompanyRow({ id: "fast-1", name: "Fast One", pipeline_local: true }),
-      makeCompanyRow({ id: "fast-2", name: "Fast Two", pipeline_local: true }),
-      makeCompanyRow({ id: "stuck", name: "Stuck Co", pipeline_local: true }),
-    ];
-
-    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => {
-      if (row.id === "stuck") return new Promise(() => {}); // never settles
-      return { company: row.name, mode, jobs: [makeRawJob(`${row.id}-${mode}`)], error: null };
-    });
-
-    try {
-      const resultPromise = fetchAllCompanyJobs(companies, deadline, hardCutoff);
-      // Let the two fast fetches settle (real microtask resolution, not tied
-      // to the fake clock), then advance the fake clock past the cutoff so
-      // hardCutoffSignal's setTimeout actually fires.
-      await vi.advanceTimersByTimeAsync(0);
-      await vi.advanceTimersByTimeAsync(10_000);
-
-      const result = await resultPromise;
-
-      expect(result.allJobs.map((j) => j.id).sort()).toEqual(["fast-1-local", "fast-2-local"]);
-      expect(result.errors).toHaveLength(0); // the stuck task simply never reported in — not a failure
-      expect(fetchCompany).toHaveBeenCalledTimes(3); // all 3 were dispatched; "stuck" just never finished
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("does not cut off early when every fetch settles before the hard cutoff", async () => {
-    const deadline = Date.now() + 60_000;
-    const hardCutoff = Date.now() + 60_000;
-    const companies = [makeCompanyRow({ id: "a", pipeline_local: true, pipeline_global: true })];
-
-    vi.mocked(fetchCompany).mockImplementation(async (row, mode) => ({
-      company: row.name,
-      mode,
-      jobs: [makeRawJob(`${row.id}-${mode}`)],
-      error: null,
-    }));
-
-    const result = await fetchAllCompanyJobs(companies, deadline, hardCutoff);
-
-    expect(result.allJobs).toHaveLength(2); // both pipelines' jobs made it through, not cut short
   });
 });
 

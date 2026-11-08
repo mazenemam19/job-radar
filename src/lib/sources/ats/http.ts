@@ -59,6 +59,26 @@ function queueByHost<T>(host: string, fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
+function combinedSignal(timeout: number, signal?: AbortSignal): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(timeout);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
+
+function waitFor(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(false);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /** Reads Retry-After (seconds or HTTP date) into a millisecond delay, if present. */
 export function parseRetryAfterMs(res: Response): number | null {
   const header = res.headers.get("retry-after");
@@ -74,6 +94,7 @@ export async function safeFetch(
   url: string,
   timeout = 45_000,
   extraHeaders?: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<Response | null> {
   trackDomainRequest(url);
   const t0 = Date.now();
@@ -92,10 +113,11 @@ export async function safeFetch(
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ...extraHeaders,
       },
-      signal: AbortSignal.timeout(timeout),
+      signal: combinedSignal(timeout, signal),
     }).catch(() => null);
 
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    if (signal?.aborted) return null;
     if (Date.now() - t0 >= MAX_TOTAL_FETCH_MS) {
       console.error(
         `[safeFetch] ${host}: giving up before attempt ${attempt} — total-time ceiling (${MAX_TOTAL_FETCH_MS}ms) reached`,
@@ -131,7 +153,7 @@ export async function safeFetch(
       );
       return res;
     }
-    await new Promise((r) => setTimeout(r, cappedBackoff));
+    if (!(await waitFor(cappedBackoff, signal))) return null;
   }
   return null; // unreachable — loop always returns
 }
@@ -184,7 +206,8 @@ export async function safeFetchJson<T>(
   url: string,
   timeout?: number,
   extraHeaders?: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  const res = await safeFetch(url, timeout, extraHeaders);
+  const res = await safeFetch(url, timeout, extraHeaders, signal);
   return parseJsonBody<T>(res);
 }
