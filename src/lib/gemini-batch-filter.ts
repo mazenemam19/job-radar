@@ -8,7 +8,9 @@
 import type { RawJob } from "./types";
 import { callWithModelFallback, GeminiQuotaExhaustedError } from "./gemini-model-fallback";
 
-export const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the larger per-job char window below)
+export const BATCH_SIZE = 10;
+export const MAX_DESCRIPTION_CHARS = 2_000;
+export const BATCH_TIMEOUT_MS = 8_000;
 
 // Spacing between sequential batch calls. Firing dozens/hundreds of batches
 // back-to-back with zero pacing is what let a single cache rebuild burn
@@ -20,6 +22,7 @@ export const BATCH_DELAY_MS = 300;
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
 
 // Fixed, code-owned response-format contract. Deliberately NOT part of
 // gemini_filter_prompt (which is user-editable).
@@ -51,7 +54,11 @@ export interface FilterResult {
   quotaExhausted?: boolean;
 }
 
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
+async function callGemini(
+  apiKey: string,
+  prompt: string,
+  abortSignal: AbortSignal,
+): Promise<string> {
   const { value } = await callWithModelFallback(
     apiKey,
     0,
@@ -59,8 +66,23 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
     (text) => (text.trim() ? text : null),
     "callGemini",
     "All Gemini models exhausted",
+    { abortSignal },
   );
   return value;
+}
+
+async function callGeminiWithinBudget(
+  apiKey: string,
+  prompt: string,
+  timeoutMs: number,
+): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await callGemini(apiKey, prompt, controller.signal);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function parseDecisions(text: string): GeminiDecision[] {
@@ -161,17 +183,17 @@ export async function filterBatch(
   apiKey: string,
   jobs: RawJob[],
   promptTemplate: string,
+  timeBudgetMs = BATCH_TIMEOUT_MS,
 ): Promise<Map<string, FilterResult>> {
   const jobSummaries = jobs.map((j, idx) => ({
     idx,
     title: j.title,
     company: j.company,
     location: j.location,
-    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs. 48.8%
-    // at the previous 6000-char ceiling; pushing past 10k buys only 8.2% more
-    // coverage for a disproportionate token-cost increase). No ingestion
-    // ceiling — processJobs stores the full description.
-    description: j.description.slice(0, 10000),
+    // A dashboard rebuild has a hard 60-second request budget. The complete
+    // description remains stored and visible in Job Radar; Gemini receives a
+    // bounded excerpt so one broad age window cannot turn into a huge prompt.
+    description: j.description.slice(0, MAX_DESCRIPTION_CHARS),
   }));
 
   const prompt = `${promptTemplate}
@@ -183,7 +205,11 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
 
   let resultMap: Map<string, FilterResult>;
   try {
-    const raw = await callGemini(apiKey, prompt);
+    const raw = await callGeminiWithinBudget(
+      apiKey,
+      prompt,
+      Math.min(BATCH_TIMEOUT_MS, timeBudgetMs),
+    );
     resultMap = buildResultMap(jobs, parseDecisions(raw), raw);
   } catch (err) {
     resultMap = failOpenResultMap(jobs, err);

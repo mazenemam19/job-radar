@@ -43,34 +43,33 @@ export class GeminiQuotaExhaustedError extends Error {
 
 type ModelAttempt<T> = { value: T } | { retry: true; quota: boolean; msg: string };
 
+function shouldStopRetrying(error: unknown, abortSignal?: AbortSignal): boolean {
+  if (abortSignal?.aborted) return true;
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("401") || msg.includes("API_KEY_INVALID") || msg.includes("INVALID_ARGUMENT");
+}
+
 async function tryModelCall<T>(
   genAI: GoogleGenAI,
   model: string,
   temperature: number,
   prompt: string,
   parse: (text: string) => T | null,
+  abortSignal?: AbortSignal,
 ): Promise<ModelAttempt<T>> {
   try {
+    if (abortSignal?.aborted) throw new Error("Gemini request aborted");
     const response = await genAI.models.generateContent({
       model,
       contents: prompt,
-      config: { temperature },
+      config: { temperature, abortSignal },
     });
     const parsed = parse(response.text ?? "");
     if (parsed !== null) return { value: parsed };
     return { retry: true, quota: false, msg: "empty or invalid response" };
   } catch (err) {
+    if (shouldStopRetrying(err, abortSignal)) throw err;
     const msg = err instanceof Error ? err.message : String(err);
-
-    // If the API key is completely invalid or unauthorized, fail immediately
-    if (
-      msg.includes("401") ||
-      msg.includes("API_KEY_INVALID") ||
-      msg.includes("INVALID_ARGUMENT")
-    ) {
-      throw err;
-    }
-
     return { retry: true, quota: isQuotaError(msg), msg };
   }
 }
@@ -89,12 +88,20 @@ export async function callWithModelFallback<T>(
   parse: (text: string) => T | null,
   label: string,
   exhaustedMessage: string,
+  options?: { abortSignal?: AbortSignal },
 ): Promise<{ value: T; model: string }> {
   const genAI = new GoogleGenAI({ apiKey });
   let allFailuresWereQuota = true;
 
   for (const model of MODEL_QUEUE) {
-    const result = await tryModelCall(genAI, model, temperature, prompt, parse);
+    const result = await tryModelCall(
+      genAI,
+      model,
+      temperature,
+      prompt,
+      parse,
+      options?.abortSignal,
+    );
     if ("value" in result) return { value: result.value, model };
 
     if (!result.quota) allFailuresWereQuota = false;
