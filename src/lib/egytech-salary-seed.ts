@@ -155,7 +155,9 @@ export function mapEgytechParticipants(records: unknown[]): EgytechSeedResult {
       role_title: roleTitle,
       years_experience: Math.floor(years),
       years_experience_exact: years,
-      salary_egp: amount,
+      // salary_egp is a legacy integer column. Keep its compatibility value
+      // deterministic, while original_amount remains the exact source amount.
+      salary_egp: Math.round(amount),
       salary_usd: null,
       currency: "EGP",
       original_amount: amount,

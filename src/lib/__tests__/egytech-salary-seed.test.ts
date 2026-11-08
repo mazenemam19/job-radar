@@ -48,6 +48,18 @@ describe("mapEgytechParticipants", () => {
     expect(first).toBe(second);
   });
 
+  it("preserves a decimal source amount while rounding only the legacy integer field", () => {
+    const { rows } = mapEgytechParticipants([
+      { ...egpParticipant, TotalCompensationEgp: 18_583.3 },
+    ]);
+
+    expect(rows[0]).toMatchObject({
+      salary_egp: 18_583,
+      original_amount: 18_583.3,
+      usd_amount: Number((18_583.3 / EGYTECH_EGP_PER_USD_JUNE_2024).toFixed(2)),
+    });
+  });
+
   it("skips foreign and hybrid records whose original currency is unknown", () => {
     const result = mapEgytechParticipants([
       { ...egpParticipant, IsEgp: "Another currency (e.g USD)" },
