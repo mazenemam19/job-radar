@@ -14,14 +14,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { catchErrorResponse } from "@/lib/api-errors";
 import { resolveUserSettings } from "@/lib/settings";
 import { isCacheFresh } from "@/lib/runner";
-import { buildFeed, enabledModes } from "@/lib/dashboard-route";
+import { buildFeed, enabledModes, shouldServeDashboardCache } from "@/lib/dashboard-route";
 import { fetchFilteredRawJobs } from "@/lib/raw-jobs-query";
 import type { ScoredJob, PipelineLog } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 
 export const maxDuration = 60; // Vercel: allow up to 60s for Gemini filter
 
-export async function GET() {
+export async function GET(request: Request) {
   // Reserve time for a cache write and response before the hosting limit.
   const requestDeadlineAt = Date.now() + 50_000;
   const user = await getUser();
@@ -47,9 +47,10 @@ export async function GET() {
   ]);
 
   // ── Cache check ──────────────────────────────────────────────
+  const forceRebuild = new URL(request.url).searchParams.get("rebuild") === "1";
   const fresh = await isCacheFresh(user.id);
 
-  if (fresh) {
+  if (shouldServeDashboardCache(fresh, forceRebuild)) {
     const { data: cache } = await db
       .from("user_jobs_cache")
       .select("jobs, pipeline_log, cached_at")

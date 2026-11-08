@@ -19,11 +19,11 @@ export function useDashboardFeed() {
   const [fromCache, setFromCache] = useState(false);
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRebuild = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(forceRebuild ? "/api/dashboard?rebuild=1" : "/api/dashboard");
       const data = await res.json();
 
       if (!data.ok) {
@@ -60,7 +60,7 @@ export function useDashboardFeed() {
 
   const rebuild = useCallback(() => {
     setRebuilding(true);
-    load();
+    load(true);
   }, [load]);
 
   const markTracked = useCallback((jobId: string) => {
