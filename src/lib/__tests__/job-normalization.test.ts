@@ -44,11 +44,20 @@ describe("posting location normalization", () => {
     ["Paris, FR", "FR", "Paris"],
     ["Sofia, Bulgaria", "BG", "Sofia"],
     ["London Office", "GB", "London"],
+    ["Office - San Francisco", "US", "San Francisco"],
+    ["Remote - New York", "US", "New York"],
+    ["Remote - California", "US", null],
+    ["Office-Manila, Philippines", "PH", "Manila"],
   ])("normalizes %s", (location, countryCode, city) => {
     const result = normalizePostingLocation(location);
     expect(result.countryCode).toBe(countryCode);
     expect(result.city).toBe(city);
     expect(result.sourceLocation).toBe(location);
+  });
+
+  it("does not convert regional labels into a country", () => {
+    expect(normalizePostingLocation("EMEA").countryCode).toBeNull();
+    expect(normalizePostingLocation("Global").countryCode).toBeNull();
   });
 
   it("keeps unknown locations uncertain instead of substituting the company city", () => {

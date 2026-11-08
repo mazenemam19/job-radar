@@ -166,6 +166,7 @@ export const COUNTRY_FLAGS: Record<string, string> = {
   BR: "🇧🇷",
   IN: "🇮🇳",
   ID: "🇮🇩",
+  PH: "🇵🇭",
   SA: "🇸🇦", // previously missing — Saudi Arabia
   AE: "🇦🇪", // previously missing — UAE
 };
