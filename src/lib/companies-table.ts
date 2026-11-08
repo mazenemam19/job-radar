@@ -43,7 +43,7 @@ export function formatCompanyCountry(
   company: Pick<ATSCompanyRow, "country" | "country_flag">,
 ): string {
   if (/^(global|worldwide|unknown|multiple locations)$/i.test(company.country.trim())) {
-    return "🌍 Unspecified / multi-country";
+    return "🌍 Multi-country";
   }
   return `${company.country_flag} ${company.country}`;
 }

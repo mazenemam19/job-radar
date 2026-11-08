@@ -1,10 +1,11 @@
 -- An active ATS company with neither source pipeline is invisible to cron:
--- no task is queued and no skip is logged. These legacy rows have therefore
--- behaved as inactive even though the admin page says otherwise. Mark them
--- inactive until an admin explicitly verifies their intended pipeline.
+-- no task is queued and no skip is logged. These legacy rows are retained as
+-- active sources and assigned the global pipeline, which is the existing
+-- catch-all source pool. Their individual posting locations still determine
+-- whether they can match a user's country profile.
 update public.ats_companies
 set
-  is_active = false,
+  pipeline_global = true,
   updated_at = now()
 where is_active = true
   and coalesce(pipeline_local, false) = false

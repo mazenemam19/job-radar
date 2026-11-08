@@ -77,7 +77,7 @@ describe("filterCompanies", () => {
 describe("formatCompanyCountry", () => {
   it("labels global company metadata as uncertain rather than a country", () => {
     expect(formatCompanyCountry(makeCompany({ country: "Global", country_flag: "🌍" }))).toBe(
-      "🌍 Unspecified / multi-country",
+      "🌍 Multi-country",
     );
   });
 
