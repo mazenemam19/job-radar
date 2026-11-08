@@ -60,6 +60,15 @@ describe("posting location normalization", () => {
     expect(normalizePostingLocation("Global").countryCode).toBeNull();
   });
 
+  it("uses an explicit title country only when the ATS location is regional", () => {
+    expect(normalizePostingLocation("EMEA", "Frontend Engineer — Germany").countryCode).toBe(
+      "DE",
+    );
+    expect(normalizePostingLocation("San Francisco", "Germany Account Manager").countryCode).toBe(
+      "US",
+    );
+  });
+
   it("keeps unknown locations uncertain instead of substituting the company city", () => {
     const result = processJobs([rawJob("Somewhere Else")], company, "local")[0];
     expect(result.location).toBe("Somewhere Else");

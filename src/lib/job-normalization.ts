@@ -215,9 +215,19 @@ function matchLocationCountry(location: string): { country: string; code: string
   return null;
 }
 
-export function normalizePostingLocation(rawLocation: string): NormalizedPostingLocation {
+function isRegionalOrUnspecifiedLocation(location: string): boolean {
+  return (
+    !location ||
+    /\b(global|emea|worldwide|any office|multiple locations|remote|anywhere)\b/i.test(location)
+  );
+}
+
+export function normalizePostingLocation(
+  rawLocation: string,
+  title = "",
+): NormalizedPostingLocation {
   const sourceLocation = rawLocation.trim();
-  const country = matchCountry(sourceLocation);
+  const sourceCountry = matchCountry(sourceLocation);
   const firstPart = sourceLocation.split(/[;,|]/, 1)[0] ?? "";
   const cityCandidate = cleanCityCandidate(firstPart);
   const cityCountry = matchKnownCity(sourceLocation);
@@ -225,7 +235,13 @@ export function normalizePostingLocation(rawLocation: string): NormalizedPosting
     (cityCandidate && !matchCountry(cityCandidate) && !matchLocationCountry(cityCandidate)
       ? cityCandidate
       : null);
-  const resolved = country ?? cityCountry ?? matchLocationCountry(sourceLocation) ?? null;
+  const sourceResolved = sourceCountry ?? cityCountry ?? matchLocationCountry(sourceLocation) ?? null;
+  // A concrete ATS location is stronger evidence than a job title. Some ATS
+  // feeds provide only a regional label (for example, EMEA); in that narrow
+  // case an explicit country in the title is still useful and reviewable.
+  const titleCountry =
+    !sourceResolved && isRegionalOrUnspecifiedLocation(sourceLocation) ? matchCountry(title) : null;
+  const resolved = sourceResolved ?? titleCountry;
 
   return {
     sourceLocation,
