@@ -38,6 +38,16 @@ export function missingPipeline(
   return isActive && !pipelineLocal && !pipelineGlobal;
 }
 
+/** Company rows are source metadata, not proof of a job's location. */
+export function formatCompanyCountry(
+  company: Pick<ATSCompanyRow, "country" | "country_flag">,
+): string {
+  if (/^(global|worldwide|unknown|multiple locations)$/i.test(company.country.trim())) {
+    return "🌍 Multi-country";
+  }
+  return `${company.country_flag} ${company.country}`;
+}
+
 // ── Pure transforms ───────────────────────────────────────────
 
 /** Filters the company list by name, country, or ATS type (case-insensitive). */

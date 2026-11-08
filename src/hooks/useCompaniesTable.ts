@@ -16,11 +16,17 @@ export function useCompaniesTable() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<CompanyForm>(EMPTY_FORM);
   const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/companies");
     const d = await res.json();
-    if (d.ok) setCompanies(d.data);
+    if (d.ok) {
+      setCompanies(d.data);
+      setError(null);
+    } else {
+      setError(d.error ?? "Could not load ATS companies");
+    }
     setLoading(false);
   }, []);
 
@@ -29,12 +35,14 @@ export function useCompaniesTable() {
   }, [load]);
 
   function startNew() {
+    setError(null);
     setShowNew(true);
     setEditId(null);
     setForm(EMPTY_FORM);
   }
 
   function startEdit(c: ATSCompanyRow) {
+    setError(null);
     setEditId(c.id);
     setForm(formFromRow(c));
     setShowNew(false);
@@ -57,6 +65,8 @@ export function useCompaniesTable() {
       setShowNew(false);
       setForm(EMPTY_FORM);
       load();
+    } else {
+      setError(d.error ?? "Could not create company");
     }
   }
 
@@ -72,6 +82,8 @@ export function useCompaniesTable() {
       setEditId(null);
       setForm(EMPTY_FORM);
       load();
+    } else {
+      setError(d.error ?? "Could not save company");
     }
   }
 
@@ -82,7 +94,7 @@ export function useCompaniesTable() {
     if (d.ok) {
       setCompanies((p) => p.filter((c) => c.id !== id));
     } else {
-      alert(`Delete failed: ${d.error ?? "unknown error"}`);
+      setError(d.error ?? "Could not delete company");
     }
   }
 
@@ -95,6 +107,7 @@ export function useCompaniesTable() {
     form,
     setForm,
     showNew,
+    error,
     startNew,
     startEdit,
     cancelForm,
