@@ -140,6 +140,8 @@ export interface ScoredJob extends RawJob {
   scoring_weights?: ScoringWeights;
   /** Why this posting passed the user's location and category preferences. */
   search_profile_match?: { reasons: string[]; uncertainties: string[] } | null;
+  /** Unknown posting country can be inspected, but is not a ranked profile match. */
+  location_match_status?: "confirmed" | "uncertain";
 }
 
 /** Snapshot stored in tracker_entries.job_snapshot */

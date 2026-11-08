@@ -175,6 +175,36 @@ describe("buildFeed", () => {
     expect(finalJobs[0].gemini_reviewed).toBe(false);
   });
 
+  it("keeps an unknown-country job reviewable without counting it as a confirmed match", async () => {
+    const job = makeJob({ country_code: null, country: "Unknown", country_flag: "🌍" });
+    const { finalJobs, pipelineLog } = await buildFeed(
+      [job],
+      makeDbFunnel({ total_fetched: 1, after_location_filter: 1 }),
+      makeSettings({
+        search_profile: {
+          locations: [
+            {
+              country_code: "DE",
+              country_name: "Germany",
+              cities: [],
+              country_wide: true,
+              remote_countrywide: true,
+            },
+          ],
+          workplace_types: ["remote"],
+          employment_types: [],
+        },
+      }),
+      null,
+      testUserId,
+      testDb,
+    );
+
+    expect(finalJobs).toHaveLength(1);
+    expect(finalJobs[0].location_match_status).toBe("uncertain");
+    expect(pipelineLog.after_scoring).toBe(0);
+  });
+
   it("calls Gemini when an API key is supplied", async () => {
     const job = makeJob({ title: "Senior React Engineer" });
     // Gemini marks the job as passing

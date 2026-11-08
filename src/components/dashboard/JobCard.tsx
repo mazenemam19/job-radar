@@ -32,6 +32,7 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
 
   const modeColor = MODE_COLORS[job.mode] ?? "#6366f1";
   const postedLabel = formatPostedLabel(job);
+  const locationUncertain = job.location_match_status === "uncertain";
 
   return (
     <article
@@ -53,17 +54,22 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
           </div>
         </div>
 
-        {/* Score badge */}
-        <div
-          className="relative flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-full"
-          style={{
-            background: `conic-gradient(${modeColor} ${displayTotalScore * 3.6}deg, #1e1e30 0deg)`,
-          }}
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d0d1a] text-[13px] font-bold text-[#e2e8f0]">
-            {displayTotalScore}
+        {locationUncertain ? (
+          <div className="max-w-28 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-center text-[11px] font-medium text-amber-300">
+            Location unverified<br />not ranked
           </div>
-        </div>
+        ) : (
+          <div
+            className="relative flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-full"
+            style={{
+              background: `conic-gradient(${modeColor} ${displayTotalScore * 3.6}deg, #1e1e30 0deg)`,
+            }}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d0d1a] text-[13px] font-bold text-[#e2e8f0]">
+              {displayTotalScore}
+            </div>
+          </div>
+        )}
       </div>
 
       <JobBadges job={job} modeColor={modeColor} settings={settings} />
