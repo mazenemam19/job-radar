@@ -22,6 +22,8 @@ import type { Json } from "@/lib/database.types";
 export const maxDuration = 60; // Vercel: allow up to 60s for Gemini filter
 
 export async function GET() {
+  // Reserve time for a cache write and response before the hosting limit.
+  const requestDeadlineAt = Date.now() + 50_000;
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -89,6 +91,7 @@ export async function GET() {
     profile?.gemini_api_key,
     user.id,
     db,
+    requestDeadlineAt,
   );
 
   // ── Write cache ──────────────────────────────────────────────

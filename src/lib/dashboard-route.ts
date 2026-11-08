@@ -70,6 +70,7 @@ export async function buildFeed(
   geminiApiKey: string | null | undefined,
   userId: string,
   db: SupabaseClient<Database>,
+  requestDeadlineAt?: number,
 ): Promise<FeedResult> {
   const requiredTerms =
     settings.required_keywords.length > 0 ? settings.required_keywords : settings.expert_skills;
@@ -90,7 +91,16 @@ export async function buildFeed(
 
   // Stage: Gemini filter — skipped when no key, fails open on error
   const geminiFiltered = geminiApiKey
-    ? await filterJobsWithGemini(geminiApiKey, afterSettingsFilter, settings, userId, db)
+    ? requestDeadlineAt === undefined
+      ? await filterJobsWithGemini(geminiApiKey, afterSettingsFilter, settings, userId, db)
+      : await filterJobsWithGemini(
+          geminiApiKey,
+          afterSettingsFilter,
+          settings,
+          userId,
+          db,
+          requestDeadlineAt,
+        )
     : afterSettingsFilter.map((j) => ({
         ...j,
         gemini_pass: true,

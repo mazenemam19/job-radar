@@ -15,6 +15,7 @@ import type { Database } from "./database.types";
 import { hashPrompt, loadCachedDecisions, persistDecisions } from "./gemini-review-cache";
 import type { CachedDecision } from "./gemini-review-cache";
 import { BATCH_SIZE, BATCH_DELAY_MS, delay, filterBatch } from "./gemini-batch-filter";
+import type { FilterResult } from "./gemini-batch-filter";
 import { callWithModelFallback } from "./gemini-model-fallback";
 
 type GeminiReviewedJob = RawJob & {
@@ -27,7 +28,7 @@ type GeminiReviewedJob = RawJob & {
 // Leave time for settings loading, cache writes, and a final response within
 // the route's 60-second hosting limit. Deferred jobs stay visible and are
 // explicitly marked as unreviewed instead of making the dashboard hang.
-const DASHBOARD_REVIEW_BUDGET_MS = 40_000;
+const DASHBOARD_REVIEW_BUDGET_MS = 25_000;
 
 function deferReview(jobs: RawJob[]): GeminiReviewedJob[] {
   return jobs.map((job) => ({
@@ -37,6 +38,29 @@ function deferReview(jobs: RawJob[]): GeminiReviewedJob[] {
     gemini_reviewed: false,
     gemini_quota_exhausted: false,
   }));
+}
+
+function recordBatchDecisions(
+  jobs: RawJob[],
+  decisions: Map<string, FilterResult>,
+  reviewed: GeminiReviewedJob[],
+  toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }>,
+): void {
+  for (const job of jobs) {
+    const d = decisions.get(job.id);
+    if (d?.reviewed) {
+      toPersist.push({ job_id: job.id, gemini_pass: d.pass, gemini_reason: d.reason });
+    }
+    if (d?.pass) {
+      reviewed.push({
+        ...job,
+        gemini_pass: true,
+        gemini_reason: d.reason,
+        gemini_reviewed: d.reviewed,
+        gemini_quota_exhausted: d.quotaExhausted ?? false,
+      });
+    }
+  }
 }
 
 // Splits jobs into ones with a usable cached decision (mapped straight to
@@ -76,6 +100,7 @@ async function reviewUncachedJobs(
   apiKey: string,
   jobsNeedingReview: RawJob[],
   prompt: string,
+  requestDeadlineAt?: number,
 ): Promise<{
   reviewed: GeminiReviewedJob[];
   toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }>;
@@ -84,7 +109,10 @@ async function reviewUncachedJobs(
   const toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }> =
     [];
 
-  const deadline = Date.now() + DASHBOARD_REVIEW_BUDGET_MS;
+  const deadline = Math.min(
+    Date.now() + DASHBOARD_REVIEW_BUDGET_MS,
+    requestDeadlineAt ?? Number.POSITIVE_INFINITY,
+  );
 
   for (let i = 0; i < jobsNeedingReview.length; i += BATCH_SIZE) {
     if (Date.now() >= deadline) {
@@ -94,22 +122,7 @@ async function reviewUncachedJobs(
     if (i > 0) await delay(BATCH_DELAY_MS);
     const batch = jobsNeedingReview.slice(i, i + BATCH_SIZE);
     const decisions = await filterBatch(apiKey, batch, prompt);
-
-    for (const job of batch) {
-      const d = decisions.get(job.id);
-      if (d?.reviewed) {
-        toPersist.push({ job_id: job.id, gemini_pass: d.pass, gemini_reason: d.reason });
-      }
-      if (d?.pass) {
-        reviewed.push({
-          ...job,
-          gemini_pass: true,
-          gemini_reason: d.reason,
-          gemini_reviewed: d.reviewed,
-          gemini_quota_exhausted: d.quotaExhausted ?? false,
-        });
-      }
-    }
+    recordBatchDecisions(batch, decisions, reviewed, toPersist);
   }
   return { reviewed, toPersist };
 }
@@ -130,6 +143,7 @@ export async function filterJobsWithGemini(
   settings: Pick<ResolvedSettings, "gemini_filter_prompt">,
   userId: string,
   db: SupabaseClient<Database>,
+  requestDeadlineAt?: number,
 ): Promise<GeminiReviewedJob[]> {
   if (!apiKey || !jobs.length) return [];
 
@@ -143,7 +157,12 @@ export async function filterJobsWithGemini(
   );
 
   const { fromCache, jobsNeedingReview } = partitionByCache(jobs, cached);
-  const { reviewed, toPersist } = await reviewUncachedJobs(apiKey, jobsNeedingReview, prompt);
+  const { reviewed, toPersist } = await reviewUncachedJobs(
+    apiKey,
+    jobsNeedingReview,
+    prompt,
+    requestDeadlineAt,
+  );
 
   await persistDecisions(db, userId, promptHash, toPersist);
 
