@@ -2,9 +2,9 @@
 
 **Goal:** Make Job Radar a useful, location-agnostic job-search tool, starting with a Germany pilot for an international candidate who does not speak German.
 
-**Branch:** `main` (PRs #64–#67 merged; PR #63 is being rebased for merge)
+**Branch:** `main` (PRs #64–#67 merged; the tracked city-source migration is PR #63)
 
-**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61), [#62](https://github.com/mazenemam19/job-radar/pull/62), and [#64](https://github.com/mazenemam19/job-radar/pull/64)–[#67](https://github.com/mazenemam19/job-radar/pull/67) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup and legacy-ID rekey are complete. Source batches are live; their measured shortlist impact is recorded below rather than inferred from source counts. This branch tracks the already-applied, additive German city-source migration in PR #63.
+**Current state:** PRs [#61](https://github.com/mazenemam19/job-radar/pull/61), [#62](https://github.com/mazenemam19/job-radar/pull/62), and [#64](https://github.com/mazenemam19/job-radar/pull/64)–[#67](https://github.com/mazenemam19/job-radar/pull/67) are merged. The Germany pilot migrations are live, Settings saves/reloads the per-user profile correctly, and the safe 90-day retention cleanup and legacy-ID rekey are complete. Source batches are live; their measured shortlist impact is recorded below rather than inferred from source counts. PR #63 tracks the already-applied, additive German city-source migration.
 
 ## Done locally
 
