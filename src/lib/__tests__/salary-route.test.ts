@@ -15,6 +15,11 @@ vi.mock("next/headers", () => ({
   cookies: () => ({ getAll: () => [], set: () => {} }),
 }));
 
+vi.mock("../salary-fx", () => ({
+  SalaryFxError: class SalaryFxError extends Error {},
+  getUsdConversion: vi.fn(),
+}));
+
 // ── Helpers ──────────────────────────────────────────────────
 
 function mockQuery(returnData: unknown, returnError: unknown = null) {
@@ -41,6 +46,13 @@ describe("GET /api/salary", () => {
     vi.clearAllMocks();
     const { getUser } = await import("../supabase/server");
     (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+    const { getUsdConversion } = await import("../salary-fx");
+    (getUsdConversion as ReturnType<typeof vi.fn>).mockResolvedValue({
+      usdAmount: 700,
+      usdConversionRate: 0.02,
+      usdRateAsOf: "2026-11-08",
+      usdRateSource: "test-rate-provider",
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -62,7 +74,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 30000,
         salary_usd: null,
+        usd_amount: 600,
         pipeline: "local",
+        reported_at: "2024-06-01T00:00:00Z",
       },
       {
         role_title: "Frontend Engineer",
@@ -70,7 +84,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 40000,
         salary_usd: null,
+        usd_amount: 800,
         pipeline: "local",
+        reported_at: "2024-06-15T00:00:00Z",
       },
     ];
     mockServerDb.from.mockReturnValue(mockQuery(rows));
@@ -123,7 +139,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 30000,
         salary_usd: null,
+        usd_amount: 600,
         pipeline: "global",
+        reported_at: "2024-06-01T00:00:00Z",
       },
       {
         role_title: "Engineer",
@@ -131,7 +149,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 40000,
         salary_usd: null,
+        usd_amount: 800,
         pipeline: "global",
+        reported_at: "2024-06-15T00:00:00Z",
       },
     ];
     const queryMock = mockQuery(rows);
@@ -153,7 +173,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 99999,
         salary_usd: null,
+        usd_amount: 1_000,
         pipeline: "local",
+        reported_at: "2024-06-01T00:00:00Z",
       },
     ];
     mockServerDb.from.mockReturnValue(mockQuery(rows));
@@ -197,6 +219,13 @@ describe("POST /api/salary", () => {
     vi.clearAllMocks();
     const { getUser } = await import("../supabase/server");
     (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+    const { getUsdConversion } = await import("../salary-fx");
+    (getUsdConversion as ReturnType<typeof vi.fn>).mockResolvedValue({
+      usdAmount: 700,
+      usdConversionRate: 0.02,
+      usdRateAsOf: "2026-11-08",
+      usdRateSource: "test-rate-provider",
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -235,6 +264,30 @@ describe("POST /api/salary", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns a clear 503 without inserting when conversion is unavailable", async () => {
+    const { getUsdConversion, SalaryFxError } = await import("../salary-fx");
+    (getUsdConversion as ReturnType<typeof vi.fn>).mockRejectedValue(new SalaryFxError());
+    const queryMock = mockQuery(null);
+    mockServerDb.from.mockReturnValue(queryMock);
+
+    const { POST } = await import("../../app/api/salary/route");
+    const req = new Request("http://localhost/api/salary", {
+      method: "POST",
+      body: JSON.stringify({
+        role_title: "Frontend Engineer",
+        years_experience: 4,
+        amount: 35000,
+        currency: "EGP",
+      }),
+    });
+    const res = await POST(req as unknown as NextRequest);
+    const json = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(json).toMatchObject({ ok: false, code: "salary:fx-unavailable" });
+    expect(queryMock.insert).not.toHaveBeenCalled();
+  });
+
   it("returns 201 and inserts a valid report", async () => {
     const insertedRow = {
       id: "r1",
@@ -259,8 +312,8 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "Frontend Engineer",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);
@@ -269,6 +322,20 @@ describe("POST /api/salary", () => {
     expect(res.status).toBe(201);
     expect(json.ok).toBe(true);
     expect(json.data.role_title).toBe("Frontend Engineer");
+    expect(queryMock.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "user",
+        source_record_key: null,
+        original_amount: 35000,
+        original_currency: "EGP",
+        usd_amount: 700,
+        usd_conversion_rate: 0.02,
+        usd_rate_as_of: "2026-11-08",
+        usd_rate_source: "test-rate-provider",
+        salary_egp: 35000,
+        salary_usd: null,
+      }),
+    );
   });
 
   // role_title is trimmed before insert
@@ -296,8 +363,8 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "  Frontend Engineer  ",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);
@@ -331,8 +398,8 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "Frontend Engineer",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);

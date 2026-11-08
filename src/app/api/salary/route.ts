@@ -4,7 +4,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser, createServerClient } from "@/lib/supabase/server";
 import { dbErrorResponse } from "@/lib/api-errors";
-import { aggregateSalaries, validateSalaryPost, type SalaryPostBody } from "@/lib/salary-route";
+import { SalaryFxError, getUsdConversion } from "@/lib/salary-fx";
+import {
+  aggregateSalaries,
+  getSubmittedAmount,
+  validateSalaryPost,
+  type SalaryPostBody,
+} from "@/lib/salary-route";
 
 // ── GET /api/salary — aggregated charts data ──────────────
 
@@ -20,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("salary_reports")
-    .select("role_title, years_experience, currency, salary_egp, salary_usd, pipeline")
+    .select("role_title, years_experience, usd_amount, pipeline, reported_at")
     .order("reported_at", { ascending: false })
     .limit(1000);
 
@@ -33,7 +39,14 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query;
   if (error) return dbErrorResponse("salary:GET", error);
 
-  return NextResponse.json({ ok: true, data: aggregateSalaries(data ?? []) });
+  const rows = data ?? [];
+  return NextResponse.json({
+    ok: true,
+    data: aggregateSalaries(rows),
+    meta: {
+      skipped_unconverted_count: rows.filter((row) => row.usd_amount == null).length,
+    },
+  });
 }
 
 // ── POST /api/salary — submit a report ────────────────────
@@ -55,8 +68,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
   }
 
-  // All required fields are guaranteed non-empty and valid after validateSalaryPost.
+  // All required fields are guaranteed valid after validateSalaryPost.
   const currency = body.currency!;
+  const amount = getSubmittedAmount(body)!;
+
+  let conversion;
+  try {
+    conversion = await getUsdConversion(amount, currency);
+  } catch (error) {
+    if (error instanceof SalaryFxError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "salary:fx-unavailable",
+          error: "A current USD conversion rate is unavailable. Please try again shortly.",
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 
   const db = await createServerClient();
   const now = new Date().toISOString();
@@ -67,9 +98,19 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       role_title: (body.role_title as string).trim(),
       years_experience: body.years_experience as number,
-      salary_egp: body.salary_egp ?? null,
-      salary_usd: body.salary_usd ?? null,
+      // Keep the legacy columns populated for older readers while the original
+      // amount/currency pair becomes the canonical representation.
+      salary_egp: currency === "EGP" ? amount : null,
+      salary_usd: currency === "USD" ? amount : null,
       currency,
+      source: "user",
+      source_record_key: null,
+      original_amount: amount,
+      original_currency: currency,
+      usd_amount: conversion.usdAmount,
+      usd_conversion_rate: conversion.usdConversionRate,
+      usd_rate_as_of: conversion.usdRateAsOf,
+      usd_rate_source: conversion.usdRateSource,
       employment_type: body.employment_type ?? null,
       work_arrangement: body.work_arrangement ?? null,
       pipeline: body.pipeline ?? null,
