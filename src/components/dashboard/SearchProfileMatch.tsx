@@ -2,6 +2,7 @@ import type { ScoredJob } from "@/lib/types";
 
 export default function SearchProfileMatch({ job }: { job: ScoredJob }) {
   const match = job.search_profile_match;
+  const locationUncertain = job.location_match_status === "uncertain";
   if (!match || (match.reasons.length === 0 && match.uncertainties.length === 0)) return null;
 
   return (
@@ -11,7 +12,9 @@ export default function SearchProfileMatch({ job }: { job: ScoredJob }) {
     >
       {match.reasons.length > 0 && (
         <p>
-          <span className="font-semibold text-slate-300">Matched your profile:</span>{" "}
+          <span className="font-semibold text-slate-300">
+            {locationUncertain ? "Role traits:" : "Matched your profile:"}
+          </span>{" "}
           {match.reasons.join(" · ")}
         </p>
       )}

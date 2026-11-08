@@ -52,6 +52,7 @@ const COUNTRY_CODES: Record<string, string> = {
   brazil: "BR",
   india: "IN",
   indonesia: "ID",
+  philippines: "PH",
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -90,55 +91,76 @@ const COUNTRY_NAMES: Record<string, string> = {
   BR: "Brazil",
   IN: "India",
   ID: "Indonesia",
+  PH: "Philippines",
 };
 
-const CITY_COUNTRIES: Record<string, { country: string; code: string }> = {
-  berlin: { country: "Germany", code: "DE" },
-  bremen: { country: "Germany", code: "DE" },
-  hamburg: { country: "Germany", code: "DE" },
-  munich: { country: "Germany", code: "DE" },
-  münchen: { country: "Germany", code: "DE" },
-  nuremberg: { country: "Germany", code: "DE" },
-  nürnberg: { country: "Germany", code: "DE" },
-  erlangen: { country: "Germany", code: "DE" },
-  buckenhof: { country: "Germany", code: "DE" },
-  frankfurt: { country: "Germany", code: "DE" },
-  stuttgart: { country: "Germany", code: "DE" },
-  cologne: { country: "Germany", code: "DE" },
-  köln: { country: "Germany", code: "DE" },
-  cairo: { country: "Egypt", code: "EG" },
-  giza: { country: "Egypt", code: "EG" },
-  alexandria: { country: "Egypt", code: "EG" },
-  london: { country: "UK", code: "GB" },
-  dublin: { country: "Ireland", code: "IE" },
-  amsterdam: { country: "Netherlands", code: "NL" },
-  paris: { country: "France", code: "FR" },
-  madrid: { country: "Spain", code: "ES" },
-  barcelona: { country: "Spain", code: "ES" },
-  lisbon: { country: "Portugal", code: "PT" },
-  vienna: { country: "Austria", code: "AT" },
-  zurich: { country: "Switzerland", code: "CH" },
-  stockholm: { country: "Sweden", code: "SE" },
-  copenhagen: { country: "Denmark", code: "DK" },
-  sofia: { country: "Bulgaria", code: "BG" },
-  warsaw: { country: "Poland", code: "PL" },
-  prague: { country: "Czechia", code: "CZ" },
-  rome: { country: "Italy", code: "IT" },
-  tokyo: { country: "Japan", code: "JP" },
-  osaka: { country: "Japan", code: "JP" },
-  kyoto: { country: "Japan", code: "JP" },
-  johannesburg: { country: "South Africa", code: "ZA" },
-  "cape town": { country: "South Africa", code: "ZA" },
-  "mexico city": { country: "Mexico", code: "MX" },
-  "buenos aires": { country: "Argentina", code: "AR" },
-  "são paulo": { country: "Brazil", code: "BR" },
-  "sao paulo": { country: "Brazil", code: "BR" },
-  "rio de janeiro": { country: "Brazil", code: "BR" },
-  mumbai: { country: "India", code: "IN" },
-  delhi: { country: "India", code: "IN" },
-  bengaluru: { country: "India", code: "IN" },
-  bangalore: { country: "India", code: "IN" },
-  jakarta: { country: "Indonesia", code: "ID" },
+// These are unambiguous country-level location terms observed in live ATS
+// records. They are deliberately separate from CITY_COUNTRIES: a state should
+// identify the posting country, but must not be presented as a city match.
+const LOCATION_COUNTRY_ALIASES: Record<string, { country: string; code: string }> = {
+  california: { country: "USA", code: "US" },
+};
+
+interface CityCountry {
+  city: string;
+  country: string;
+  code: string;
+}
+
+const CITY_COUNTRIES: Record<string, CityCountry> = {
+  berlin: { city: "Berlin", country: "Germany", code: "DE" },
+  bremen: { city: "Bremen", country: "Germany", code: "DE" },
+  hamburg: { city: "Hamburg", country: "Germany", code: "DE" },
+  munich: { city: "Munich", country: "Germany", code: "DE" },
+  münchen: { city: "München", country: "Germany", code: "DE" },
+  nuremberg: { city: "Nuremberg", country: "Germany", code: "DE" },
+  nürnberg: { city: "Nürnberg", country: "Germany", code: "DE" },
+  erlangen: { city: "Erlangen", country: "Germany", code: "DE" },
+  buckenhof: { city: "Buckenhof", country: "Germany", code: "DE" },
+  frankfurt: { city: "Frankfurt", country: "Germany", code: "DE" },
+  stuttgart: { city: "Stuttgart", country: "Germany", code: "DE" },
+  cologne: { city: "Cologne", country: "Germany", code: "DE" },
+  köln: { city: "Köln", country: "Germany", code: "DE" },
+  cairo: { city: "Cairo", country: "Egypt", code: "EG" },
+  giza: { city: "Giza", country: "Egypt", code: "EG" },
+  alexandria: { city: "Alexandria", country: "Egypt", code: "EG" },
+  london: { city: "London", country: "UK", code: "GB" },
+  dublin: { city: "Dublin", country: "Ireland", code: "IE" },
+  amsterdam: { city: "Amsterdam", country: "Netherlands", code: "NL" },
+  paris: { city: "Paris", country: "France", code: "FR" },
+  madrid: { city: "Madrid", country: "Spain", code: "ES" },
+  barcelona: { city: "Barcelona", country: "Spain", code: "ES" },
+  lisbon: { city: "Lisbon", country: "Portugal", code: "PT" },
+  vienna: { city: "Vienna", country: "Austria", code: "AT" },
+  zurich: { city: "Zurich", country: "Switzerland", code: "CH" },
+  stockholm: { city: "Stockholm", country: "Sweden", code: "SE" },
+  copenhagen: { city: "Copenhagen", country: "Denmark", code: "DK" },
+  sofia: { city: "Sofia", country: "Bulgaria", code: "BG" },
+  warsaw: { city: "Warsaw", country: "Poland", code: "PL" },
+  prague: { city: "Prague", country: "Czechia", code: "CZ" },
+  rome: { city: "Rome", country: "Italy", code: "IT" },
+  tokyo: { city: "Tokyo", country: "Japan", code: "JP" },
+  osaka: { city: "Osaka", country: "Japan", code: "JP" },
+  kyoto: { city: "Kyoto", country: "Japan", code: "JP" },
+  johannesburg: { city: "Johannesburg", country: "South Africa", code: "ZA" },
+  "cape town": { city: "Cape Town", country: "South Africa", code: "ZA" },
+  "mexico city": { city: "Mexico City", country: "Mexico", code: "MX" },
+  "buenos aires": { city: "Buenos Aires", country: "Argentina", code: "AR" },
+  "são paulo": { city: "São Paulo", country: "Brazil", code: "BR" },
+  "sao paulo": { city: "Sao Paulo", country: "Brazil", code: "BR" },
+  "rio de janeiro": { city: "Rio de Janeiro", country: "Brazil", code: "BR" },
+  mumbai: { city: "Mumbai", country: "India", code: "IN" },
+  delhi: { city: "Delhi", country: "India", code: "IN" },
+  bengaluru: { city: "Bengaluru", country: "India", code: "IN" },
+  bangalore: { city: "Bangalore", country: "India", code: "IN" },
+  jakarta: { city: "Jakarta", country: "Indonesia", code: "ID" },
+  "san francisco": { city: "San Francisco", country: "USA", code: "US" },
+  "new york": { city: "New York", country: "USA", code: "US" },
+  chicago: { city: "Chicago", country: "USA", code: "US" },
+  seattle: { city: "Seattle", country: "USA", code: "US" },
+  austin: { city: "Austin", country: "USA", code: "US" },
+  boston: { city: "Boston", country: "USA", code: "US" },
+  manila: { city: "Manila", country: "Philippines", code: "PH" },
 };
 
 function escapeRegex(value: string): string {
@@ -166,6 +188,7 @@ function cleanCityCandidate(value: string): string | null {
     .replace(/\b(office|headquarters|hq)\b/gi, " ")
     .replace(/[()]/g, " ")
     .trim()
+    .replace(/^[\s-]+|[\s-]+$/g, "")
     .replace(/\s+/g, " ");
   if (!candidate || /^(worldwide|global|multiple locations|anywhere|unknown)$/i.test(candidate)) {
     return null;
@@ -173,17 +196,52 @@ function cleanCityCandidate(value: string): string | null {
   return candidate;
 }
 
-export function normalizePostingLocation(rawLocation: string): NormalizedPostingLocation {
+function matchKnownCity(location: string): CityCountry | null {
+  const entries = Object.entries(CITY_COUNTRIES).sort(([a], [b]) => b.length - a.length);
+  for (const [name, city] of entries) {
+    if (new RegExp(`(?:^|[^\\p{L}])${escapeRegex(name)}(?=$|[^\\p{L}])`, "iu").test(location)) {
+      return city;
+    }
+  }
+  return null;
+}
+
+function matchLocationCountry(location: string): { country: string; code: string } | null {
+  for (const [alias, resolved] of Object.entries(LOCATION_COUNTRY_ALIASES)) {
+    if (new RegExp(`(?:^|[^\\p{L}])${escapeRegex(alias)}(?=$|[^\\p{L}])`, "iu").test(location)) {
+      return resolved;
+    }
+  }
+  return null;
+}
+
+function isRegionalOrUnspecifiedLocation(location: string): boolean {
+  return (
+    !location ||
+    /\b(global|emea|worldwide|any office|multiple locations|remote|anywhere)\b/i.test(location)
+  );
+}
+
+export function normalizePostingLocation(
+  rawLocation: string,
+  title = "",
+): NormalizedPostingLocation {
   const sourceLocation = rawLocation.trim();
-  const country = matchCountry(sourceLocation);
+  const sourceCountry = matchCountry(sourceLocation);
   const firstPart = sourceLocation.split(/[;,|]/, 1)[0] ?? "";
   const cityCandidate = cleanCityCandidate(firstPart);
-  const city =
-    cityCandidate && (CITY_COUNTRIES[cityCandidate.toLowerCase()] || !matchCountry(cityCandidate))
+  const cityCountry = matchKnownCity(sourceLocation);
+  const city = cityCountry?.city ??
+    (cityCandidate && !matchCountry(cityCandidate) && !matchLocationCountry(cityCandidate)
       ? cityCandidate
-      : null;
-  const cityCountry = city ? CITY_COUNTRIES[city.toLowerCase()] : undefined;
-  const resolved = country ?? cityCountry ?? null;
+      : null);
+  const sourceResolved = sourceCountry ?? cityCountry ?? matchLocationCountry(sourceLocation) ?? null;
+  // A concrete ATS location is stronger evidence than a job title. Some ATS
+  // feeds provide only a regional label (for example, EMEA); in that narrow
+  // case an explicit country in the title is still useful and reviewable.
+  const titleCountry =
+    !sourceResolved && isRegionalOrUnspecifiedLocation(sourceLocation) ? matchCountry(title) : null;
+  const resolved = sourceResolved ?? titleCountry;
 
   return {
     sourceLocation,

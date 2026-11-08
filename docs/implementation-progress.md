@@ -52,6 +52,14 @@
 - [x] Execute the one-time production cleanup after explicit confirmation: deleted 8,154 untracked 90-day rows, invalidated three dashboard caches, and refreshed the scheduler timestamp. `raw_jobs` fell from 27,717 to 19,563 rows; no stale untracked 90-day candidate remains.
 - [ ] Check the database-size trend after the next cron runs. A normal vacuum makes deleted space reusable; it does not necessarily reduce the allocated-disk chart immediately.
 
+## Active: location-truth audit (#82)
+
+- [x] Audit the live unknown-country pool before changing matching behavior. The large concrete-location gap was not Germany coverage: 2,966 unclassified US postings and 129 Philippines postings used ATS wrapper strings such as `Office - San Francisco`, `Remote - California`, and `Office-Manila, Philippines`.
+- [x] Add evidence-only normalization for those wrappers and apply its idempotent tracked backfill (`20261108170000_backfill_audited_posting_locations.sql`). Production verification left zero rows matching that concrete-location audit unclassified. Generic `Global` and `EMEA` labels remain unresolved.
+- [x] Audit title evidence separately. Nine Grafana postings had an `EMEA` source location but explicitly said `Germany | Remote` in the title; `20261108171000_backfill_regional_title_country_evidence.sql` correctly marked those as Germany while preserving their regional source location. Production verification left zero such unclassified rows.
+- [x] Make the dashboard distinguish a confirmed country match from an unverified posting country. Unknown-country roles remain available in a collapsed **Location needs review** section, but are excluded from the confirmed match count and score ranking.
+- [ ] Push/open the review PR, then manually verify the review section and a cache rebuild against the deployed branch before merging.
+
 ## Sequenced completion plan
 
 Each implementation item is handled in its own branch and pull request. Before marking an item Done, the branch receives a code review, the focused and full automated checks run, and the user-facing path is manually tested in the browser. Its GitHub issue, Project #3 item, and this document are then updated together.

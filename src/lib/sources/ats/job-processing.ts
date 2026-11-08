@@ -71,7 +71,7 @@ export function processJobs(raw: ATSRawInput[], company: BaseCompany, mode: JobM
 
     const workAuthorization = detectWorkAuthorizationSignal(`${title}\n${r.description}`);
     const actualSponsorship = workAuthorization.status === "sponsorship_available";
-    const normalizedLocation = normalizePostingLocation(r.location || "");
+    const normalizedLocation = normalizePostingLocation(r.location || "", title);
     const workplaceType = inferWorkplaceType(r.location, title, r.description, r.workplaceType);
     const employmentTypes = inferEmploymentTypes(r.employmentType, title, r.description);
     const languageClues = extractLanguageClues(r.description);

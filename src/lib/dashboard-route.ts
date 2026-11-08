@@ -16,6 +16,10 @@ export type FeedResult = {
   pipelineLog: PipelineLog;
 };
 
+function hasLocationToConfirm(settings: ResolvedSettings): boolean {
+  return (settings.search_profile?.locations.length ?? 0) > 0;
+}
+
 function normalizeText(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ");
 }
@@ -128,12 +132,20 @@ export async function buildFeed(
   // Stage: Merge — deduplicates and sorts by total_score descending.
   // Empty first arg is intentional: this is a full rebuild path, not an
   // incremental merge — there are no pre-existing cached jobs to preserve.
-  const finalJobs = mergeJobs([], scoredJobs).map((job) => ({
-    ...job,
-    search_profile_match: settings.search_profile
-      ? explainSearchProfileMatch(job, settings.search_profile)
-      : null,
-  }));
+  const finalJobs = mergeJobs([], scoredJobs).map((job) => {
+    const locationUncertain = hasLocationToConfirm(settings) && !job.country_code;
+    const locationMatchStatus: ScoredJob["location_match_status"] = locationUncertain
+      ? "uncertain"
+      : "confirmed";
+    return {
+      ...job,
+      location_match_status: locationMatchStatus,
+      search_profile_match: settings.search_profile
+        ? explainSearchProfileMatch(job, settings.search_profile)
+        : null,
+    };
+  });
+  const confirmedJobs = finalJobs.filter((job) => job.location_match_status !== "uncertain");
 
   const pipelineLog: PipelineLog = {
     total_fetched: dbFunnelCounts.total_fetched,
@@ -143,7 +155,7 @@ export async function buildFeed(
     after_location_filter: dbFunnelCounts.after_location_filter,
     after_settings_filter: afterSettingsFilter.length,
     after_gemini_filter: geminiFiltered.length,
-    after_scoring: finalJobs.length,
+    after_scoring: confirmedJobs.length,
     cached_at: new Date().toISOString(),
   };
 
