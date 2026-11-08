@@ -8,7 +8,9 @@
 import type { RawJob } from "./types";
 import { callWithModelFallback, GeminiQuotaExhaustedError } from "./gemini-model-fallback";
 
-export const BATCH_SIZE = 15; // jobs per Gemini call (halved from 30 to offset the larger per-job char window below)
+export const BATCH_SIZE = 10;
+export const MAX_DESCRIPTION_CHARS = 2_000;
+export const BATCH_TIMEOUT_MS = 10_000;
 
 // Spacing between sequential batch calls. Firing dozens/hundreds of batches
 // back-to-back with zero pacing is what let a single cache rebuild burn
@@ -19,6 +21,24 @@ export const BATCH_DELAY_MS = 300;
 
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Gemini batch exceeded the ${timeoutMs}ms dashboard budget`));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 // Fixed, code-owned response-format contract. Deliberately NOT part of
@@ -167,11 +187,10 @@ export async function filterBatch(
     title: j.title,
     company: j.company,
     location: j.location,
-    // 10,000 chars (data-driven: 91% of jobs fully covered at 10k vs. 48.8%
-    // at the previous 6000-char ceiling; pushing past 10k buys only 8.2% more
-    // coverage for a disproportionate token-cost increase). No ingestion
-    // ceiling — processJobs stores the full description.
-    description: j.description.slice(0, 10000),
+    // A dashboard rebuild has a hard 60-second request budget. The complete
+    // description remains stored and visible in Job Radar; Gemini receives a
+    // bounded excerpt so one broad age window cannot turn into a huge prompt.
+    description: j.description.slice(0, MAX_DESCRIPTION_CHARS),
   }));
 
   const prompt = `${promptTemplate}
@@ -183,7 +202,7 @@ ${JSON.stringify(jobSummaries, null, 2)}`;
 
   let resultMap: Map<string, FilterResult>;
   try {
-    const raw = await callGemini(apiKey, prompt);
+    const raw = await withTimeout(callGemini(apiKey, prompt), BATCH_TIMEOUT_MS);
     resultMap = buildResultMap(jobs, parseDecisions(raw), raw);
   } catch (err) {
     resultMap = failOpenResultMap(jobs, err);

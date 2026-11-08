@@ -24,6 +24,21 @@ type GeminiReviewedJob = RawJob & {
   gemini_quota_exhausted: boolean;
 };
 
+// Leave time for settings loading, cache writes, and a final response within
+// the route's 60-second hosting limit. Deferred jobs stay visible and are
+// explicitly marked as unreviewed instead of making the dashboard hang.
+const DASHBOARD_REVIEW_BUDGET_MS = 40_000;
+
+function deferReview(jobs: RawJob[]): GeminiReviewedJob[] {
+  return jobs.map((job) => ({
+    ...job,
+    gemini_pass: true,
+    gemini_reason: "gemini-review-deferred",
+    gemini_reviewed: false,
+    gemini_quota_exhausted: false,
+  }));
+}
+
 // Splits jobs into ones with a usable cached decision (mapped straight to
 // the final output shape) and ones that still need a real Gemini call.
 function partitionByCache(
@@ -69,7 +84,13 @@ async function reviewUncachedJobs(
   const toPersist: Array<{ job_id: string; gemini_pass: boolean; gemini_reason: string | null }> =
     [];
 
+  const deadline = Date.now() + DASHBOARD_REVIEW_BUDGET_MS;
+
   for (let i = 0; i < jobsNeedingReview.length; i += BATCH_SIZE) {
+    if (Date.now() >= deadline) {
+      reviewed.push(...deferReview(jobsNeedingReview.slice(i)));
+      break;
+    }
     if (i > 0) await delay(BATCH_DELAY_MS);
     const batch = jobsNeedingReview.slice(i, i + BATCH_SIZE);
     const decisions = await filterBatch(apiKey, batch, prompt);
