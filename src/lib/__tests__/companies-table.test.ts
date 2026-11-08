@@ -18,6 +18,7 @@ function makeCompany(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
     pipeline_local: true,
     pipeline_global: false,
     is_active: true,
+    is_featured: false,
     created_at: "2025-01-01T00:00:00Z",
     updated_at: "2025-01-01T00:00:00Z",
     ...overrides,
@@ -81,6 +82,7 @@ describe("formFromRow", () => {
       pipeline_local: false,
       pipeline_global: true,
       is_active: false,
+      is_featured: true,
     });
     const form = formFromRow(c);
     expect(form.name).toBe("Acme");
@@ -92,6 +94,7 @@ describe("formFromRow", () => {
     expect(form.pipeline_local).toBe(false);
     expect(form.pipeline_global).toBe(true);
     expect(form.is_active).toBe(false);
+    expect(form.is_featured).toBe(true);
   });
 
   it("falls back to empty string when city is null", () => {
@@ -116,6 +119,7 @@ describe("EMPTY_FORM", () => {
     expect(EMPTY_FORM.pipeline_local).toBe(false);
     expect(EMPTY_FORM.pipeline_global).toBe(false);
     expect(EMPTY_FORM.is_active).toBe(true);
+    expect(EMPTY_FORM.is_featured).toBe(false);
   });
 
   // EMPTY_FORM itself is exactly the state missingPipeline flags — this is

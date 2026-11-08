@@ -26,6 +26,7 @@ function makeCompanyRow(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
     pipeline_local: true,
     pipeline_global: false,
     is_active: true,
+    is_featured: false,
     created_at: "2025-01-01T00:00:00Z",
     updated_at: "2025-01-01T00:00:00Z",
     ...overrides,

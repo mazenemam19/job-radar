@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     pipeline_local: sub.pipeline_local,
     pipeline_global: sub.pipeline_global,
     is_active: true,
+    is_featured: false,
     created_at: sub.submitted_at,
     updated_at: sub.submitted_at,
   };
