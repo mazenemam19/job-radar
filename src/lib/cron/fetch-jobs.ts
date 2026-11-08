@@ -60,6 +60,7 @@ function makeFetchTask(
   task: ScheduledFetchTask,
   deadline: number,
   signal: AbortSignal,
+  onStart: (task: ScheduledFetchTask) => void,
   onSettle: (task: ScheduledFetchTask, result: FetchTaskResult) => void,
 ): () => Promise<FetchTaskResult> {
   return async () => {
@@ -75,6 +76,7 @@ function makeFetchTask(
       onSettle(task, result);
       return result;
     }
+    onStart(task);
     const result = await fetchCompany(row, mode, signal);
     const completed: FetchTaskResult = { ...result, completed: !signal.aborted };
     onSettle(task, completed);
@@ -97,11 +99,10 @@ export async function fetchAllCompanyJobs(
   const warnings: string[] = [];
   const controller = new AbortController();
   const selectedTasks = sortAndRotateTasks(buildScheduledTasks(companies)).slice(0, batchSize);
-  const completedTaskKeys = new Set<string>();
+  const startedTaskKeys = new Set<string>();
 
   function recordResult(task: ScheduledFetchTask, result: FetchTaskResult): void {
     const healthKey = `${result.company}:${result.mode}`;
-    if (result.completed) completedTaskKeys.add(`${task.row.id}:${task.mode}`);
     if (result.error) {
       errors.push(`${result.company} (${result.mode}): ${result.error}`);
       sourceHealth[healthKey] = { company: result.company, fetched: 0, errors: 1 };
@@ -116,7 +117,13 @@ export async function fetchAllCompanyJobs(
   const workableTasks: Array<() => Promise<FetchTaskResult>> = [];
   const otherTasks: Array<() => Promise<FetchTaskResult>> = [];
   for (const task of selectedTasks) {
-    const fetchTask = makeFetchTask(task, deadline, controller.signal, recordResult);
+    const fetchTask = makeFetchTask(
+      task,
+      deadline,
+      controller.signal,
+      (startedTask) => startedTaskKeys.add(`${startedTask.row.id}:${startedTask.mode}`),
+      recordResult,
+    );
     (task.row.ats === "workable" ? workableTasks : otherTasks).push(fetchTask);
   }
 
@@ -134,7 +141,8 @@ export async function fetchAllCompanyJobs(
   if (outcome === "cutoff") {
     console.warn("[cron] fetch hard cutoff reached; aborting remaining ATS requests");
     controller.abort();
+    await dispatchComplete;
   }
-  recordDispatchCursor(selectedTasks, completedTaskKeys);
+  recordDispatchCursor(selectedTasks, startedTaskKeys);
   return { allJobs, sourceHealth, errors, warnings };
 }

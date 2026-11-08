@@ -178,4 +178,39 @@ describe("fetchAllCompanyJobs — dispatch rotation cursor", () => {
     await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000, 1);
     expect(fetchCompany).toHaveBeenCalledWith(companies[1], "local", expect.any(AbortSignal));
   });
+
+  it("moves past an aborted early task when a later scheduled task started", async () => {
+    vi.useFakeTimers();
+    const { fetchCompany } = await import("../ats-bridge");
+    const dispatched: string[] = [];
+    vi.mocked(fetchCompany).mockImplementation(async (row, mode, signal) => {
+      dispatched.push(row.id);
+      if (row.id !== "stuck") return { company: row.name, mode, jobs: [], error: null };
+      return new Promise((resolve) => {
+        signal?.addEventListener(
+          "abort",
+          () => resolve({ company: row.name, mode, jobs: [], error: "Aborted" }),
+          { once: true },
+        );
+      });
+    });
+    const { fetchAllCompanyJobs } = await import("../cron/fetch-jobs");
+    const start = Date.now();
+    const companies = [
+      makeCompanyRow({ id: "stuck", ats: "workable", created_at: "2025-01-01T00:00:00Z" }),
+      makeCompanyRow({ id: "fast", created_at: "2025-01-02T00:00:00Z" }),
+      makeCompanyRow({ id: "tail", created_at: "2025-01-03T00:00:00Z" }),
+    ];
+
+    try {
+      const firstRun = fetchAllCompanyJobs(companies, start + 60_000, start + 1_000, 2);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await firstRun;
+      dispatched.length = 0;
+      await fetchAllCompanyJobs(companies, Date.now() + 60_000, Date.now() + 120_000, 1);
+      expect(dispatched).toEqual(["tail"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

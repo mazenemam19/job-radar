@@ -65,12 +65,12 @@ export function sortAndRotate(rows: ATSCompanyRow[]): ATSCompanyRow[] {
   return [...unique.values()];
 }
 
-/** Advance only through the contiguous completed prefix. A cancelled task is
- * left for the next run; a completed request that returns an ATS error moves
- * past that source instead of permanently blocking the schedule. */
+/** Advance through the contiguous started prefix. A request aborted at the
+ * cutoff is retried on the next catalog rotation, but it cannot prevent
+ * later sources from receiving a turn on every intervening invocation. */
 export function recordDispatchCursor(
   orderedTasks: ScheduledFetchTask[],
-  completedTaskKeys: ReadonlySet<string>,
+  startedTaskKeys: ReadonlySet<string>,
 ): void;
 export function recordDispatchCursor(
   orderedRows: ATSCompanyRow[],
@@ -78,13 +78,13 @@ export function recordDispatchCursor(
 ): void;
 export function recordDispatchCursor(
   ordered: ScheduledFetchTask[] | ATSCompanyRow[],
-  completed: ReadonlySet<string>,
+  started: ReadonlySet<string>,
 ): void {
   const tasksWereProvided = ordered.length > 0 && "row" in ordered[0];
   if (!tasksWereProvided) {
     let lastRow: ATSCompanyRow | null = null;
     for (const row of ordered as ATSCompanyRow[]) {
-      if (completed.has(row.id)) lastRow = row;
+      if (started.has(row.id)) lastRow = row;
     }
     if (!lastRow) return;
     cursorCache = { companyId: lastRow.id, createdAt: lastRow.created_at };
@@ -92,10 +92,10 @@ export function recordDispatchCursor(
     return;
   }
   const orderedTasks = ordered as ScheduledFetchTask[];
-  const completedTaskKeys = completed;
+  const startedTaskKeys = started;
   let last: ScheduledFetchTask | null = null;
   for (const task of orderedTasks) {
-    if (!completedTaskKeys.has(`${task.row.id}:${task.mode}`)) break;
+    if (!startedTaskKeys.has(`${task.row.id}:${task.mode}`)) break;
     last = task;
   }
   if (!last) return;
