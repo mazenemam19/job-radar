@@ -1,6 +1,6 @@
 // src/lib/__tests__/job-display.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { formatRelativeDate, formatPostedLabel } from "../job-display";
+import { formatJobLocation, formatRelativeDate, formatPostedLabel } from "../job-display";
 
 const NOW = new Date("2025-06-01T12:00:00Z").getTime();
 
@@ -63,5 +63,33 @@ describe("formatPostedLabel", () => {
       posted_at: new Date(NOW).toISOString(), // ignored — must not be used
     };
     expect(formatPostedLabel(job)).toBe("~5d ago (date unknown)");
+  });
+});
+
+describe("formatJobLocation", () => {
+  it("uses posting evidence instead of a stale company-derived flag", () => {
+    expect(
+      formatJobLocation({
+        title: "Senior Software Engineer",
+        location: "Berlin, Germany",
+        source_location: "Berlin, Germany",
+      }),
+    ).toBe("🇩🇪 Berlin, Germany");
+  });
+
+  it("recognizes a concrete US location even if legacy fields were global", () => {
+    expect(
+      formatJobLocation({
+        title: "Frontend Engineer",
+        location: "Mountain View, California",
+        source_location: "Mountain View, California",
+      }),
+    ).toBe("🇺🇸 Mountain View, California");
+  });
+
+  it("does not invent a country when the ATS omitted the location", () => {
+    expect(
+      formatJobLocation({ title: "Frontend Engineer", location: "", source_location: "" }),
+    ).toBe("🌍 Location not supplied");
   });
 });

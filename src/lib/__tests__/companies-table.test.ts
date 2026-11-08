@@ -3,7 +3,13 @@
 // lib/companies-table.ts (audit row #21): filterCompanies and formFromRow.
 
 import { describe, it, expect } from "vitest";
-import { filterCompanies, formFromRow, EMPTY_FORM, missingPipeline } from "../companies-table";
+import {
+  filterCompanies,
+  formFromRow,
+  formatCompanyCountry,
+  EMPTY_FORM,
+  missingPipeline,
+} from "../companies-table";
 import type { ATSCompanyRow } from "../types";
 
 function makeCompany(overrides: Partial<ATSCompanyRow> = {}): ATSCompanyRow {
@@ -65,6 +71,20 @@ describe("filterCompanies", () => {
     // Let's use a letter that matches all three differently
     const result = filterCompanies(companies, "e"); // Acme, Beta, greenhouse, lever
     expect(result.length).toBeGreaterThan(1);
+  });
+});
+
+describe("formatCompanyCountry", () => {
+  it("labels global company metadata as uncertain rather than a country", () => {
+    expect(formatCompanyCountry(makeCompany({ country: "Global", country_flag: "🌍" }))).toBe(
+      "🌍 Unspecified / multi-country",
+    );
+  });
+
+  it("keeps a verified company country readable", () => {
+    expect(formatCompanyCountry(makeCompany({ country: "Germany", country_flag: "🇩🇪" }))).toBe(
+      "🇩🇪 Germany",
+    );
   });
 });
 

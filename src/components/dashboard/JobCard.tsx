@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { computeLiveDisplayScore } from "@/lib/scoring";
-import { formatPostedLabel } from "@/lib/job-display";
+import { formatJobLocation, formatPostedLabel } from "@/lib/job-display";
 import { MODE_COLORS } from "@/lib/constants";
 import JobBadges from "./JobBadges";
 import JobScoreBreakdown from "./JobScoreBreakdown";
@@ -50,7 +50,7 @@ export default function JobCard({ job, onTrack, onStrategy, isTracked, settings 
             {job.title}
           </Link>
           <div className="mt-1 text-[13px] text-[#94a3b8]">
-            {job.company} · {job.country_flag} {job.location} · {postedLabel}
+            {job.company} · {formatJobLocation(job)} · {postedLabel}
           </div>
         </div>
 

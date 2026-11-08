@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
 import { computeLiveDisplayScore } from "@/lib/scoring";
-import { formatPostedLabel } from "@/lib/job-display";
+import { formatJobLocation, formatPostedLabel } from "@/lib/job-display";
 import { MODE_COLORS } from "@/lib/constants";
 import JobDetailBadges from "@/components/dashboard/JobDetailBadges";
 import JobScoreBreakdown from "@/components/dashboard/JobScoreBreakdown";
@@ -122,7 +122,7 @@ export default function JobDetailPage() {
           <div className="min-w-0 flex-1">
             <h1 className="m-0 mb-1.5 text-[22px] font-bold text-slate-200">{job.title}</h1>
             <div className="text-sm text-slate-400">
-              {job.company} · {job.country_flag} {job.location} · {postedLabel}
+              {job.company} · {formatJobLocation(job)} · {postedLabel}
             </div>
           </div>
 

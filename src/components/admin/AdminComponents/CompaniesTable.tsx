@@ -4,7 +4,12 @@
 // filtering and form helpers live in lib/companies-table.ts.
 
 import { VALID_ATS } from "@/lib/constants";
-import { filterCompanies, type CompanyForm } from "@/lib/companies-table";
+import {
+  filterCompanies,
+  formatCompanyCountry,
+  missingPipeline,
+  type CompanyForm,
+} from "@/lib/companies-table";
 import { useCompaniesTable } from "@/hooks/useCompaniesTable";
 import { ActionBtn, FormField, INPUT_CLASS, TH_CLASS, TD_CLASS, LABEL_CLASS } from "./_shared";
 
@@ -16,6 +21,7 @@ export function CompaniesTable() {
     setSearch,
     editId,
     form,
+    error,
     setForm,
     showNew,
     startNew,
@@ -46,6 +52,15 @@ export function CompaniesTable() {
         placeholder="Search by name, country, ATS..."
         className={`${INPUT_CLASS} mb-4`}
       />
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+        >
+          {error}
+        </div>
+      )}
 
       {(showNew || editId) && (
         <CompanyFormPanel
@@ -81,15 +96,18 @@ export function CompaniesTable() {
                     <div className="text-[11px] text-[#64748b]">{c.slug}</div>
                   </td>
                   <td className={`${TD_CLASS} font-mono text-xs text-[#818cf8]`}>{c.ats}</td>
-                  <td className={TD_CLASS}>
-                    {c.country_flag} {c.country}
-                  </td>
+                  <td className={TD_CLASS}>{formatCompanyCountry(c)}</td>
                   <td className={TD_CLASS}>
                     {c.pipeline_local && (
                       <span className="mr-1 text-[10px] text-[#22c55e]">🇪🇬Local</span>
                     )}
                     {c.pipeline_global && (
                       <span className="text-[10px] text-[#f59e0b]">🌐Global</span>
+                    )}
+                    {missingPipeline(c.is_active, c.pipeline_local, c.pipeline_global) && (
+                      <span className="text-[10px] font-semibold text-[#f87171]">
+                        ⚠ No pipeline — not fetched
+                      </span>
                     )}
                   </td>
                   <td className={TD_CLASS}>
@@ -165,7 +183,7 @@ function CompanyFormPanel({
         />
         <FormField
           id="company-country"
-          label="Country code (e.g. GB)"
+          label="Company country (ISO code preferred; blank only if unknown)"
           value={form.country}
           onChange={(v) => set("country", v.toUpperCase())}
         />
