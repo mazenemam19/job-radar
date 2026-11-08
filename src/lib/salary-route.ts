@@ -15,10 +15,10 @@ import type {
 export type RawSalaryRow = {
   role_title: string;
   years_experience: number;
-  currency: string;
-  salary_egp: number | null;
-  salary_usd: number | null;
+  years_experience_exact: number | null;
+  usd_amount: number | null;
   pipeline: string | null;
+  reported_at: string;
 };
 
 export const VALID_CURRENCIES: readonly SalaryCurrency[] = ["EGP", "USD", "EUR", "GBP"];
@@ -34,6 +34,8 @@ export const VALID_CURRENCIES: readonly SalaryCurrency[] = ["EGP", "USD", "EUR",
 export type SalaryPostBody = {
   role_title?: string;
   years_experience?: number;
+  amount?: number;
+  /** Legacy fields are accepted during the client transition only. */
   salary_egp?: number;
   salary_usd?: number;
   currency?: SalaryCurrency;
@@ -51,32 +53,60 @@ export function isSalaryCurrency(x: unknown): x is SalaryCurrency {
 
 /** Validates a POST /api/salary request body. Returns ok or an error message. */
 export function validateSalaryPost(body: SalaryPostBody): ValidationResult {
-  if (!body.role_title || body.years_experience == null || !body.currency) {
-    return { ok: false, error: "role_title, years_experience and currency are required" };
+  if (typeof body.role_title !== "string" || !body.role_title.trim() || !body.currency) {
+    return { ok: false, error: "role_title and currency are required" };
   }
   if (!isSalaryCurrency(body.currency)) {
     return { ok: false, error: "Invalid currency" };
   }
+  if (
+    typeof body.years_experience !== "number" ||
+    !Number.isFinite(body.years_experience) ||
+    body.years_experience < 0 ||
+    body.years_experience > 80
+  ) {
+    return { ok: false, error: "years_experience must be between 0 and 80" };
+  }
+  if (getSubmittedAmount(body) == null) {
+    return { ok: false, error: "A positive salary amount is required" };
+  }
   return { ok: true };
+}
+
+/** Resolves the new amount field, with a short-lived fallback for older clients. */
+export function getSubmittedAmount(body: SalaryPostBody): number | null {
+  const amount = body.amount;
+  if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) return amount;
+
+  const legacyAmount =
+    body.currency === "EGP"
+      ? body.salary_egp
+      : body.currency === "USD"
+        ? body.salary_usd
+        : body.salary_usd ?? body.salary_egp;
+
+  return typeof legacyAmount === "number" && Number.isFinite(legacyAmount) && legacyAmount > 0
+    ? legacyAmount
+    : null;
 }
 
 // ── Aggregation ───────────────────────────────────────────────
 
 type AggKey = string;
-type AggMeta = { role: string; exp: number; curr: string; pipeline: string | null };
+type AggMeta = {
+  role: string;
+  exp: number;
+  pipeline: string | null;
+  earliestReportedAt: string;
+  latestReportedAt: string;
+};
 
 /**
- * Picks the numeric salary amount from a row based on its currency.
- * EUR/GBP fall back to whichever column is non-null (old schema shape).
+ * Returns only an auditable USD snapshot. Legacy rows without a recorded
+ * conversion deliberately stay out of the combined USD aggregate.
  */
-export function pickAmount(
-  currency: string,
-  salary_egp: number | null,
-  salary_usd: number | null,
-): number | null {
-  if (currency === "EGP") return salary_egp;
-  if (currency === "USD") return salary_usd;
-  return salary_usd ?? salary_egp;
+export function pickAmount(usdAmount: number | null): number | null {
+  return typeof usdAmount === "number" && Number.isFinite(usdAmount) ? usdAmount : null;
 }
 
 /**
@@ -90,7 +120,7 @@ export function bucketExperience(years: number): number {
   return 10;
 }
 
-/** Groups rows by (role × expBand × currency × pipeline). */
+/** Groups rows by (role × expBand × pipeline), all in normalized USD. */
 function buildGroups(rows: RawSalaryRow[]): {
   groups: Map<AggKey, number[]>;
   meta: Map<AggKey, AggMeta>;
@@ -99,20 +129,25 @@ function buildGroups(rows: RawSalaryRow[]): {
   const meta = new Map<AggKey, AggMeta>();
 
   for (const row of rows) {
-    const amount = pickAmount(row.currency, row.salary_egp, row.salary_usd);
+    const amount = pickAmount(row.usd_amount);
     if (amount == null) continue;
 
-    const expBand = bucketExperience(row.years_experience);
-    const key: AggKey = `${row.role_title}|${expBand}|${row.currency}|${row.pipeline ?? "all"}`;
+    const expBand = bucketExperience(row.years_experience_exact ?? row.years_experience);
+    const key: AggKey = `${row.role_title}|${expBand}|${row.pipeline ?? "all"}`;
 
     if (!groups.has(key)) {
       groups.set(key, []);
       meta.set(key, {
         role: row.role_title,
         exp: expBand,
-        curr: row.currency,
         pipeline: row.pipeline,
+        earliestReportedAt: row.reported_at,
+        latestReportedAt: row.reported_at,
       });
+    } else {
+      const existing = meta.get(key)!;
+      if (row.reported_at < existing.earliestReportedAt) existing.earliestReportedAt = row.reported_at;
+      if (row.reported_at > existing.latestReportedAt) existing.latestReportedAt = row.reported_at;
     }
     groups.get(key)!.push(amount);
   }
@@ -121,7 +156,7 @@ function buildGroups(rows: RawSalaryRow[]): {
 }
 
 /**
- * Aggregates raw salary rows into buckets (role × expBand × currency × pipeline).
+ * Aggregates raw salary rows into USD buckets (role × expBand × pipeline).
  * Suppresses buckets with fewer than 2 entries (privacy floor).
  */
 export function aggregateSalaries(rows: RawSalaryRow[]): SalaryAggregate[] {
@@ -137,12 +172,14 @@ export function aggregateSalaries(rows: RawSalaryRow[]): SalaryAggregate[] {
     results.push({
       role_title: m.role,
       years_experience: m.exp,
-      currency: m.curr as SalaryCurrency,
+      currency: "USD",
       min: sorted[0],
       max: sorted[sorted.length - 1],
       median: sorted[Math.floor(sorted.length / 2)],
       count: sorted.length,
       pipeline: m.pipeline as Pipeline | null,
+      earliest_reported_at: m.earliestReportedAt,
+      latest_reported_at: m.latestReportedAt,
     });
   }
 

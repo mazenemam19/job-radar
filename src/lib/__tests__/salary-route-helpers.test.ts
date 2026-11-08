@@ -1,43 +1,27 @@
-// src/lib/__tests__/salary-route-helpers.test.ts
-// Covers the pure helpers extracted from salary/route.ts into lib/salary-route.ts
-// (audit row #19): pickAmount, bucketExperience, aggregateSalaries, validateSalaryPost.
+// Covers pure salary-route helpers: USD-only aggregation, privacy suppression,
+// and input validation before the server records conversion provenance.
 
 import { describe, it, expect } from "vitest";
 import {
   pickAmount,
   bucketExperience,
   aggregateSalaries,
+  getSubmittedAmount,
   validateSalaryPost,
   VALID_CURRENCIES,
 } from "../salary-route";
 import type { RawSalaryRow } from "../salary-route";
 import type { SalaryCurrency } from "@/lib/types";
 
-// ── pickAmount ────────────────────────────────────────────────
-
 describe("pickAmount", () => {
-  it("returns salary_egp for EGP currency", () => {
-    expect(pickAmount("EGP", 30000, null)).toBe(30000);
+  it("returns an auditable USD snapshot", () => {
+    expect(pickAmount(1_500)).toBe(1_500);
   });
 
-  it("returns salary_usd for USD currency", () => {
-    expect(pickAmount("USD", null, 1500)).toBe(1500);
-  });
-
-  it("falls back to salary_usd for EUR (old two-column schema)", () => {
-    expect(pickAmount("EUR", null, 1200)).toBe(1200);
-  });
-
-  it("falls back to salary_egp when salary_usd is null for non-EGP/USD", () => {
-    expect(pickAmount("GBP", 40000, null)).toBe(40000);
-  });
-
-  it("returns null when both columns are null", () => {
-    expect(pickAmount("EUR", null, null)).toBeNull();
+  it("does not guess a conversion for legacy rows", () => {
+    expect(pickAmount(null)).toBeNull();
   });
 });
-
-// ── bucketExperience ──────────────────────────────────────────
 
 describe("bucketExperience", () => {
   it("buckets 0-2 years as band 1", () => {
@@ -61,16 +45,14 @@ describe("bucketExperience", () => {
   });
 });
 
-// ── aggregateSalaries ─────────────────────────────────────────
-
 function row(overrides: Partial<RawSalaryRow> = {}): RawSalaryRow {
   return {
     role_title: "Frontend Engineer",
     years_experience: 4,
-    currency: "EGP",
-    salary_egp: 30000,
-    salary_usd: null,
+    years_experience_exact: 4,
+    usd_amount: 750,
     pipeline: "local",
+    reported_at: "2024-06-15T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -84,103 +66,155 @@ describe("aggregateSalaries", () => {
     expect(aggregateSalaries([row()])).toEqual([]);
   });
 
-  it("returns an aggregate for a bucket with 2+ entries", () => {
-    const rows = [row({ salary_egp: 30000 }), row({ salary_egp: 40000 })];
-    const result = aggregateSalaries(rows);
+  it("returns a USD aggregate for a bucket with 2+ entries", () => {
+    const result = aggregateSalaries([row({ usd_amount: 600 }), row({ usd_amount: 800 })]);
+
     expect(result).toHaveLength(1);
-    expect(result[0].min).toBe(30000);
-    expect(result[0].max).toBe(40000);
-    expect(result[0].median).toBe(40000); // floor(2/2) = index 1
-    expect(result[0].count).toBe(2);
+    expect(result[0]).toMatchObject({
+      min: 600,
+      max: 800,
+      median: 800,
+      count: 2,
+      currency: "USD",
+    });
   });
 
-  it("skips rows where the resolved amount is null", () => {
-    // EUR row with both columns null → amount is null → skipped
-    const rows = [
-      row({ currency: "EUR", salary_egp: null, salary_usd: null }),
-      row({ currency: "EUR", salary_egp: null, salary_usd: null }),
-    ];
-    expect(aggregateSalaries(rows)).toEqual([]);
+  it("skips rows without a recorded USD conversion", () => {
+    expect(aggregateSalaries([row({ usd_amount: null }), row({ usd_amount: null })])).toEqual([]);
   });
 
   it("buckets rows with the same role into the same experience band", () => {
-    const rows = [
-      row({ years_experience: 3, salary_egp: 30000 }), // band 4
-      row({ years_experience: 5, salary_egp: 40000 }), // band 4 → same key
-    ];
-    const result = aggregateSalaries(rows);
+    const result = aggregateSalaries([
+      row({ years_experience: 3, usd_amount: 600 }),
+      row({ years_experience: 5, usd_amount: 800 }),
+    ]);
+
     expect(result).toHaveLength(1);
-    expect(result[0].years_experience).toBe(4); // band representative
+    expect(result[0].years_experience).toBe(4);
     expect(result[0].count).toBe(2);
   });
 
-  it("keeps roles in separate buckets when currency differs", () => {
-    const rows = [
-      row({ currency: "EGP", salary_egp: 30000, salary_usd: null }),
-      row({ currency: "EGP", salary_egp: 40000, salary_usd: null }),
-      row({ currency: "USD", salary_egp: null, salary_usd: 1500 }),
-      row({ currency: "USD", salary_egp: null, salary_usd: 2000 }),
-    ];
-    const result = aggregateSalaries(rows);
-    expect(result).toHaveLength(2);
-    const currencies = result.map((r) => r.currency).sort();
-    expect(currencies).toEqual(["EGP", "USD"]);
+  it("uses an exact source value for experience bands when present", () => {
+    const result = aggregateSalaries([
+      row({ years_experience: 3, years_experience_exact: 2.5, usd_amount: 600 }),
+      row({ years_experience: 3, years_experience_exact: 2.5, usd_amount: 800 }),
+    ]);
+
+    expect(result[0].years_experience).toBe(1);
+  });
+
+  it("combines converted source currencies into the same USD bucket", () => {
+    const result = aggregateSalaries([
+      row({ usd_amount: 600 }),
+      row({ usd_amount: 800 }),
+      row({ usd_amount: 1_500 }),
+      row({ usd_amount: 2_000 }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ currency: "USD", count: 4 });
+  });
+
+  it("keeps the report-date range without exposing individual reports", () => {
+    const result = aggregateSalaries([
+      row({ usd_amount: 600, reported_at: "2024-04-10T10:20:10.000Z" }),
+      row({ usd_amount: 800, reported_at: "2024-07-01T08:06:54.000Z" }),
+    ]);
+
+    expect(result[0]).toMatchObject({
+      earliest_reported_at: "2024-04-10T10:20:10.000Z",
+      latest_reported_at: "2024-07-01T08:06:54.000Z",
+    });
   });
 
   it("returns results sorted alphabetically by role_title", () => {
     const make = (role: string) => [
-      row({ role_title: role, salary_egp: 10000 }),
-      row({ role_title: role, salary_egp: 20000 }),
+      row({ role_title: role, usd_amount: 100 }),
+      row({ role_title: role, usd_amount: 200 }),
     ];
-    const rows = [...make("Zebra Role"), ...make("Alpha Role")];
-    const result = aggregateSalaries(rows);
+    const result = aggregateSalaries([...make("Zebra Role"), ...make("Alpha Role")]);
+
     expect(result[0].role_title).toBe("Alpha Role");
     expect(result[1].role_title).toBe("Zebra Role");
   });
 });
 
-// ── validateSalaryPost ────────────────────────────────────────
-
 describe("validateSalaryPost", () => {
   it("returns ok for a complete valid body", () => {
-    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: "EGP" })).toEqual(
-      { ok: true },
-    );
+    expect(
+      validateSalaryPost({
+        role_title: "Dev",
+        years_experience: 3,
+        amount: 30_000,
+        currency: "EGP",
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("rejects when role_title is missing", () => {
-    const result = validateSalaryPost({ years_experience: 3, currency: "EGP" });
-    expect(result.ok).toBe(false);
+    expect(validateSalaryPost({ years_experience: 3, amount: 1, currency: "EGP" }).ok).toBe(false);
   });
 
-  it("rejects when years_experience is null", () => {
-    const result = validateSalaryPost({
-      role_title: "Dev",
-      years_experience: null as unknown as number,
-      currency: "EGP",
-    });
-    expect(result.ok).toBe(false);
+  it("rejects when years_experience is invalid", () => {
+    expect(
+      validateSalaryPost({
+        role_title: "Dev",
+        years_experience: null as unknown as number,
+        amount: 1,
+        currency: "EGP",
+      }).ok,
+    ).toBe(false);
   });
 
-  it("rejects when currency is missing", () => {
-    const result = validateSalaryPost({ role_title: "Dev", years_experience: 3 });
-    expect(result.ok).toBe(false);
-  });
+  it("rejects when currency is missing or unrecognised", () => {
+    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1 }).ok).toBe(
+      false,
+    );
 
-  it("rejects an unrecognised currency", () => {
     const result = validateSalaryPost({
       role_title: "Dev",
       years_experience: 3,
+      amount: 1,
       currency: "BTC" as unknown as SalaryCurrency,
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("Invalid currency");
+    expect(result).toEqual({ ok: false, error: "Invalid currency" });
   });
 
-  it("accepts all entries in VALID_CURRENCIES", () => {
-    for (const c of VALID_CURRENCIES) {
-      const result = validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: c });
-      expect(result.ok).toBe(true);
+  it("accepts all supported original currencies", () => {
+    for (const currency of VALID_CURRENCIES) {
+      expect(
+        validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 1, currency }),
+      ).toEqual({
+        ok: true,
+      });
     }
+  });
+
+  it("rejects missing, non-positive, and non-finite amounts", () => {
+    expect(validateSalaryPost({ role_title: "Dev", years_experience: 3, currency: "USD" }).ok).toBe(
+      false,
+    );
+    expect(
+      validateSalaryPost({ role_title: "Dev", years_experience: 3, amount: 0, currency: "USD" }).ok,
+    ).toBe(false);
+    expect(
+      validateSalaryPost({
+        role_title: "Dev",
+        years_experience: 3,
+        amount: Number.NaN,
+        currency: "USD",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("temporarily accepts a valid legacy amount from older clients", () => {
+    const body = {
+      role_title: "Dev",
+      years_experience: 3,
+      salary_egp: 30_000,
+      currency: "EGP" as const,
+    };
+    expect(validateSalaryPost(body)).toEqual({ ok: true });
+    expect(getSubmittedAmount(body)).toBe(30_000);
   });
 });

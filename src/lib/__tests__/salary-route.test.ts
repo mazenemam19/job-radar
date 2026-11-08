@@ -2,8 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
-// ── Mock Supabase clients ──────────────────────────────────────
-
 const mockServerDb = { from: vi.fn() };
 
 vi.mock("../supabase/server", () => ({
@@ -15,7 +13,10 @@ vi.mock("next/headers", () => ({
   cookies: () => ({ getAll: () => [], set: () => {} }),
 }));
 
-// ── Helpers ──────────────────────────────────────────────────
+vi.mock("../salary-fx", () => ({
+  SalaryFxError: class SalaryFxError extends Error {},
+  getUsdConversion: vi.fn(),
+}));
 
 function mockQuery(returnData: unknown, returnError: unknown = null) {
   const chain: Record<string, unknown> = {
@@ -34,13 +35,13 @@ function mockQuery(returnData: unknown, returnError: unknown = null) {
 
 const mockUser = { id: "user-123", email: "user@example.com" };
 
-// ── Tests ─────────────────────────────────────────────────────
-
 describe("GET /api/salary", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { getUser } = await import("../supabase/server");
     (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+    const { getUsdConversion } = await import("../salary-fx");
+    (getUsdConversion as ReturnType<typeof vi.fn>).mockResolvedValue({ usdAmount: 700, usdConversionRate: 0.02, usdRateAsOf: "2026-11-08", usdRateSource: "test-rate-provider" });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -62,7 +63,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 30000,
         salary_usd: null,
+        usd_amount: 600,
         pipeline: "local",
+        reported_at: "2024-06-01T00:00:00Z",
       },
       {
         role_title: "Frontend Engineer",
@@ -70,7 +73,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 40000,
         salary_usd: null,
+        usd_amount: 800,
         pipeline: "local",
+        reported_at: "2024-06-15T00:00:00Z",
       },
     ];
     mockServerDb.from.mockReturnValue(mockQuery(rows));
@@ -123,7 +128,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 30000,
         salary_usd: null,
+        usd_amount: 600,
         pipeline: "global",
+        reported_at: "2024-06-01T00:00:00Z",
       },
       {
         role_title: "Engineer",
@@ -131,7 +138,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 40000,
         salary_usd: null,
+        usd_amount: 800,
         pipeline: "global",
+        reported_at: "2024-06-15T00:00:00Z",
       },
     ];
     const queryMock = mockQuery(rows);
@@ -144,7 +153,6 @@ describe("GET /api/salary", () => {
     expect(queryMock.eq).toHaveBeenCalledWith("pipeline", "global");
   });
 
-  // Aggregation suppresses groups with fewer than 2 entries (privacy guard)
   it("suppresses aggregation groups with fewer than 2 entries", async () => {
     const rows = [
       {
@@ -153,7 +161,9 @@ describe("GET /api/salary", () => {
         currency: "EGP",
         salary_egp: 99999,
         salary_usd: null,
+        usd_amount: 1_000,
         pipeline: "local",
+        reported_at: "2024-06-01T00:00:00Z",
       },
     ];
     mockServerDb.from.mockReturnValue(mockQuery(rows));
@@ -180,7 +190,6 @@ describe("GET /api/salary", () => {
     expect(json.data).toEqual([]);
   });
 
-  // Supabase query failure returns 500
   it("returns 500 when Supabase query fails", async () => {
     mockServerDb.from.mockReturnValue(mockQuery(null, { message: "connection reset" }));
 
@@ -197,6 +206,8 @@ describe("POST /api/salary", () => {
     vi.clearAllMocks();
     const { getUser } = await import("../supabase/server");
     (getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+    const { getUsdConversion } = await import("../salary-fx");
+    (getUsdConversion as ReturnType<typeof vi.fn>).mockResolvedValue({ usdAmount: 700, usdConversionRate: 0.02, usdRateAsOf: "2026-11-08", usdRateSource: "test-rate-provider" });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -259,8 +270,8 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "Frontend Engineer",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);
@@ -271,7 +282,6 @@ describe("POST /api/salary", () => {
     expect(json.data.role_title).toBe("Frontend Engineer");
   });
 
-  // role_title is trimmed before insert
   it("trims whitespace from role_title before insert", async () => {
     const insertedRow = {
       id: "r1",
@@ -296,19 +306,17 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "  Frontend Engineer  ",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    // The route trims role_title before insert
     expect(json.data.role_title).toBe("Frontend Engineer");
   });
 
-  // Malformed JSON body returns 400
   it("returns 400 for invalid JSON body", async () => {
     const { POST } = await import("../../app/api/salary/route");
     const req = new Request("http://localhost/api/salary", {
@@ -331,8 +339,8 @@ describe("POST /api/salary", () => {
       body: JSON.stringify({
         role_title: "Frontend Engineer",
         years_experience: 4,
+        amount: 35000,
         currency: "EGP",
-        salary_egp: 35000,
       }),
     });
     const res = await POST(req as unknown as NextRequest);

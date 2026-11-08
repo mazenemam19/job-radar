@@ -324,6 +324,7 @@ export interface TrackerEntry {
 // ── Salary ──────────────────────────────────────────────────
 
 export type SalaryCurrency = "EGP" | "USD" | "EUR" | "GBP";
+export type SalaryReportSource = "user" | "egytech" | string;
 export type EmploymentType = "full-time" | "part-time" | "contract" | "freelance";
 export type WorkArrangement = "onsite" | "remote" | "hybrid";
 export type Pipeline = "local" | "global";
@@ -336,6 +337,15 @@ export interface SalaryReport {
   salary_egp: number | null;
   salary_usd: number | null;
   currency: SalaryCurrency;
+  source: SalaryReportSource;
+  source_record_key: string | null;
+  original_amount: number | null;
+  original_currency: SalaryCurrency | null;
+  years_experience_exact: number | null;
+  usd_amount: number | null;
+  usd_conversion_rate: number | null;
+  usd_rate_as_of: string | null;
+  usd_rate_source: string | null;
   employment_type: EmploymentType | null;
   work_arrangement: WorkArrangement | null;
   pipeline: Pipeline | null;
@@ -347,12 +357,15 @@ export interface SalaryReport {
 export interface SalaryAggregate {
   role_title: string;
   years_experience: number;
-  currency: SalaryCurrency;
+  /** All display aggregates are normalized from an auditable USD snapshot. */
+  currency: "USD";
   min: number;
   max: number;
   median: number;
   count: number;
   pipeline: Pipeline | null;
+  earliest_reported_at: string;
+  latest_reported_at: string;
 }
 
 // ── ATS Submissions ─────────────────────────────────────────
