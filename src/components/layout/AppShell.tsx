@@ -46,9 +46,16 @@ export default function AppShell({ children, isAdmin, userEmail }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#08080f] font-sans text-slate-200">
-      {/* Sidebar */}
-      <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#1e1e30] bg-[#0d0d1a] py-6">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#08080f] font-sans text-slate-200 md:flex-row">
+      <MobileNavigation
+        isAdmin={isAdmin}
+        pathname={pathname}
+        userEmail={userEmail}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Desktop sidebar */}
+      <aside className="hidden w-[220px] shrink-0 flex-col border-r border-[#1e1e30] bg-[#0d0d1a] py-6 md:flex">
         {/* Logo */}
         <div className="mb-4 border-b border-[#1e1e30] px-5 pb-6">
           <div className="flex items-center gap-2 text-lg font-bold tracking-tight text-indigo-400">
@@ -97,8 +104,57 @@ export default function AppShell({ children, isAdmin, userEmail }: Props) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-auto">{children}</main>
     </div>
+  );
+}
+
+function MobileNavigation({
+  isAdmin,
+  pathname,
+  userEmail,
+  onSignOut,
+}: {
+  isAdmin?: boolean;
+  pathname: string | null;
+  userEmail?: string;
+  onSignOut: () => void;
+}) {
+  const navItems = isAdmin ? [...NAV, ...ADMIN_NAV] : NAV;
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-[#1e1e30] bg-[#0d0d1a]/95 backdrop-blur md:hidden">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-base font-bold tracking-tight text-indigo-400">
+          <Image src="/icon-192.png" alt="" width={20} height={20} className="h-5 w-5 shrink-0" />
+          <span>Job Radar</span>
+          {userEmail && (
+            <span className="truncate text-[11px] font-normal text-slate-500">{userEmail}</span>
+          )}
+        </div>
+        <button
+          onClick={onSignOut}
+          className="shrink-0 rounded-md border border-[#1e1e30] px-2.5 py-1.5 text-xs text-slate-400 cursor-pointer"
+        >
+          Sign out
+        </button>
+      </div>
+      <nav className="flex gap-1 overflow-x-auto px-2 pb-2" aria-label="Mobile navigation">
+        {navItems.map((item) => (
+          <MobileNavLink
+            key={item.href}
+            item={item}
+            active={
+              item.href === "/admin"
+                ? pathname === "/admin"
+                : item.href.startsWith("/admin/")
+                  ? Boolean(pathname?.startsWith(item.href))
+                  : pathname === item.href
+            }
+          />
+        ))}
+      </nav>
+    </header>
   );
 }
 
@@ -111,6 +167,20 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       }`}
     >
       <span className="text-base">{item.icon}</span>
+      {item.label}
+    </Link>
+  );
+}
+
+function MobileNavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs no-underline transition-colors ${
+        active ? "bg-indigo-500/15 font-semibold text-indigo-300" : "text-slate-400"
+      }`}
+    >
+      <span aria-hidden="true">{item.icon}</span>
       {item.label}
     </Link>
   );
