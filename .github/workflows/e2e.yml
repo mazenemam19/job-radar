@@ -10,10 +10,14 @@ on:
   # an open PR each time.
   workflow_dispatch:
 
-# Prevent concurrent runs on the same branch from stomping on each other.
+# Every run mutates the one dedicated Supabase test profile (including the
+# blocked-user security check). Queue all refs together so a PR run and the
+# post-merge main run cannot revoke each other's sessions mid-suite.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: job-radar-e2e-shared-test-profile
+  # Cancellation can interrupt cleanup after the blocked-user test and leave
+  # the shared account inactive. Let an in-flight run complete instead.
+  cancel-in-progress: false
 
 jobs:
   e2e:
