@@ -19,7 +19,7 @@ vi.mock("../gemini", () => ({
 import { filterJobsWithGemini } from "../gemini";
 const mockGemini = filterJobsWithGemini as ReturnType<typeof vi.fn>;
 
-import { buildFeed, enabledModes } from "../dashboard-route";
+import { buildFeed, enabledModes, shouldServeDashboardCache } from "../dashboard-route";
 
 // buildFeed just threads userId/db through to filterJobsWithGemini, which is
 // mocked above -- these never touch a real Supabase client in this file.
@@ -122,6 +122,20 @@ describe("enabledModes", () => {
     expect(enabledModes(makeSettings({ pipeline_local: false, pipeline_global: false }))).toEqual(
       [],
     );
+  });
+});
+
+describe("shouldServeDashboardCache", () => {
+  it("serves a fresh cache for an ordinary dashboard load", () => {
+    expect(shouldServeDashboardCache(true, false)).toBe(true);
+  });
+
+  it("bypasses a fresh cache for an explicit rebuild", () => {
+    expect(shouldServeDashboardCache(true, true)).toBe(false);
+  });
+
+  it("does not serve a stale cache", () => {
+    expect(shouldServeDashboardCache(false, false)).toBe(false);
   });
 });
 

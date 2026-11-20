@@ -16,6 +16,15 @@ export type FeedResult = {
   pipelineLog: PipelineLog;
 };
 
+/**
+ * A user-initiated rebuild must run the pipeline even when the last result is
+ * still fresh. Keeping this decision pure makes the route's cache contract
+ * explicit and regression-testable.
+ */
+export function shouldServeDashboardCache(cacheIsFresh: boolean, forceRebuild: boolean): boolean {
+  return cacheIsFresh && !forceRebuild;
+}
+
 function hasLocationToConfirm(settings: ResolvedSettings): boolean {
   return (settings.search_profile?.locations.length ?? 0) > 0;
 }
