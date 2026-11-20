@@ -152,9 +152,29 @@ test.describe("settings — save round-trip via real API", () => {
     await expect(saveButton).toBeVisible({ timeout: 8_000 });
   });
 
-  test("Gemini API key field accepts input and PATCH /api/settings returns 200", async ({
+  test("Gemini API key field submits its key without changing the shared test profile", async ({
     page,
   }) => {
+    const dummyKey = "AIzaSyE2ETestKeyOnlyDoNotPersist";
+    let submittedKey: unknown;
+
+    // Other E2E specs share one real Supabase profile. Intercept only this
+    // mutation: saving a dummy key would otherwise persist it for later
+    // dashboard tests and make the Gemini SDK reject its HTTP header.
+    await page.route("**/api/settings", async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.continue();
+        return;
+      }
+
+      submittedKey = route.request().postDataJSON().gemini_api_key;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
     await page.goto("/settings");
     await page.waitForLoadState("networkidle");
 
@@ -166,8 +186,6 @@ test.describe("settings — save round-trip via real API", () => {
 
     await expect(keyField).toBeVisible({ timeout: 8_000 });
 
-    // Fill with a dummy key that passes basic format validation
-    const dummyKey = "«redacted:AIza…»";
     await keyField.fill(dummyKey);
 
     const patchPromise = page.waitForResponse(
@@ -180,5 +198,6 @@ test.describe("settings — save round-trip via real API", () => {
     await saveButton.click();
     const patchResponse = await patchPromise;
     expect(patchResponse.status()).toBe(200);
+    expect(submittedKey).toBe(dummyKey);
   });
 });
